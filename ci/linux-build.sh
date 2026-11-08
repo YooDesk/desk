@@ -75,6 +75,7 @@ if [[ "$kind" == desk ]]; then
         cp "$VCPKG_ROOT/vcpkg" /opt/yoodesk-tools/bin/yoodesk-vcpkg
     fi
     "$VCPKG_ROOT/vcpkg" version --disable-metrics
+    touch /opt/yoodesk-tools/.ready
     pushd artifacts/rustdesk-engine-src
     "$VCPKG_ROOT/vcpkg" install --triplet "$triplet" --host-triplet "$triplet" --x-install-root="$VCPKG_INSTALLED_ROOT"
     popd

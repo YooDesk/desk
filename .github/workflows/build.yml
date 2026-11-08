@@ -64,7 +64,7 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: |
-            .ci-cache/
+            .ci-cache/vcpkg/
             target/
             desk-engine/target/
           key: native-desk-${{ matrix.platform }}-rust199-ubuntu18-v2-${{ hashFiles('**/Cargo.lock', 'engine-patches/**', 'scripts/*.py', 'ci/linux-build.sh') }}
@@ -151,7 +151,7 @@ jobs:
           path: dist/
           if-no-files-found: error
       - name: Preserve successfully installed build tools even if native compilation fails
-        if: always() && runner.os == 'Linux' && steps.linux-tools.outputs.cache-hit != 'true'
+        if: always() && runner.os == 'Linux' && steps.linux-tools.outputs.cache-hit != 'true' && hashFiles('.ci-cache/tools/.ready') != ''
         uses: actions/cache/save@v4
         with:
           path: .ci-cache/tools/
