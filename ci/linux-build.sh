@@ -33,6 +33,8 @@ git config --global --add safe.directory /workspace
 git config --global --add safe.directory /workspace/desk-engine/target/drmtap/source
 export CARGO_BUILD_TARGET="$target"
 if [[ "$kind" == desk ]]; then
+    # A restored marker covers the old tool key; regenerate it only after all tools validate.
+    rm -f /opt/yoodesk-tools/.ready
     # System dependency list and LLVM/vcpkg pins come from RustDesk's flutter-build.yml.
     apt-get install -y --no-install-recommends clang-10 libclang-10-dev llvm-10-dev libasound2-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev libgtk-3-dev libpulse-dev libva-dev libxcb-randr0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxcb-shm0-dev libxdo-dev libxfixes-dev libxrandr-dev libxtst-dev libxkbcommon-dev libudev-dev libdbus-1-dev libegl1-mesa-dev libgles2-mesa-dev libgbm-dev libdrm-dev
     export LIBCLANG_PATH=/usr/lib/llvm-10/lib
@@ -59,13 +61,15 @@ if [[ "$kind" == desk ]]; then
     fi
     if [[ "$platform" == linux-x64 && ! -x /opt/yoodesk-tools/bin/nasm ]]; then
         # CMake's NASM include flags require the modern directory handling used by vcpkg.
-        curl -fL --retry 3 https://www.nasm.us/pub/nasm/releasebuilds/3.01/nasm-3.01.tar.xz -o /tmp/nasm.tar.xz
+        curl -fL --retry 3 https://www.nasm.us/pub/nasm/releasebuilds/3.01/nasm-3.01.tar.xz -o /tmp/nasm.tar.xz || \
+            curl -fL --retry 3 https://www.nasm.dev/pub/nasm/releasebuilds/3.01/nasm-3.01.tar.xz -o /tmp/nasm.tar.xz
         tar -xf /tmp/nasm.tar.xz -C /tmp
         pushd /tmp/nasm-3.01
         ./configure --prefix=/opt/yoodesk-tools --disable-doc
         make -j3
         make install
         popd
+        nasm -v
     fi
     python3.13 scripts/prepare_sources.py
     python3.13 scripts/prepare_linux_native.py
