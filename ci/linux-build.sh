@@ -6,7 +6,7 @@ target="$3"
 triplet="$4"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
-apt-get install -y --no-install-recommends build-essential gcc-8 g++-8 ca-certificates curl git unzip zip xz-utils pkg-config libssl-dev zlib1g-dev libffi-dev libbz2-dev liblzma-dev libreadline-dev libsqlite3-dev autoconf automake libtool ninja-build nasm
+apt-get install -y --no-install-recommends build-essential gcc-8 g++-8 ca-certificates curl git unzip zip xz-utils pkg-config libssl-dev zlib1g-dev libffi-dev libbz2-dev liblzma-dev libreadline-dev libsqlite3-dev autoconf automake libtool ninja-build nasm musl
 export CC=gcc-8 CXX=g++-8
 export VCPKG_MAX_CONCURRENCY=3 CARGO_BUILD_JOBS=3
 # Never acquire host executables built against a newer glibc.
@@ -67,7 +67,7 @@ if [[ "$kind" == desk ]]; then
         git -C "$VCPKG_ROOT" fetch --depth 1 origin 9e593bb18ea69cc5095e012465dcd675a822ed0d
         git -C "$VCPKG_ROOT" checkout --detach FETCH_HEAD
     fi
-    # The x64 musl tool runs on glibc 2.27. On arm64 this builds the C++17 tool from source.
+    # The x64 tool uses the Ubuntu 18 musl loader; ARM64 builds the C++17 tool from source.
     # Both target dependency builds still use the Ubuntu 18.04 glibc compiler/sysroot.
     python3.13 scripts/prepare_vcpkg_tool.py
     if [[ -x /opt/yoodesk-tools/bin/yoodesk-vcpkg ]]; then
