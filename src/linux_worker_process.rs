@@ -359,6 +359,28 @@ fn cleanup(namespace: &str, uid: u32) -> io::Result<()> {
     }
     Ok(())
 }
+// Worker records belong to this plugin; validate/create their root-owned directory locally.
+fn trusted_worker_directory(path: &Path, mode: u32) -> io::Result<()> {
+    use std::os::unix::fs::PermissionsExt;
+    let mut current = PathBuf::from("/");
+    for component in path.components().skip(1) {
+        current.push(component);
+        match std::fs::create_dir(&current) {
+            Ok(()) => std::fs::set_permissions(&current, std::fs::Permissions::from_mode(mode))?,
+            Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {}
+            Err(error) => return Err(error),
+        }
+        let metadata = current.symlink_metadata()?;
+        if !metadata.is_dir() || metadata.uid() != 0 || metadata.mode() & 0o022 != 0 {
+            return Err(io::Error::other(format!(
+                "untrusted native worker directory: {}",
+                current.display()
+            )));
+        }
+    }
+    Ok(())
+}
+
 pub(super) fn records() -> io::Result<PathBuf> {
     let name = std::env::var("YOODESK_NATIVE_SERVICE_NAME").map_err(io::Error::other)?;
     if name.is_empty()
@@ -372,8 +394,7 @@ pub(super) fn records() -> io::Result<PathBuf> {
     let directory = Path::new("/run")
         .join(format!("{}-native-workers", env!("PRODUCT_ID")))
         .join(name);
-    super::super::linux_service::trusted_directory(&directory, 0o700)
-        .map_err(|e| io::Error::other(e.to_string()))?;
+    trusted_worker_directory(&directory, 0o700)?;
     Ok(directory)
 }
 // 只消费本服务 root0700 目录的记录；任一记录 PID 仍存在时保守跳过，避免重用误清。
