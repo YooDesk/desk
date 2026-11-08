@@ -82,7 +82,8 @@ if [[ "$kind" == desk ]]; then
     "$VCPKG_ROOT/vcpkg" install --triplet "$triplet" --host-triplet "$triplet" --x-install-root="$VCPKG_INSTALLED_ROOT"
     popd
     export PKG_CONFIG_PATH="$VCPKG_INSTALLED_ROOT/$triplet/lib/pkgconfig:$VCPKG_INSTALLED_ROOT/$triplet/share/pkgconfig"
-    export SODIUM_LIB_DIR="$VCPKG_INSTALLED_ROOT/$triplet/lib" SODIUM_STATIC=1
+    export SODIUM_LIB_DIR="$VCPKG_INSTALLED_ROOT/$triplet/lib"
+    unset SODIUM_STATIC SODIUM_SHARED
     export YOODESK_STATIC_CODEC_DIR="$VCPKG_INSTALLED_ROOT/$triplet/lib"
     export YOODESK_STATIC_FFMPEG_DIR="$VCPKG_INSTALLED_ROOT/$triplet/lib"
     # libyuv's vcpkg port does not ship a pkg-config descriptor.

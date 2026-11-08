@@ -136,7 +136,6 @@ jobs:
           $env:VCPKG_DEFAULT_HOST_TRIPLET='${{ matrix.triplet }}'
           if ($env:CARGO_BUILD_TARGET -eq 'aarch64-pc-windows-msvc') {
             $env:SODIUM_LIB_DIR="$env:VCPKG_ROOT/installed/${{ matrix.triplet }}/lib"
-            $env:SODIUM_STATIC='1'
           }
           python scripts/build_engine.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
