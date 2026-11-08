@@ -33,11 +33,22 @@ if [[ "$kind" == desk ]]; then
     apt-get install -y --no-install-recommends clang-10 libclang-10-dev llvm-10-dev libasound2-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev libgtk-3-dev libpulse-dev libva-dev libxcb-randr0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxcb-shm0-dev libxdo-dev libxfixes-dev libxrandr-dev libxtst-dev libxkbcommon-dev libudev-dev libdbus-1-dev libegl1-mesa-dev libgles2-mesa-dev libgbm-dev libdrm-dev
     export LIBCLANG_PATH=/usr/lib/llvm-10/lib
     python3.13 -m pip install 'meson==1.9.0'
+    # CMake 4.3's bundled curl requires OpenSSL 3; Ubuntu 18.04 provides OpenSSL 1.1.
+    # Build this tooling dependency against the same old glibc instead of changing the build image.
+    if [[ ! -f /opt/yoodesk-tools/openssl/lib/libssl.a ]]; then
+        curl -fL --retry 3 https://github.com/openssl/openssl/releases/download/openssl-3.5.4/openssl-3.5.4.tar.gz -o /tmp/openssl.tar.gz
+        tar -xf /tmp/openssl.tar.gz -C /tmp
+        pushd /tmp/openssl-3.5.4
+        ./Configure no-shared no-tests --prefix=/opt/yoodesk-tools/openssl --libdir=lib
+        make -j3
+        make install_sw
+        popd
+    fi
     if [[ ! -x /opt/yoodesk-tools/bin/cmake ]]; then
         curl -fL --retry 3 https://github.com/Kitware/CMake/releases/download/v4.3.0/cmake-4.3.0.tar.gz -o /tmp/cmake.tar.gz
         tar -xf /tmp/cmake.tar.gz -C /tmp
         pushd /tmp/cmake-4.3.0
-        ./bootstrap --prefix=/opt/yoodesk-tools --parallel=3 -- -DCMAKE_USE_OPENSSL=ON
+        ./bootstrap --prefix=/opt/yoodesk-tools --parallel=3 -- -DCMAKE_USE_OPENSSL=ON -DOPENSSL_ROOT_DIR=/opt/yoodesk-tools/openssl -DOPENSSL_USE_STATIC_LIBS=TRUE
         make -j3
         make install
         popd

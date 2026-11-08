@@ -6,6 +6,10 @@
 #[path = "scripts/brand_build.rs"]
 mod brand_build;
 fn main() {
+    if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("linux") {
+        println!("cargo:rustc-cdylib-link-arg=-Wl,--exclude-libs,ALL");
+    }
+
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
     brand_build::configure(root);
     let proto_dir = root.join("protocol/rustdesk");
