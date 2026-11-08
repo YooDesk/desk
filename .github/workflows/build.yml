@@ -82,7 +82,7 @@ jobs:
             .ci-cache/vcpkg/
             target/
             desk-engine/target/
-          key: native-desk-${{ matrix.platform }}-rust199-ubuntu18-v2-${{ hashFiles('**/Cargo.lock', 'engine-patches/**', 'scripts/*.py', 'ci/linux-build.sh', 'ci/*.py') }}-${{ github.run_id }}
+          key: native-desk-${{ matrix.platform }}-rust199-ubuntu18-v2-${{ hashFiles('**/Cargo.lock', 'engine-patches/**', 'scripts/*.py', 'ci/linux-build.sh', 'ci/*.py', 'ci/triplets/**') }}-${{ github.run_id }}
           restore-keys: native-desk-${{ matrix.platform }}-rust199-ubuntu18-v2-
       - uses: actions/setup-python@v5
         if: runner.os == 'Windows'

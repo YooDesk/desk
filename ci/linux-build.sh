@@ -106,7 +106,7 @@ if [[ "$kind" == desk ]]; then
         python3.13 /workspace/ci/patch_clang10_neon.py
     fi
     pushd artifacts/rustdesk-engine-src
-    if ! "$VCPKG_ROOT/vcpkg" install --triplet "$triplet" --host-triplet "$triplet" --x-install-root="$VCPKG_INSTALLED_ROOT"; then
+    if ! "$VCPKG_ROOT/vcpkg" install --triplet "$triplet" --host-triplet "$triplet" --overlay-triplets=/workspace/ci/triplets --x-install-root="$VCPKG_INSTALLED_ROOT"; then
         python3.13 /workspace/ci/native_failure.py "$VCPKG_ROOT/buildtrees"
         exit 1
     fi
