@@ -64,8 +64,12 @@ if [[ "$kind" == desk ]]; then
     if [[ ! -d "$VCPKG_ROOT/.git" ]]; then
         git init "$VCPKG_ROOT"
         git -C "$VCPKG_ROOT" remote add origin https://github.com/microsoft/vcpkg.git
-        git -C "$VCPKG_ROOT" fetch --depth 1 origin 9e593bb18ea69cc5095e012465dcd675a822ed0d
+        git -C "$VCPKG_ROOT" fetch origin 9e593bb18ea69cc5095e012465dcd675a822ed0d
         git -C "$VCPKG_ROOT" checkout --detach FETCH_HEAD
+    fi
+    # Versioned manifest ports refer to historical git trees, beyond the pinned HEAD tree.
+    if [[ "$(git -C "$VCPKG_ROOT" rev-parse --is-shallow-repository)" == true ]]; then
+        git -C "$VCPKG_ROOT" fetch --unshallow origin 9e593bb18ea69cc5095e012465dcd675a822ed0d
     fi
     # The x64 tool uses the Ubuntu 18 musl loader; ARM64 builds the C++17 tool from source.
     # Both target dependency builds still use the Ubuntu 18.04 glibc compiler/sysroot.
