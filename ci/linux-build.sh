@@ -9,6 +9,8 @@ apt-get update
 apt-get install -y --no-install-recommends build-essential gcc-8 g++-8 ca-certificates curl git unzip zip xz-utils pkg-config libssl-dev zlib1g-dev libffi-dev libbz2-dev liblzma-dev libreadline-dev libsqlite3-dev autoconf automake libtool ninja-build nasm
 export CC=gcc-8 CXX=g++-8
 export VCPKG_MAX_CONCURRENCY=3 CARGO_BUILD_JOBS=3
+# Never acquire host executables built against a newer glibc.
+export VCPKG_FORCE_SYSTEM_BINARIES=1
 mkdir -p /opt/yoodesk-tools
 if [[ ! -x /opt/yoodesk-tools/bin/python3.13 ]]; then
     curl -fL --retry 3 https://www.python.org/ftp/python/3.13.5/Python-3.13.5.tgz -o /tmp/python.tgz
@@ -33,7 +35,7 @@ if [[ "$kind" == desk ]]; then
     apt-get install -y --no-install-recommends clang-10 libclang-10-dev llvm-10-dev libasound2-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev libgtk-3-dev libpulse-dev libva-dev libxcb-randr0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxcb-shm0-dev libxdo-dev libxfixes-dev libxrandr-dev libxtst-dev libxkbcommon-dev libudev-dev libdbus-1-dev libegl1-mesa-dev libgles2-mesa-dev libgbm-dev libdrm-dev
     export LIBCLANG_PATH=/usr/lib/llvm-10/lib
     python3.13 -m pip install 'meson==1.9.0'
-    # CMake 4.3's bundled curl requires OpenSSL 3; Ubuntu 18.04 provides OpenSSL 1.1.
+    # The pinned vcpkg requires CMake 4.4, whose bundled curl requires OpenSSL 3; Ubuntu 18.04 provides OpenSSL 1.1.
     # Build this tooling dependency against the same old glibc instead of changing the build image.
     if [[ ! -f /opt/yoodesk-tools/openssl/lib/libssl.a ]]; then
         curl -fL --retry 3 https://github.com/openssl/openssl/releases/download/openssl-3.5.4/openssl-3.5.4.tar.gz -o /tmp/openssl.tar.gz
@@ -44,10 +46,10 @@ if [[ "$kind" == desk ]]; then
         make install_sw
         popd
     fi
-    if [[ ! -x /opt/yoodesk-tools/bin/cmake ]]; then
-        curl -fL --retry 3 https://github.com/Kitware/CMake/releases/download/v4.3.0/cmake-4.3.0.tar.gz -o /tmp/cmake.tar.gz
+    if [[ ! -x /opt/yoodesk-tools/bin/cmake ]] || [[ "$(cmake --version | head -n1)" != "cmake version 4.4.0" ]]; then
+        curl -fL --retry 3 https://github.com/Kitware/CMake/releases/download/v4.4.0/cmake-4.4.0.tar.gz -o /tmp/cmake.tar.gz
         tar -xf /tmp/cmake.tar.gz -C /tmp
-        pushd /tmp/cmake-4.3.0
+        pushd /tmp/cmake-4.4.0
         ./bootstrap --prefix=/opt/yoodesk-tools --parallel=3 -- -DCMAKE_USE_OPENSSL=ON -DOPENSSL_ROOT_DIR=/opt/yoodesk-tools/openssl -DOPENSSL_USE_STATIC_LIBS=TRUE
         make -j3
         make install
@@ -75,7 +77,7 @@ if [[ "$kind" == desk ]]; then
         cp "$VCPKG_ROOT/vcpkg" /opt/yoodesk-tools/bin/yoodesk-vcpkg
     fi
     "$VCPKG_ROOT/vcpkg" version --disable-metrics
-    touch /opt/yoodesk-tools/.ready
+    printf "%s\n" "cmake-4.4.0 rust-1.99.0 vcpkg-9e593 libdl" > /opt/yoodesk-tools/.ready
     pushd artifacts/rustdesk-engine-src
     "$VCPKG_ROOT/vcpkg" install --triplet "$triplet" --host-triplet "$triplet" --x-install-root="$VCPKG_INSTALLED_ROOT"
     popd

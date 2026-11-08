@@ -4,19 +4,35 @@ on:
     branches: [main]
     tags: ['v*']
   workflow_dispatch:
+    inputs:
+      platform:
+        description: Build one platform for diagnosis, or all platforms for release
+        type: choice
+        default: all
+        options: [all, windows-x64, windows-arm64, linux-x64, linux-arm64]
 
 permissions:
   contents: read
 concurrency:
-  group: build-${{ github.ref }}
+  group: build-${{ github.ref }}-${{ inputs.platform || 'all' }}
   cancel-in-progress: true
 env:
   RUST_VERSION: '1.99.0'
   LLVM_VERSION: '15.0.6'
   VCPKG_COMMIT_ID: '9e593bb18ea69cc5095e012465dcd675a822ed0d'
-  VCPKG_CMAKE_VERSION: '4.3.0'
+  VCPKG_CMAKE_VERSION: '4.4.0'
   PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
 jobs:
+  targets:
+    runs-on: ubuntu-24.04-arm
+    outputs:
+      matrix: ${{ steps.select.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: select
+        env:
+          PLATFORM: ${{ inputs.platform || 'all' }}
+        run: python ci/build_matrix.py >> "$GITHUB_OUTPUT"
 
   browser:
     runs-on: ubuntu-24.04-arm
@@ -37,17 +53,12 @@ jobs:
           path: browser/
           if-no-files-found: error
   native:
-    needs: [browser]
+    needs: [browser, targets]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 360
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - {platform: windows-x64, os: windows-2022, target: x86_64-pc-windows-msvc, triplet: x64-windows-static, msvc: x64}
-          - {platform: windows-arm64, os: windows-11-arm, target: aarch64-pc-windows-msvc, triplet: arm64-windows-static, msvc: x64_arm64}
-          - {platform: linux-x64, os: ubuntu-22.04, target: x86_64-unknown-linux-gnu, triplet: x64-linux}
-          - {platform: linux-arm64, os: ubuntu-22.04-arm, target: aarch64-unknown-linux-gnu, triplet: arm64-linux}
+      matrix: ${{ fromJSON(needs.targets.outputs.matrix) }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
@@ -55,12 +66,12 @@ jobs:
           name: browser
           path: browser/
 
-      - uses: actions/cache@v4
+      - uses: actions/cache/restore@v4
         if: runner.os == 'Linux'
         id: linux-tools
         with:
           path: .ci-cache/tools/
-          key: ubuntu18-desk-tools-${{ matrix.platform }}-rust199-python3135-openssl354-cmake430-vcpkg9e593-dl-v1
+          key: ubuntu18-desk-tools-${{ matrix.platform }}-rust199-python3135-openssl354-cmake440-vcpkg9e593-dl-v2
       - uses: actions/cache@v4
         with:
           path: |
@@ -96,7 +107,7 @@ jobs:
         run: python scripts/prepare_sources.py
       - name: Install CMake required by the RustDesk vcpkg scripts
         if: runner.os == 'Windows'
-        run: python -m pip install 'cmake==4.3.0'
+        run: python -m pip install 'cmake==4.4.0'
       - name: Setup vcpkg with GitHub Actions binary cache
         if: runner.os == 'Windows'
         uses: lukka/run-vcpkg@b1a0dd252f06b9e25b3c022a9a03bd7a427fb6a2
@@ -156,9 +167,9 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: .ci-cache/tools/
-          key: ubuntu18-desk-tools-${{ matrix.platform }}-rust199-python3135-openssl354-cmake430-vcpkg9e593-dl-v1
+          key: ubuntu18-desk-tools-${{ matrix.platform }}-rust199-python3135-openssl354-cmake440-vcpkg9e593-dl-v2
   release:
-    if: github.event_name != 'pull_request'
+    if: github.event_name != 'pull_request' && (github.event_name != 'workflow_dispatch' || inputs.platform == 'all')
     needs: native
     runs-on: ubuntu-24.04-arm
     permissions:
