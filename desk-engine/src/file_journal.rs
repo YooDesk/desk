@@ -94,7 +94,8 @@ fn remove_temporary(path: &Path, dev: u64, ino: u64) -> io::Result<()> {
         let from = std::ffi::CString::new(from.as_os_str().as_bytes()).map_err(io::Error::other)?;
         let to = std::ffi::CString::new(to.as_os_str().as_bytes()).map_err(io::Error::other)?;
         if unsafe {
-            hbb_common::libc::renameat2(
+            hbb_common::libc::syscall(
+                hbb_common::libc::SYS_renameat2,
                 hbb_common::libc::AT_FDCWD,
                 from.as_ptr(),
                 hbb_common::libc::AT_FDCWD,

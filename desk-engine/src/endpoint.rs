@@ -640,13 +640,21 @@ fn rename_new(from: &std::path::Path, to: &std::path::Path) -> Result<(), Fault>
     #[cfg(target_os = "linux")]
     {
         use std::{ffi::CString, os::unix::ffi::OsStrExt};
-        extern "C" {
-            fn renameat2(oldfd: i32, old: *const i8, newfd: i32, new: *const i8, flags: u32)
-                -> i32;
-        }
+        use hbb_common::libc::{syscall, AT_FDCWD, RENAME_NOREPLACE, SYS_renameat2};
         let from = CString::new(from.as_os_str().as_bytes()).map_err(invalid)?;
         let to = CString::new(to.as_os_str().as_bytes()).map_err(invalid)?;
-        if unsafe { renameat2(-100, from.as_ptr(), -100, to.as_ptr(), 1) } != 0 {
+        // The kernel supports this on Ubuntu 18; its libc does not export renameat2 yet.
+        if unsafe {
+            syscall(
+                SYS_renameat2,
+                AT_FDCWD,
+                from.as_ptr(),
+                AT_FDCWD,
+                to.as_ptr(),
+                RENAME_NOREPLACE,
+            )
+        } != 0
+        {
             return Err(file_error(std::io::Error::last_os_error()));
         }
         Ok(())
