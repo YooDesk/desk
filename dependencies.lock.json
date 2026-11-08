@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "repositories": [
+    {
+      "name": "rustdesk",
+      "url": "https://github.com/rustdesk/rustdesk.git",
+      "commit": "e1ca09766cc97eaaba5e350114431189b109be7d",
+      "role": "endpoint-only; no upstream UI/server",
+      "revision": "1.5.1"
+    },
+    {
+      "name": "yamux-rs",
+      "url": "https://github.com/libp2p/rust-yamux.git",
+      "commit": "6610cff7b3fe81aeb4fda9fa96d7ac4b3b2dbaf8",
+      "role": "Rust stream multiplexing",
+      "revision": "v0.14.1"
+    },
+    {
+      "name": "yamux-go",
+      "url": "https://github.com/hashicorp/yamux.git",
+      "commit": "17017e907efcfb40ef55c8e52ca6149d676375c7",
+      "role": "Go stream multiplexing",
+      "revision": "v0.1.2"
+    },
+    {
+      "name": "ironrdp",
+      "url": "https://github.com/Devolutions/IronRDP.git",
+      "commit": "11a0810cfbbabd8b8023875a05e3041216d4b01b",
+      "role": "RDP protocol and Web client",
+      "revision": "ironrdp-v0.17.0"
+    },
+    {
+      "name": "rtc",
+      "url": "https://github.com/webrtc-rs/rtc.git",
+      "revision": "v0.21.1",
+      "role": "patched WebRTC protocol implementation",
+      "commit": "2a732df55ca4bcf26b80914fa0f570cfaf74cfcb"
+    },
+    {
+      "name": "hwcodec",
+      "url": "https://github.com/rustdesk-org/hwcodec",
+      "revision": "778df1f99597722473b29443bac22ae6c23946fe",
+      "role": "patched desk video encoder",
+      "commit": "778df1f99597722473b29443bac22ae6c23946fe"
+    }
+  ]
+}

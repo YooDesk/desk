@@ -24,7 +24,7 @@ def copy_changed(source, destination):
 
 def prepare():
     source = ROOT / "deps/hwcodec"
-    lock = json.loads((ROOT / "deps/lock.json").read_text(encoding="utf-8"))
+    lock = json.loads((ROOT / "dependencies.lock.json").read_text(encoding="utf-8"))
     commit = next(entry["commit"] for entry in lock["repositories"] if entry["name"] == "hwcodec")
     revision = git(source, "rev-parse", "HEAD", capture_output=True, text=True).stdout.strip()
     if revision != commit:

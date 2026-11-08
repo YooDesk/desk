@@ -13,7 +13,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("source", type=Path)
     tree = parser.parse_args().source.resolve(strict=True)
-    entries = json.loads((ROOT / "deps/lock.json").read_text(encoding="utf-8"))["repositories"]
+    entries = json.loads((ROOT / "dependencies.lock.json").read_text(encoding="utf-8"))["repositories"]
     locked = next(entry["commit"] for entry in entries if entry["name"] == "rustdesk")
     git = ["git", "-C", str(tree)]
     if subprocess.check_output(git + ["rev-parse", "HEAD"], text=True).strip() != locked:

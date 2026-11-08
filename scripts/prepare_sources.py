@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def checkout(name, target, modules=()):
-    entries = json.loads((ROOT / "deps/lock.json").read_text(encoding="utf-8"))["repositories"]
+    entries = json.loads((ROOT / "dependencies.lock.json").read_text(encoding="utf-8"))["repositories"]
     entry = next(item for item in entries if item["name"] == name)
     target = target.resolve()
     if not target.is_relative_to(ROOT):
