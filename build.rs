@@ -111,6 +111,7 @@ fn link_engine() {
                 "gstreamer-app-1.0",
                 "gstreamer-video-1.0",
                 "gio-2.0",
+                "gtk+-3.0",
                 "libudev",
                 "libyuv",
                 "aom",
