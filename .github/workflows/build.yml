@@ -171,6 +171,15 @@ jobs:
           name: native-${{ matrix.platform }}
           path: dist/
           if-no-files-found: error
+      - name: Return container build cache ownership to the runner
+        if: always() && runner.os == 'Linux'
+        shell: bash
+        run: |
+          for cache in .ci-cache/tools .ci-cache/vcpkg target desk-engine/target; do
+            if [[ -e "$cache" ]]; then
+              sudo chown -R "$(id -u):$(id -g)" "$cache"
+            fi
+          done
       - name: Detect reusable native build data
         if: always()
         id: native-data
