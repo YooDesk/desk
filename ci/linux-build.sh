@@ -82,6 +82,12 @@ if [[ "$kind" == desk ]]; then
     fi
     "$VCPKG_ROOT/vcpkg" version --disable-metrics
     printf "%s\n" "cmake-4.4.0 rust-1.99.0 vcpkg-9e593 libdl" > /opt/yoodesk-tools/.ready
+    # LLVM 10 includes the ARM64 NEON store intrinsics absent from Ubuntu's GCC 8.
+    # Keep the Ubuntu 18 system headers, libstdc++ and glibc baseline.
+    if [[ "$platform" == linux-arm64 ]]; then
+        export CC=clang-10 CXX=clang++-10
+        export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=clang-10
+    fi
     pushd artifacts/rustdesk-engine-src
     if ! "$VCPKG_ROOT/vcpkg" install --triplet "$triplet" --host-triplet "$triplet" --x-install-root="$VCPKG_INSTALLED_ROOT"; then
         python3.13 /workspace/ci/native_failure.py "$VCPKG_ROOT/buildtrees"
