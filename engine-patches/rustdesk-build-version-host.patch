@@ -1,0 +1,31 @@
+diff --git a/Cargo.toml b/Cargo.toml
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -274,7 +274,7 @@
+ 
+ [build-dependencies]
+ cc = "1.0"
+-hbb_common = { path = "libs/hbb_common" }
++chrono = "0.4"
+ os-version = "0.2"
+ 
+ [dev-dependencies]
+diff --git a/build.rs b/build.rs
+--- a/build.rs
++++ b/build.rs
+@@ -94,7 +94,14 @@
+ }
+ 
+ fn main() {
+-    hbb_common::gen_version();
++    println!("cargo:rerun-if-changed=Cargo.toml");
++    let version = env!("CARGO_PKG_VERSION");
++    let date = chrono::Local::now().format("%Y-%m-%d %H:%M");
++    std::fs::write(
++        "src/version.rs",
++        format!("pub const VERSION: &str = {version:?};\n#[allow(dead_code)]\npub const BUILD_DATE: &str = \"{date}\";\n"),
++    )
++    .expect("write RustDesk version metadata");
+     install_android_deps();
+     #[cfg(all(windows, feature = "inline"))]
+     build_manifest();

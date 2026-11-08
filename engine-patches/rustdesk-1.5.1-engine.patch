@@ -1,0 +1,627 @@
+diff --git a/Cargo.toml b/Cargo.toml
+index 100258694..70eec17b6 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -26,7 +26,12 @@ use_samplerate = ["samplerate", "libsamplerate-sys"]
+ use_rubato = ["rubato"]
+ use_dasp = ["dasp"]
+ flutter = ["flutter_rust_bridge"]
+-default = ["use_dasp"]
++default = ["use_dasp", "gui"]
++# GUI 依赖（tray / whiteboard）只在 GUI 构建中出现。
++gui = ["dep:tray-icon", "dep:tao"]
++# 不编译任何 GUI（Sciter/tao/tray）；供嵌入本库的 headless 产品使用。
++headless = []
++
+ hwcodec = ["scrap/hwcodec"]
+ vram = ["scrap/vram"]
+ mediacodec = ["scrap/mediacodec"]
+@@ -169,10 +174,12 @@ piet-coregraphics = "0.6"
+ foreign-types = "0.3"
+ 
+ [target.'cfg(any(target_os = "macos", target_os = "linux", target_os = "windows"))'.dependencies]
+-tray-icon = { git = "https://github.com/tauri-apps/tray-icon", version = "0.21.3" }
+-tao = { git = "https://github.com/rustdesk-org/tao", branch = "dev" }
++# 仅 GUI 构建需要（tray / whiteboard）；headless 构建不引入窗口系统。
++tray-icon = { git = "https://github.com/tauri-apps/tray-icon", version = "0.21.3", optional = true }
++tao = { git = "https://github.com/rustdesk-org/tao", branch = "dev", optional = true }
+ image = "0.24"
+ 
++
+ [target.'cfg(any(target_os = "macos", target_os = "linux"))'.dependencies]
+ keepawake = { git = "https://github.com/rustdesk-org/keepawake-rs" }
+ 
+@@ -292,3 +299,12 @@ rpath = true
+ 
+ [profile.dev]
+ debug = 1
++
++# sciter-rs turns sciter's bit-flag values into enums with `transmute` (e.g.
++# SW_MAIN|SW_RESIZEABLE = 0x84, which has no declared variant). rustc inserts a
++# debug-only enum validity check on such transmutes and aborts:
++#   "trying to construct an enum from an invalid value 0x84"
++# Upstream pins Rust 1.75 for the Sciter build; on a current toolchain the check
++# has to be off for this crate. Release builds already default it off.
++[profile.dev.package.sciter-rs]
++debug-assertions = false
+diff --git a/build.rs b/build.rs
+--- a/build.rs
++++ b/build.rs
+@@ -9,6 +9,9 @@ fn build_windows() {
+     }
+     build.file(file).file(file2).compile("windows");
+     println!("cargo:rustc-link-lib=WtsApi32");
++    // hwcodec's Media Foundation encoder path references the MF GUIDs directly.
++    println!("cargo:rustc-link-lib=mfuuid");
++    println!("cargo:rustc-link-lib=strmiids");
+     println!("cargo:rerun-if-changed={}", file);
+     println!("cargo:rerun-if-changed={}", file2);
+ }
+diff --git a/libs/scrap/src/common/hwcodec.rs b/libs/scrap/src/common/hwcodec.rs
+index 9cf3367ba..82f8868a8 100644
+--- a/libs/scrap/src/common/hwcodec.rs
++++ b/libs/scrap/src/common/hwcodec.rs
+@@ -57,6 +57,24 @@ pub struct HwRamEncoder {
+     config: HwRamEncoderConfig,
+ }
+ 
++/// ffmpeg registers the software H.264/H.265 encoders under `libx264`/`libx265`, which
++/// hwcodec's substring matcher does not recognise. Map those names to the format that
++/// hwcodec derives from `mc_name` or from the suffix of `name`.
++fn format_from_mc_name(config: &HwRamEncoderConfig) -> String {
++    if let Some(mc) = config.mc_name.as_ref() {
++        if !mc.is_empty() {
++            return mc.clone();
++        }
++    }
++    if config.name.contains("264") {
++        return "h264".to_owned();
++    }
++    if config.name.contains("265") || config.name.contains("hevc") {
++        return "hevc".to_owned();
++    }
++    config.name.clone()
++}
++
+ impl EncoderApi for HwRamEncoder {
+     fn new(cfg: EncoderCfg, _i444: bool) -> ResultType<Self>
+     where
+@@ -84,7 +102,12 @@ impl EncoderApi for HwRamEncoder {
+                     q: -1,
+                     thread_count: codec_thread_num(16) as _, // ffmpeg's thread_count is used for cpu
+                 };
+-                let format = match Encoder::format_from_name(config.name.clone()) {
++                // `name` is what ffmpeg opens, so it can be `libx264`. Fall back to the
++                // media-codec name for the format when the primary name is not one of
++                // hwcodec's own prefixes.
++                let format = match Encoder::format_from_name(config.name.clone())
++                    .or_else(|_| Encoder::format_from_name(format_from_mc_name(&config)))
++                {
+                     Ok(format) => format,
+                     Err(_) => {
+                         return Err(anyhow!(format!(
+@@ -200,8 +223,18 @@ impl EncoderApi for HwRamEncoder {
+             .all(|&x| !self.config.name.contains(x))
+     }
+ 
++    /// Whether this encoder is hardware-backed.
++    ///
++    /// ffmpeg's software encoders (libx264/libx265) live in the same HwRamEncoder type,
++    /// so the answer has to come from the registered config: a software codec needs a
++    /// few frames before it emits anything, and treating that as a hardware failure
++    /// makes the video service drop H.264 and fall back to VP9 on the first frame.
+     fn is_hardware(&self) -> bool {
+-        true
++        self.config.name.contains("nvenc")
++            || self.config.name.contains("qsv")
++            || self.config.name.contains("amf")
++            || self.config.name.contains("vaapi")
++            || self.config.name.contains("videotoolbox")
+     }
+ 
+     fn disable(&self) {
+diff --git a/libs/scrap/src/lib.rs b/libs/scrap/src/lib.rs
+index 77070d1a2..23696b358 100644
+--- a/libs/scrap/src/lib.rs
++++ b/libs/scrap/src/lib.rs
+@@ -7,6 +7,11 @@ pub use hbb_common::libc;
+ extern crate winapi;
+ 
+ pub use common::*;
++// Allow hosts that embed this crate (rather than the RustDesk UI) to drive codec
++// selection: the module is public, but `pub use common::*` only re-exports items.
++pub use common::hwcodec;
++#[cfg(feature = "hwcodec")]
++pub use ::hwcodec as raw_hwcodec;
+ 
+ #[cfg(quartz)]
+ pub mod quartz;
+diff --git a/src/keyboard.rs b/src/keyboard.rs
+index ca813166b..81714488b 100644
+--- a/src/keyboard.rs
++++ b/src/keyboard.rs
+@@ -2,11 +2,25 @@
+ use crate::flutter;
+ #[cfg(target_os = "windows")]
+ use crate::platform::windows::{get_char_from_vk, get_unicode_from_vk};
+-#[cfg(not(feature = "flutter"))]
++#[cfg(all(not(feature = "flutter"), not(feature = "headless")))]
+ use crate::ui::CUR_SESSION;
++#[cfg(not(feature = "headless"))]
+ use crate::ui_session_interface::{InvokeUiSession, Session};
+-#[cfg(not(any(target_os = "android", target_os = "ios")))]
++#[cfg(all(not(any(target_os = "android", target_os = "ios")), not(feature = "headless")))]
+ use crate::{client::get_key_state, common::GrabState};
++#[cfg(all(not(any(target_os = "android", target_os = "ios")), feature = "headless"))]
++use crate::common::GrabState;
++
++/// headless：读取本机键状态（原实现依赖控制端会话的 enigo 实例）。
++#[cfg(all(not(any(target_os = "android", target_os = "ios")), feature = "headless"))]
++fn get_key_state(key: enigo::Key) -> bool {
++    use enigo::KeyboardControllable;
++    #[cfg(target_os = "macos")]
++    if key == enigo::Key::NumLock {
++        return true;
++    }
++    crate::headless_ui::key_state(key)
++}
+ #[cfg(not(any(target_os = "android", target_os = "ios")))]
+ use hbb_common::log;
+ use base::message_proto::*;
+@@ -364,6 +378,7 @@ pub mod client {
+         }
+     }
+ 
++    #[cfg(not(feature = "headless"))]
+     pub fn process_event_with_session<T: InvokeUiSession>(
+         keyboard_mode: &str,
+         event: &Event,
+@@ -523,7 +538,7 @@ static mut IS_LEFT_OPTION_DOWN: bool = false;
+ 
+ #[cfg(not(any(target_os = "android", target_os = "ios")))]
+ fn get_keyboard_mode() -> String {
+-    #[cfg(not(feature = "flutter"))]
++    #[cfg(all(not(feature = "flutter"), not(feature = "headless")))]
+     if let Some(session) = CUR_SESSION.lock().unwrap().as_ref() {
+         return session.get_keyboard_mode();
+     }
+@@ -948,10 +963,19 @@ fn parse_add_lock_modes_modifiers(
+ 
+ #[cfg(not(any(target_os = "android", target_os = "ios")))]
+ fn add_lock_modes_modifiers(key_event: &mut KeyEvent, is_numpad_key: bool, is_letter_key: bool) {
+-    if is_letter_key && get_key_state(enigo::Key::CapsLock) {
++    // headless 没有控制端会话：锁键修饰符只影响“本机把按键回送给远端”这条路径，
++    // 端侧不做这件事，因此不追加 CapsLock/NumLock 修饰。
++    #[cfg(feature = "headless")]
++    let (caps_on, num_on) = (false, false);
++    #[cfg(all(not(feature = "headless"), not(any(target_os = "android", target_os = "ios"))))]
++    let (caps_on, num_on) = (
++        get_key_state(enigo::Key::CapsLock),
++        get_key_state(enigo::Key::NumLock),
++    );
++    if is_letter_key && caps_on {
+         key_event.modifiers.push(ControlKey::CapsLock.into());
+     }
+-    if is_numpad_key && get_key_state(enigo::Key::NumLock) {
++    if is_numpad_key && num_on {
+         key_event.modifiers.push(ControlKey::NumLock.into());
+     }
+ }
+@@ -1049,7 +1073,7 @@ pub fn event_to_key_events(
+ }
+ 
+ pub fn send_key_event(key_event: &KeyEvent) {
+-    #[cfg(not(feature = "flutter"))]
++    #[cfg(all(not(feature = "flutter"), not(feature = "headless")))]
+     if let Some(session) = CUR_SESSION.lock().unwrap().as_ref() {
+         session.send_key_event(key_event);
+     }
+@@ -1061,7 +1085,7 @@ pub fn send_key_event(key_event: &KeyEvent) {
+ }
+ 
+ pub fn get_peer_platform() -> String {
+-    #[cfg(not(feature = "flutter"))]
++    #[cfg(all(not(feature = "flutter"), not(feature = "headless")))]
+     if let Some(session) = CUR_SESSION.lock().unwrap().as_ref() {
+         return session.peer_platform();
+     }
+diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -13,7 +13,12 @@ pub use platform::{
+ mod server;
+ #[cfg(not(any(target_os = "ios")))]
+ pub use self::server::*;
++#[cfg(not(feature = "headless"))]
+ mod client;
++#[cfg(feature = "headless")]
++mod headless_client;
++#[cfg(feature = "headless")]
++use headless_client as client;
+ mod lan;
+ #[cfg(not(any(target_os = "ios")))]
+ mod rendezvous_mediator;
+@@ -26,7 +31,8 @@ pub mod ipc;
+ #[cfg(not(any(
+     target_os = "android",
+     target_os = "ios",
+-    feature = "flutter"
++    feature = "flutter",
++    feature = "headless"
+ )))]
+ pub mod ui;
+ pub(crate) mod update_metadata;
+@@ -45,27 +51,42 @@ use common::*;
+ mod auth_2fa;
+ mod trusted_devices;
+ #[cfg(not(target_os = "ios"))]
+ mod clipboard;
+-#[cfg(not(any(target_os = "android", target_os = "ios")))]
++#[cfg(all(not(any(target_os = "android", target_os = "ios")), not(feature = "headless")))]
+ pub mod core_main;
+ mod custom_server;
+ mod lang;
+-#[cfg(not(any(target_os = "android", target_os = "ios")))]
++// 客户端端口转发（把本机端口透传给远端）属于控制端功能，headless 不编译。
++#[cfg(all(not(any(target_os = "android", target_os = "ios")), not(feature = "headless")))]
+ mod port_forward;
+ mod port_forward_mux;
+ 
+-#[cfg(not(any(target_os = "android", target_os = "ios")))]
++#[cfg(not(any(target_os = "android", target_os = "ios", feature = "headless")))]
+ mod tray;
+ 
+-#[cfg(not(any(target_os = "android", target_os = "ios")))]
++#[cfg(not(any(target_os = "android", target_os = "ios", feature = "headless")))]
++mod whiteboard;
++#[cfg(all(not(any(target_os = "android", target_os = "ios")), feature = "headless"))]
++#[path = "headless_whiteboard.rs"]
+ mod whiteboard;
+ 
+ #[cfg(not(any(target_os = "android", target_os = "ios")))]
+ mod updater;
+ 
++#[cfg(not(feature = "headless"))]
+ mod ui_cm_interface;
++#[cfg(not(feature = "headless"))]
+ mod ui_interface;
++#[cfg(not(feature = "headless"))]
+ mod ui_session_interface;
++#[cfg(feature = "headless")]
++mod headless_ui;
++#[cfg(feature = "headless")]
++use headless_ui as ui_interface;
++#[cfg(feature = "headless")]
++use headless_ui as ui_session_interface;
++#[cfg(feature = "headless")]
++use headless_ui as ui_cm_interface;
+ 
+ mod hbbs_http;
+ 
+diff --git a/src/port_forward_mux.rs b/src/port_forward_mux.rs
+index 32287952a..4b30a23aa 100644
+--- a/src/port_forward_mux.rs
++++ b/src/port_forward_mux.rs
+@@ -408,10 +408,12 @@ pub async fn run_channel<R, W>(
+     log::debug!("port forward channel {} ended: {:?} / {:?}", id, first, second);
+ }
+ 
+-#[cfg(not(any(target_os = "android", target_os = "ios")))]
++// `Tunnel` 依赖控制端的 `client::Interface`（登录状态机 + UI 对话），headless 不承载
++// 控制端，因此不编译它；服务端只用 `PortForwardMux` 本身。
++#[cfg(all(not(any(target_os = "android", target_os = "ios")), not(feature = "headless")))]
+ pub use tunnel::{Claim, Tunnel};
+ 
+-#[cfg(not(any(target_os = "android", target_os = "ios")))]
++#[cfg(all(not(any(target_os = "android", target_os = "ios")), not(feature = "headless")))]
+ mod tunnel {
+     use super::*;
+     use crate::client::Interface;
+diff --git a/src/server/video_service.rs b/src/server/video_service.rs
+index 754c491a7..262daaa91 100644
+--- a/src/server/video_service.rs
++++ b/src/server/video_service.rs
+@@ -1560,3 +1560,47 @@ mod tests {
+         assert!(refresh_allowed(true, false, false));
+     }
+ }
++
++/// Register ffmpeg's software H.264/H.265 encoders with the codec selector.
++///
++/// The upstream probe only tests GPU encoders, so a host without one reports no
++/// usable encoder and falls back to VP9. Embedding hosts that must deliver H.264
++/// call this once at startup; the encoders themselves are ffmpeg's soft ones.
++pub fn register_software_encoders() {
++    use scrap::codec::EncodingUpdate;
++    use scrap::raw_hwcodec::ffmpeg_ram::CodecInfo;
++    #[cfg(feature = "hwcodec")]
++    {
++        // Two upstream naming rules meet here: ffmpeg registers the software encoder
++        // as `libx264`/`libx265`, while `scrap` derives the data format from the name
++        // by substring (`contains("h264")`). Keep both satisfied.
++        let soft = CodecInfo::soft();
++        let mut ram_encode = Vec::new();
++        // `name` is what ffmpeg opens, so it must be this build's codec name
++        // (`libx264`); scrap's format matcher is taught the same names in
++        // `format_from_mc_name`.
++        if let Some(mut info) = soft.h264.clone() {
++            info.name = "libx264".to_owned();
++            ram_encode.push(info);
++        }
++        if let Some(mut info) = soft.h265.clone() {
++            info.name = "libx265".to_owned();
++            ram_encode.push(info);
++        }
++        let config = scrap::hwcodec::HwCodecConfig {
++            signature: 0,
++            ram_encode,
++            ram_decode: Vec::new(),
++            #[cfg(feature = "vram")]
++            vram_encode: Vec::new(),
++            #[cfg(feature = "vram")]
++            vram_decode: Vec::new(),
++        };
++        scrap::hwcodec::HwCodecConfig::set(serde_json::to_string(&config).unwrap_or_default());
++        scrap::codec::Encoder::update(EncodingUpdate::Check);
++    }
++    #[cfg(not(feature = "hwcodec"))]
++    {
++        let _ = EncodingUpdate::Check;
++    }
++}
+diff --git a/src/headless_ui.rs b/src/headless_ui.rs
+new file mode 100644
+index 000000000..f5f03d26e
+--- /dev/null
++++ b/src/headless_ui.rs
+@@ -0,0 +1,107 @@
++//! Headless 替换：`feature = "headless"` 时替代 `ui_interface` / `ui_session_interface` /
++//! `ui_cm_interface`。
++//!
++//! 嵌入本库的产品（YooDesk WebService）不使用 RustDesk 的 GUI，但端侧代码仍在几处引用
++//! UI 模块的小工具函数。这里只提供这些函数的等价实现，不引入 Sciter/tao/tray-icon 等
++//! GUI 依赖，因此链接产物里不会出现任何窗口系统代码。
++//!
++//! 语义保持与上游一致：不改变端侧行为，只去掉“展示/交互”部分。
++
++use hbb_common::config::Config;
++use hbb_common::log;
++
++/// 与上游 `ui_interface::max_encrypt_len` 一致。
++pub fn max_encrypt_len() -> usize {
++    hbb_common::config::ENCRYPT_MAX_LEN
++}
++
++/// headless 从不做纹理渲染（没有渲染后端）。
++pub fn use_texture_render() -> bool {
++    false
++}
++
++/// 读取配置项；与 `ui_interface::get_option` 同签名（`AsRef<str>`）。
++pub fn get_option<T: AsRef<str>>(key: T) -> String {
++    Config::get_option(key.as_ref())
++}
++
++/// 写入配置项；没有 UI 进程需要同步，直接落本地配置。
++pub fn set_option(key: String, value: String) {
++    Config::set_option(key, value);
++}
++
++/// 本地（不参与云端同步）配置读取。
++pub fn get_local_option(key: String) -> String {
++    crate::get_local_option(&key)
++}
++
++/// 本地配置写入。
++pub fn set_local_option(key: String, value: String) {
++    hbb_common::config::LocalConfig::set_option(key, value);
++}
++
++/// 内置（随安装包固定）配置项。
++pub fn get_builtin_option(key: &str) -> String {
++    crate::get_builtin_option(key)
++}
++
++/// API 服务器地址；与上游同义，直接由公共配置推导。
++pub fn get_api_server() -> String {
++    crate::get_api_server(
++        get_option("api-server"),
++        get_option("custom-rendezvous-server"),
++    )
++}
++
++/// headless 以“已安装”为准：服务通常以安装形态运行，且没有 UI 可提示。
++pub fn is_installed() -> bool {
++    true
++}
++
++/// 录制目录：没有 UI，就落到当前工作目录下的 `records/`。
++pub fn video_save_directory(_root: bool) -> String {
++    let dir = std::env::current_dir()
++        .map(|cwd| cwd.join("records"))
++        .unwrap_or_else(|_| std::path::PathBuf::from("records"));
++    let _ = std::fs::create_dir_all(&dir);
++    dir.to_string_lossy().into_owned()
++}
++
++/// 与上游 `ui_cm_interface::check_file_count_limit` 同语义，读取同一配置项。
++pub fn check_file_count_limit(file_count: usize) -> Result<(), String> {
++    use base::config::keys::OPTION_FILE_TRANSFER_MAX_FILES;
++    let max_files: usize = Config::get_option(OPTION_FILE_TRANSFER_MAX_FILES)
++        .parse()
++        .unwrap_or(1000);
++    if file_count > max_files {
++        let msg = format!(
++            "file transfer rejected: too many files ({file_count} files exceeds limit of {max_files})"
++        );
++        hbb_common::log::warn!("{msg}");
++        Err(msg)
++    } else {
++        Ok(())
++    }
++}
++
++/// 本机按键状态；headless 没有控制端的 enigo 实例，改用平台查询。
++pub fn key_state(key: enigo::Key) -> bool {
++    #[cfg(target_os = "windows")]
++    {
++        use winapi::um::winuser::GetKeyState;
++        let vk = match key {
++            enigo::Key::CapsLock => 0x14,
++            enigo::Key::NumLock => 0x90,
++            enigo::Key::Shift => 0x10,
++            enigo::Key::Control => 0x11,
++            enigo::Key::Alt => 0x12,
++            _ => return false,
++        };
++        unsafe { GetKeyState(vk) & 0x8000u16 as i16 != 0 }
++    }
++    #[cfg(not(target_os = "windows"))]
++    {
++        let _ = key;
++        false
++    }
++}
+diff --git a/src/headless_client.rs b/src/headless_client.rs
+new file mode 100644
+index 000000000..72ecca336
+--- /dev/null
++++ b/src/headless_client.rs
+@@ -0,0 +1,78 @@
++//! Headless 替换：`feature = "headless"` 时替代 `client` 模块中服务端会用到的常量。
++//!
++//! 端侧代码只引用登录错误文案与 Wayland 登录屏标记；客户端（控制端）的会话、
++//! IO 循环、界面接口全部不参与 headless 构建。
++//!
++//! 文案与上游 `client.rs` 保持逐字一致，避免协议层对端看到不同的错误字符串。
++
++/// 密码错误。
++pub const LOGIN_MSG_PASSWORD_WRONG: &str = "Wrong Password";
++/// 无密码访问被拒绝。
++pub const LOGIN_MSG_NO_PASSWORD_ACCESS: &str = "No Password Access";
++/// 对端离线。
++pub const LOGIN_MSG_OFFLINE: &str = "Offline";
++/// 2FA 验证码错误。
++pub const LOGIN_MSG_2FA_WRONG: &str = "Wrong 2FA Code";
++/// 需要 2FA。
++pub const REQUIRE_2FA: &str = "2FA Required";
++/// Wayland 登录屏相关标记；headless 不检测登录屏。
++pub const LOGIN_SCREEN_WAYLAND: &str = "Wayland login screen is not supported";
++
++// ---- 语音通话 / 媒体回传 ----
++//
++// 这些类型在服务端用于把控制端的语音回传给对端。headless 不承载控制端 UI，
++// 因此提供同名类型与“无操作”实现：调用点结构不变，行为上不发送任何数据。
++
++use base::message_proto::{
++    AudioFormat, AudioFrame, Message, VideoFrame, VoiceCallRequest, VoiceCallResponse,
++};
++
++/// 控制端媒体数据；与服务端字段保持一致。
++pub enum MediaData {
++    /// 视频队列信号。
++    VideoQueue,
++    /// 视频帧。
++    VideoFrame(Box<VideoFrame>),
++    /// 音频帧。
++    AudioFrame(Box<AudioFrame>),
++    /// 音频格式。
++    AudioFormat(AudioFormat),
++    /// 重置。
++    Reset,
++    /// 录屏开关。
++    RecordScreen(bool),
++}
++
++/// 媒体发送端。
++pub type MediaSender = std::sync::mpsc::Sender<MediaData>;
++
++/// 启动音频线程；headless 返回一个立即丢弃所有数据的发送端。
++pub fn start_audio_thread() -> MediaSender {
++    let (sender, receiver) = std::sync::mpsc::channel::<MediaData>();
++    // 持续排空，避免发送方阻塞；不做任何解码。
++    std::thread::spawn(move || {
++        while receiver.recv().is_ok() {}
++    });
++    sender
++}
++
++/// 语音呼叫请求消息。
++pub fn new_voice_call_request(is_connect: bool) -> Message {
++    let mut request = VoiceCallRequest::new();
++    request.is_connect = is_connect;
++    request.req_timestamp = hbb_common::get_time();
++    let mut message = Message::new();
++    message.set_voice_call_request(request);
++    message
++}
++
++/// 语音呼叫响应消息。
++pub fn new_voice_call_response(request_timestamp: i64, accepted: bool) -> Message {
++    let mut response = VoiceCallResponse::new();
++    response.accepted = accepted;
++    response.req_timestamp = request_timestamp;
++    response.ack_timestamp = hbb_common::get_time();
++    let mut message = Message::new();
++    message.set_voice_call_response(response);
++    message
++}
+diff --git a/src/headless_whiteboard.rs b/src/headless_whiteboard.rs
+new file mode 100644
+index 000000000..cee0c393d
+--- /dev/null
++++ b/src/headless_whiteboard.rs
+@@ -0,0 +1,53 @@
++//! Headless 替换：`feature = "headless"` 时替代 `whiteboard` 模块。
++//!
++//! 白板是控制端叠加层的客户端功能；端侧只需要同名的类型与空实现，调用点保持
++//! 结构不变（与上游 `whiteboard::*` 的签名一致），行为上是无操作。
++
++use serde::{Deserialize, Serialize};
++
++/// 白板事件；与上游定义保持一致，供 `ipc::Data::Whiteboard` 等类型引用。
++#[derive(Debug, Serialize, Deserialize, Clone)]
++#[serde(tag = "t", content = "c")]
++pub enum CustomEvent {
++    /// 光标位置。
++    Cursor(Cursor),
++    /// 清空。
++    Clear,
++    /// 退出。
++    Exit,
++}
++
++/// 白板光标。
++#[derive(Debug, Serialize, Deserialize, Clone)]
++#[serde(tag = "t")]
++pub struct Cursor {
++    /// 相对 X。
++    pub x: f32,
++    /// 相对 Y。
++    pub y: f32,
++    /// 颜色（ARGB）。
++    pub argb: u32,
++    /// 按键位图。
++    pub btns: i32,
++    /// 附带文本。
++    pub text: String,
++}
++
++/// headless 不支持白板。
++pub fn is_supported() -> bool {
++    false
++}
++
++/// 当前连接的白板键；headless 恒为空。
++pub fn get_key_cursor(_conn_id: i32) -> String {
++    String::new()
++}
++
++/// 注册白板（无操作）。
++pub fn register_whiteboard(_key: String) {}
++
++/// 注销白板（无操作）。
++pub fn unregister_whiteboard(_key: String) {}
++
++/// 更新白板（无操作）。
++pub fn update_whiteboard(_key: String, _event: CustomEvent) {}

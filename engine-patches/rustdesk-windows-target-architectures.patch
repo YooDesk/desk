@@ -1,0 +1,72 @@
+diff --git a/res/vcpkg/ffmpeg/portfile.cmake b/res/vcpkg/ffmpeg/portfile.cmake
+--- a/res/vcpkg/ffmpeg/portfile.cmake
++++ b/res/vcpkg/ffmpeg/portfile.cmake
+@@ -129,6 +129,7 @@
+         endif()
+     endif()
+ elseif(VCPKG_TARGET_IS_WINDOWS)
++    string(APPEND OPTIONS " --enable-libx264 --enable-libx265 --enable-encoder=libx264 --enable-encoder=libx265")
+     string(APPEND OPTIONS "\
+ --target-os=win32 \
+ --toolchain=msvc \
+@@ -163,7 +164,6 @@
+         string(APPEND OPTIONS " --arch=i686 --enable-cross-compile")
+     elseif(VCPKG_TARGET_ARCHITECTURE STREQUAL "x64")
+         set(LIB_MACHINE_ARG /machine:x64)
+-        string(APPEND OPTIONS " --enable-libx264 --enable-libx265 --enable-encoder=libx264 --enable-encoder=libx265")
+         string(APPEND OPTIONS " --arch=x86_64")
+     elseif(VCPKG_TARGET_ARCHITECTURE STREQUAL "arm64")
+         set(LIB_MACHINE_ARG /machine:arm64)
+diff --git a/res/vcpkg/ffmpeg/vcpkg.json b/res/vcpkg/ffmpeg/vcpkg.json
+--- a/res/vcpkg/ffmpeg/vcpkg.json
++++ b/res/vcpkg/ffmpeg/vcpkg.json
+@@ -8,8 +8,8 @@
+   "homepage": "https://ffmpeg.org",
+   "license": null,
+   "dependencies": [
+-    { "name": "x264", "platform": "windows & x64 & !uwp" },
+-    { "name": "x265", "platform": "windows & x64 & !uwp" },
++    { "name": "x264", "platform": "windows & !uwp" },
++    { "name": "x265", "platform": "windows & !uwp" },
+     {
+       "name": "vcpkg-cmake-get-vars",
+       "host": true
+diff --git a/vcpkg.json b/vcpkg.json
+--- a/vcpkg.json
++++ b/vcpkg.json
+@@ -23,5 +23,5 @@
+     {
+       "name": "libsodium",
+       "host": false,
+-      "platform": "windows & arm64"
++      "platform": "windows & (x86 | arm64)"
+     },
+@@ -52,16 +52,16 @@
+     {
+       "name": "mfx-dispatch",
+       "host": true,
+-      "platform": "((x86 | x64) & (android | linux)) | (windows & !uwp)"
++      "platform": "((x86 | x64) & (android | linux)) | (windows & (x86 | x64) & !uwp)"
+     },
+     {
+       "name": "mfx-dispatch",
+       "host": false,
+-      "platform": "((x86 | x64) & (android | linux)) | (windows & !uwp)"
++      "platform": "((x86 | x64) & (android | linux)) | (windows & (x86 | x64) & !uwp)"
+     },
+     {
+       "name": "ffmpeg",
+-      "host": true,
++      "host": false,
+       "features": [
+         {
+           "name": "amf",
+@@ -73,7 +73,7 @@
+         },
+         {
+           "name": "qsv",
+-          "platform": "(windows & !arm & static)"
++          "platform": "(windows & !arm & !arm64 & static)"
+         }
+       ],
+       "platform": "((windows | (linux & !arm32) | osx) & static)"

@@ -1,0 +1,49 @@
+diff --git a/src/headless_ui.rs b/src/headless_ui.rs
+index f5f03d2..d5452b0 100644
+--- a/src/headless_ui.rs
++++ b/src/headless_ui.rs
+@@ -30,6 +30,22 @@ pub fn set_option(key: String, value: String) {
+     Config::set_option(key, value);
+ }
+ 
++pub fn set_auth_option(key: String, value: String) -> hbb_common::ResultType<()> {
++    if key == base::config::keys::OPTION_TRUSTED_DEVICE_EXPIRATION
++        && !matches!(value.as_str(), "" | "1" | "7" | "30" | "90" | "0")
++    {
++        hbb_common::bail!("Invalid trusted-device expiration period");
++    }
++    let mut options = Config::get_options();
++    if value.is_empty() {
++        options.remove(&key);
++    } else {
++        options.insert(key, value);
++    }
++    crate::trusted_devices::config::set_options(options)
++}
++
++
+ /// 本地（不参与云端同步）配置读取。
+ pub fn get_local_option(key: String) -> String {
+     crate::get_local_option(&key)
+diff --git a/src/trusted_devices/mod.rs b/src/trusted_devices/mod.rs
+index 69c0ab2..0e41670 100644
+--- a/src/trusted_devices/mod.rs
++++ b/src/trusted_devices/mod.rs
+@@ -1,4 +1,5 @@
+ pub mod authority;
++#[cfg(not(feature = "headless"))]
+ pub mod client;
+ pub mod config;
+ pub mod host;
+diff --git a/src/server.rs b/src/server.rs
+--- a/src/server.rs
++++ b/src/server.rs
+@@ -76,6 +76,8 @@
+ #[cfg(windows)]
+ pub mod portable_service;
+ mod service;
++#[cfg(feature = "headless")]
++pub use service::{GenericService as PublicGenericService, Service as PublicService, ServiceTmpl as PublicServiceTmpl};
+ mod video_qos;
+ pub mod video_service;
+ 

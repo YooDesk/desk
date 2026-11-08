@@ -1,0 +1,18 @@
+--- a/src/headless_client.rs
++++ b/src/headless_client.rs
+@@ -17,6 +17,15 @@
+ pub const REQUIRE_2FA: &str = "2FA Required";
+ /// Wayland 登录屏相关标记；headless 不检测登录屏。
+ pub const LOGIN_SCREEN_WAYLAND: &str = "Wayland login screen is not supported";
++
++#[cfg(target_os = "linux")]
++pub const SCRAP_UBUNTU_HIGHER_REQUIRED: &str = "ubuntu-21-04-required";
++#[cfg(target_os = "linux")]
++pub const SCRAP_OTHER_VERSION_OR_X11_REQUIRED: &str = "wayland-requires-higher-linux-version";
++#[cfg(target_os = "linux")]
++pub const SCRAP_XDP_PORTAL_UNAVAILABLE: &str = "xdp-portal-unavailable";
++#[cfg(target_os = "linux")]
++pub const SCRAP_X11_REQUIRED: &str = "x11 expected";
+ 
+ // ---- 语音通话 / 媒体回传 ----
+ //

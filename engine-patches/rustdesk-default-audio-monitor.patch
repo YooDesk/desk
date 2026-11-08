@@ -1,0 +1,17 @@
+--- a/src/platform/linux.rs
++++ b/src/platform/linux.rs
+@@ -1497,8 +1497,8 @@
+ pub fn get_pa_monitor() -> String {
+-    get_pa_sources()
+-        .drain(..)
+-        .map(|x| x.0)
+-        .filter(|x| x.contains("monitor"))
+-        .next()
+-        .unwrap_or("".to_owned())
++    use pulsectl::controllers::*;
++    SinkController::create()
++        .and_then(|mut controller| controller.get_default_device())
++        .ok()
++        .and_then(|sink| sink.monitor_name)
++        .unwrap_or_default()
+ }

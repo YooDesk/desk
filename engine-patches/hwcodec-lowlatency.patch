@@ -1,0 +1,23 @@
+diff --git a/cpp/common/util.cpp b/cpp/common/util.cpp
+index 45810b4..5df3fd5 100644
+--- a/cpp/common/util.cpp
++++ b/cpp/common/util.cpp
+@@ -276,6 +276,18 @@ bool force_hw(void *priv_data, const std::string &name) {
+ 
+ bool set_others(void *priv_data, const std::string &name) {
+   int ret;
++  // Software encoders (libx264/libx265) default to lookahead + B-frames, so the
++  // first frames produce no output at all. A remote-desktop host must emit the
++  // first frame immediately, so ask for the low-latency tune here.
++  if (name.find("libx264") != std::string::npos ||
++      name.find("libx265") != std::string::npos) {
++    if ((ret = av_opt_set(priv_data, "tune", "zerolatency", 0)) < 0) {
++      LOG_ERROR(std::string("set tune zerolatency failed, ret = ") + av_err2str(ret));
++    }
++    if ((ret = av_opt_set(priv_data, "preset", "ultrafast", 0)) < 0) {
++      LOG_ERROR(std::string("set preset failed, ret = ") + av_err2str(ret));
++    }
++  }
+   if (name.find("_mf") != std::string::npos) {
+     // ff_eAVScenarioInfo_DisplayRemoting = 1
+     if ((ret = av_opt_set_int(priv_data, "scenario", 1, 0)) < 0) {

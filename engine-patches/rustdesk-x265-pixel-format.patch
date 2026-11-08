@@ -1,0 +1,28 @@
+diff --git a/libs/scrap/src/common/hwcodec.rs b/libs/scrap/src/common/hwcodec.rs
+--- a/libs/scrap/src/common/hwcodec.rs
++++ b/libs/scrap/src/common/hwcodec.rs
+@@ -75,7 +93,11 @@ impl EncoderApi for HwRamEncoder {
+                     mc_name: config.mc_name.clone(),
+                     width: config.width as _,
+                     height: config.height as _,
+-                    pixfmt: DEFAULT_PIXFMT,
++                    pixfmt: if config.name == "libx265" {
++                        AVPixelFormat::AV_PIX_FMT_YUV420P
++                    } else {
++                        DEFAULT_PIXFMT
++                    },
+                     align: HW_STRIDE_ALIGN as _,
+                     kbs: bitrate as i32,
+                     fps: DEFAULT_FPS,
+diff --git a/libs/scrap/src/common/codec.rs b/libs/scrap/src/common/codec.rs
+--- a/libs/scrap/src/common/codec.rs
++++ b/libs/scrap/src/common/codec.rs
+@@ -374,7 +374,7 @@
+                     CodecFormat::VP9
+                 } else if name.contains("av1") {
+                     CodecFormat::AV1
+-                } else if name.contains("h264") {
++                } else if name.contains("h264") || name == "libx264" {
+                     CodecFormat::H264
+                 } else {
+                     CodecFormat::H265

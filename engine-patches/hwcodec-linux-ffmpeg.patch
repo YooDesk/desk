@@ -1,0 +1,39 @@
+diff --git a/build.rs b/build.rs
+--- a/build.rs
++++ b/build.rs
+@@ -101,5 +101,10 @@ mod ffmpeg {
+     pub fn build_ffmpeg(builder: &mut Build) {
+         ffmpeg_ffi();
+-        link_vcpkg(builder, std::env::var("VCPKG_ROOT").unwrap().into());
++        if std::env::var("CARGO_CFG_TARGET_OS").unwrap() == "linux" {
++            // The Linux pkg-config branch does not consume a vcpkg root.
++            link_vcpkg(builder, PathBuf::new());
++        } else {
++            link_vcpkg(builder, std::env::var("VCPKG_ROOT").unwrap().into());
++        }
+         link_os();
+         build_ffmpeg_ram(builder);
+@@ -114,5 +114,23 @@ mod ffmpeg {
+     fn link_vcpkg(builder: &mut Build, mut path: PathBuf) -> PathBuf {
+         let target_os = std::env::var("CARGO_CFG_TARGET_OS").unwrap();
++        if target_os == "linux" {
++            // Linux uses the system FFmpeg ABI and its pkg-config link flags.
++            // Packing distro static archives would omit their codec dependencies.
++            let output = std::process::Command::new("pkg-config")
++                .args(["--cflags", "--libs", "libavcodec", "libavutil", "libavformat"])
++                .output().expect("pkg-config is required for Linux FFmpeg");
++            assert!(output.status.success(), "FFmpeg development packages unavailable");
++            for flag in String::from_utf8(output.stdout).unwrap().split_whitespace() {
++                if let Some(include) = flag.strip_prefix("-I") {
++                    builder.include(include);
++                } else if let Some(directory) = flag.strip_prefix("-L") {
++                    println!("cargo:rustc-link-search=native={directory}");
++                } else if let Some(library) = flag.strip_prefix("-l") {
++                    println!("cargo:rustc-link-lib={library}");
++                }
++            }
++            return PathBuf::from("/usr/include");
++        }
+         let mut target_arch = std::env::var("CARGO_CFG_TARGET_ARCH").unwrap();
+         if target_arch == "x86_64" {
+             target_arch = "x64".to_owned();
