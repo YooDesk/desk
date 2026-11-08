@@ -29,6 +29,8 @@ if [[ ! -x /opt/yoodesk-tools/bin/cargo ]]; then
 fi
 cd /workspace
 git config --global --add safe.directory /workspace
+# Actions restores this pinned checkout as the runner user; the Ubuntu container runs as root.
+git config --global --add safe.directory /workspace/desk-engine/target/drmtap/source
 export CARGO_BUILD_TARGET="$target"
 if [[ "$kind" == desk ]]; then
     # System dependency list and LLVM/vcpkg pins come from RustDesk's flutter-build.yml.
