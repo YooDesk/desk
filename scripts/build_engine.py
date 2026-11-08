@@ -103,6 +103,9 @@ def main() -> int:
         return 0
 
     env = dict(os.environ)
+    # libsodium-sys links statically by default; SODIUM_STATIC is a fatal deprecated option.
+    env.pop("SODIUM_STATIC", None)
+    env.pop("SODIUM_SHARED", None)
     if sys.platform == "linux":
         product = "yoodesk"
         if env.get("PRODUCT_BRAND_FILE"):

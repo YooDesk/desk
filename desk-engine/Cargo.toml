@@ -6,7 +6,7 @@ license = "AGPL-3.0-only"
 description = "YooDesk desk engine: RustDesk endpoint capabilities behind a small, stable FFI"
 
 # 独立 workspace：RustDesk 的依赖图（含其 fork 的 webrtc/tungstenite）与 WebService 自身
-# 的依赖图互不影响。产物是静态库，由 web-service 链接。
+# 的依赖图互不影响。产物是静态库，只由 desk 插件链接。
 [workspace]
 
 [lib]
