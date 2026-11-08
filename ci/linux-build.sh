@@ -83,7 +83,10 @@ if [[ "$kind" == desk ]]; then
     "$VCPKG_ROOT/vcpkg" version --disable-metrics
     printf "%s\n" "cmake-4.4.0 rust-1.99.0 vcpkg-9e593 libdl" > /opt/yoodesk-tools/.ready
     pushd artifacts/rustdesk-engine-src
-    "$VCPKG_ROOT/vcpkg" install --triplet "$triplet" --host-triplet "$triplet" --x-install-root="$VCPKG_INSTALLED_ROOT"
+    if ! "$VCPKG_ROOT/vcpkg" install --triplet "$triplet" --host-triplet "$triplet" --x-install-root="$VCPKG_INSTALLED_ROOT"; then
+        python3.13 /workspace/ci/native_failure.py "$VCPKG_ROOT/buildtrees"
+        exit 1
+    fi
     popd
     export PKG_CONFIG_PATH="$VCPKG_INSTALLED_ROOT/$triplet/lib/pkgconfig:$VCPKG_INSTALLED_ROOT/$triplet/share/pkgconfig"
     export SODIUM_LIB_DIR="$VCPKG_INSTALLED_ROOT/$triplet/lib"

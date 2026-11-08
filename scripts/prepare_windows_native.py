@@ -20,6 +20,10 @@ def main():
         raise SystemExit(f"Expected RustDesk commit {locked}")
     if tree == (ROOT / "deps/rustdesk").resolve():
         raise SystemExit("Use a separate RustDesk build worktree")
+    port=tree/'res/vcpkg/ffmpeg/portfile.cmake'
+    options='string(APPEND OPTIONS " --enable-libx264 --enable-libx265 --enable-encoder=libx264 --enable-encoder=libx265'
+    # Normalize our whitespace fix while checking the already applied versioned patch.
+    port.write_text(port.read_text(encoding='utf-8').replace(options+' ")',options+'")'),encoding='utf-8')
     if subprocess.run(git + ["apply", "--reverse", "--check", str(ARCH_PATCH)], capture_output=True).returncode:
         if subprocess.run(git + ["apply", "--reverse", "--check", str(PATCH)], capture_output=True).returncode:
             subprocess.run(git + ["apply", str(PATCH)], check=True)
@@ -27,6 +31,7 @@ def main():
     opus_patch = PATCH.with_name("rustdesk-windows-opus-static-crt.patch")
     if subprocess.run(git + ["apply", "--reverse", "--check", str(opus_patch)], capture_output=True).returncode:
         subprocess.run(git + ["apply", str(opus_patch)], check=True)
+    port.write_text(port.read_text(encoding='utf-8').replace(options+'")',options+' ")'),encoding='utf-8')
     print(f"Windows FFmpeg software encoders enabled at {tree}")
 
 

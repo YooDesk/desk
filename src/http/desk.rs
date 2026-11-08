@@ -1312,7 +1312,7 @@ mod tests {
     #[test]
     fn stream_controls_match_browser_contract() {
         let vectors: serde_json::Value = serde_json::from_str(include_str!(
-            "../../../protocol/desk-stream-control-v1.vectors.json"
+            "../../protocol/desk-stream-control-v1.vectors.json"
         ))
         .unwrap();
         for vector in vectors.as_array().unwrap() {
@@ -1334,7 +1334,7 @@ mod tests {
     #[test]
     fn events_heartbeat_matches_browser_vectors() {
         let vectors: serde_json::Value = serde_json::from_str(include_str!(
-            "../../../protocol/vectors-v2/desk-events-heartbeat.json"
+            "../../protocol/vectors-v2/desk-events-heartbeat.json"
         ))
         .unwrap();
         for vector in vectors["cases"].as_array().unwrap() {
