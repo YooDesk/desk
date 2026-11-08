@@ -71,7 +71,8 @@ jobs:
         id: linux-tools
         with:
           path: .ci-cache/tools/
-          key: ubuntu18-desk-tools-${{ matrix.platform }}-rust199-python3135-openssl354-cmake440-vcpkg9e593-dl-v2
+          key: ubuntu18-desk-tools-${{ matrix.platform }}-rust199-python3135-openssl354-cmake440-vcpkg9e593-glibc-v3
+          restore-keys: ubuntu18-desk-tools-${{ matrix.platform }}-rust199-python3135-openssl354-cmake440-vcpkg9e593-dl-v2
       - uses: actions/cache@v4
         with:
           path: |
@@ -166,7 +167,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: .ci-cache/tools/
-          key: ubuntu18-desk-tools-${{ matrix.platform }}-rust199-python3135-openssl354-cmake440-vcpkg9e593-dl-v2
+          key: ubuntu18-desk-tools-${{ matrix.platform }}-rust199-python3135-openssl354-cmake440-vcpkg9e593-glibc-v3
   release:
     if: github.event_name != 'pull_request' && (github.event_name != 'workflow_dispatch' || inputs.platform == 'all')
     needs: native

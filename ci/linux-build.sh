@@ -71,8 +71,8 @@ if [[ "$kind" == desk ]]; then
     if [[ "$(git -C "$VCPKG_ROOT" rev-parse --is-shallow-repository)" == true ]]; then
         git -C "$VCPKG_ROOT" fetch --unshallow origin 9e593bb18ea69cc5095e012465dcd675a822ed0d
     fi
-    # The x64 tool uses the Ubuntu 18 musl loader; ARM64 builds the C++17 tool from source.
-    # Both target dependency builds still use the Ubuntu 18.04 glibc compiler/sysroot.
+    # Build the C++17 tool on both CPUs: a musl executable cannot load glibc libcurl.
+    # Tools and target dependencies use the Ubuntu 18.04 glibc compiler/sysroot.
     python3.13 scripts/prepare_vcpkg_tool.py
     if [[ -x /opt/yoodesk-tools/bin/yoodesk-vcpkg ]]; then
         cp /opt/yoodesk-tools/bin/yoodesk-vcpkg "$VCPKG_ROOT/vcpkg"
