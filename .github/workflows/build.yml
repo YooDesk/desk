@@ -106,6 +106,8 @@ jobs:
         uses: KyleMayes/install-llvm-action@ebc0426251bc40c7cd31162802432c68818ab8f0
         with:
           version: ${{ env.LLVM_VERSION }}
+          arch: x64
+          directory: ${{ github.workspace }}/artifacts/llvm-x64
       - name: Prepare pinned RustDesk and hwcodec source with YooDesk adapters
         if: runner.os == 'Windows'
         run: python scripts/prepare_sources.py
@@ -137,6 +139,7 @@ jobs:
           CARGO_BUILD_TARGET: ${{ matrix.target }}
           RUSTFLAGS: '-C target-feature=+crt-static'
           _CL_: '/MT'
+          LIBCLANG_PATH: ${{ github.workspace }}/artifacts/llvm-x64/bin
         run: |
           $env:VCPKG_INSTALLED_ROOT="$env:VCPKG_ROOT/installed"
           $env:VCPKG_DEFAULT_TRIPLET='${{ matrix.triplet }}'
