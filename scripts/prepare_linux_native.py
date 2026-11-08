@@ -16,6 +16,7 @@ text=text.replace(addition.replace('libx265 ")','libx265")'),addition)
 if addition not in text:
     if text.count('if(VCPKG_TARGET_IS_LINUX)')!=1:raise ValueError('FFmpeg Linux port anchor changed')
     text=text.replace('if(VCPKG_TARGET_IS_LINUX)',addition,1).replace('--disable-swresample','--enable-swresample')
+text=text.replace('--enable-cuda_llvm \\', '--enable-cuda_llvm --nvcc=clang-10 \\')
 port.write_text(text,encoding="utf-8")
 manifest=tree/"res/vcpkg/ffmpeg/vcpkg.json"
 data=json.loads(manifest.read_text(encoding="utf-8"))
