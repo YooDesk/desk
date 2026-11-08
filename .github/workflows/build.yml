@@ -122,6 +122,9 @@ jobs:
         working-directory: artifacts/rustdesk-engine-src
         shell: pwsh
         run: |
+          $binaryCache="$env:GITHUB_WORKSPACE/.ci-cache/vcpkg"
+          New-Item -ItemType Directory -Force -Path $binaryCache | Out-Null
+          $env:VCPKG_BINARY_SOURCES="clear;x-gha,readwrite;files,$binaryCache,readwrite"
           & "$env:VCPKG_ROOT/vcpkg.exe" install --triplet '${{ matrix.triplet }}' --host-triplet '${{ matrix.triplet }}' --x-install-root="$env:VCPKG_ROOT/installed"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
