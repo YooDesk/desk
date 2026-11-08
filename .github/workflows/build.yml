@@ -103,7 +103,7 @@ jobs:
         working-directory: artifacts/rustdesk-engine-src
         shell: pwsh
         run: |
-          & "$env:VCPKG_ROOT/vcpkg.exe" install --triplet '${{ matrix.triplet }}' --host-triplet x64-windows-static --x-install-root="$env:VCPKG_ROOT/installed"
+          & "$env:VCPKG_ROOT/vcpkg.exe" install --triplet '${{ matrix.triplet }}' --host-triplet '${{ matrix.triplet }}' --x-install-root="$env:VCPKG_ROOT/installed"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Build Windows native code and run tests
@@ -115,7 +115,11 @@ jobs:
         run: |
           $env:VCPKG_INSTALLED_ROOT="$env:VCPKG_ROOT/installed"
           $env:VCPKG_DEFAULT_TRIPLET='${{ matrix.triplet }}'
-          $env:VCPKG_DEFAULT_HOST_TRIPLET='x64-windows-static'
+          $env:VCPKG_DEFAULT_HOST_TRIPLET='${{ matrix.triplet }}'
+          if ($env:CARGO_BUILD_TARGET -eq 'aarch64-pc-windows-msvc') {
+            $env:SODIUM_LIB_DIR="$env:VCPKG_ROOT/installed/${{ matrix.triplet }}/lib"
+            $env:SODIUM_STATIC='1'
+          }
           python scripts/build_engine.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $env:YOODESK_DESK_ENGINE_LIB_DIR="$env:GITHUB_WORKSPACE/desk-engine/target/$env:CARGO_BUILD_TARGET/release"
@@ -128,6 +132,8 @@ jobs:
         if: runner.os == 'Linux'
         shell: bash
         run: |
+          # Same disposable runner cleanup as the RustDesk Linux workflow.
+          sudo rm -rf /opt/ghc /usr/local/lib/android /usr/share/dotnet
           mkdir -p .ci-cache/tools .ci-cache/vcpkg
           docker run --rm \
             -e GITHUB_SHA -e RELEASE_VERSION \
