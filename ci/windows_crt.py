@@ -8,8 +8,8 @@ cryptnet.dll cryptsp.dll d2d1.dll d3d9.dll d3d11.dll d3d12.dll d3dcompiler_47.dl
 dbghelp.dll dhcpcsvc.dll dhcpcsvc6.dll dnsapi.dll dpapi.dll dwrite.dll dwmapi.dll
 dxcore.dll dxgi.dll gdi32.dll gdiplus.dll imm32.dll iphlpapi.dll kernel32.dll kernelbase.dll
 mf.dll mfplat.dll mfreadwrite.dll mfsrcsnk.dll msacm32.dll msasn1.dll msimg32.dll
-netapi32.dll normaliz.dll ntdll.dll ole32.dll oleacc.dll oleaut32.dll opengl32.dll
-pdh.dll powrprof.dll propsys.dll psapi.dll rpcrt4.dll secur32.dll setupapi.dll
+netapi32.dll newdev.dll normaliz.dll ntdll.dll ole32.dll oleacc.dll oleaut32.dll opengl32.dll
+pdh.dll powrprof.dll propsys.dll psapi.dll rpcrt4.dll sas.dll secur32.dll setupapi.dll
 shell32.dll shlwapi.dll user32.dll userenv.dll uxtheme.dll version.dll wevtapi.dll
 windowscodecs.dll winhttp.dll wininet.dll winmm.dll winspool.drv wintrust.dll
 ws2_32.dll wtsapi32.dll'''.split())
