@@ -56,6 +56,12 @@ jobs:
           path: browser/
 
       - uses: actions/cache@v4
+        if: runner.os == 'Linux'
+        id: linux-tools
+        with:
+          path: .ci-cache/tools/
+          key: ubuntu18-desk-tools-${{ matrix.platform }}-rust199-python3135-openssl354-cmake430-vcpkg9e593-dl-v1
+      - uses: actions/cache@v4
         with:
           path: |
             .ci-cache/
@@ -144,6 +150,12 @@ jobs:
           name: native-${{ matrix.platform }}
           path: dist/
           if-no-files-found: error
+      - name: Preserve successfully installed build tools even if native compilation fails
+        if: always() && runner.os == 'Linux' && steps.linux-tools.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: .ci-cache/tools/
+          key: ubuntu18-desk-tools-${{ matrix.platform }}-rust199-python3135-openssl354-cmake430-vcpkg9e593-dl-v1
   release:
     if: github.event_name != 'pull_request'
     needs: native

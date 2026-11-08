@@ -67,7 +67,14 @@ if [[ "$kind" == desk ]]; then
     fi
     # The x64 musl tool runs on glibc 2.27. On arm64 this builds the C++17 tool from source.
     # Both target dependency builds still use the Ubuntu 18.04 glibc compiler/sysroot.
-    "$VCPKG_ROOT/bootstrap-vcpkg.sh" -musl -disableMetrics
+    python3.13 scripts/prepare_vcpkg_tool.py
+    if [[ -x /opt/yoodesk-tools/bin/yoodesk-vcpkg ]]; then
+        cp /opt/yoodesk-tools/bin/yoodesk-vcpkg "$VCPKG_ROOT/vcpkg"
+    else
+        "$VCPKG_ROOT/bootstrap-vcpkg.sh" -musl -disableMetrics
+        cp "$VCPKG_ROOT/vcpkg" /opt/yoodesk-tools/bin/yoodesk-vcpkg
+    fi
+    "$VCPKG_ROOT/vcpkg" version --disable-metrics
     pushd artifacts/rustdesk-engine-src
     "$VCPKG_ROOT/vcpkg" install --triplet "$triplet" --host-triplet "$triplet" --x-install-root="$VCPKG_INSTALLED_ROOT"
     popd
