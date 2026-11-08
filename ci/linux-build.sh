@@ -88,10 +88,11 @@ if [[ "$kind" == desk ]]; then
     # Keep the Ubuntu 18 system headers, libstdc++ and glibc baseline.
     if [[ "$platform" == linux-arm64 ]]; then
         export CC=clang-10 CXX=clang++-10
+        export CFLAGS=-flax-vector-conversions CXXFLAGS=-flax-vector-conversions
         export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=clang-10
     fi
     pushd artifacts/rustdesk-engine-src
-    if ! "$VCPKG_ROOT/vcpkg" install --triplet "$triplet" --host-triplet "$triplet" --x-install-root="$VCPKG_INSTALLED_ROOT"; then
+    if ! "$VCPKG_ROOT/vcpkg" install --triplet "$triplet" --host-triplet "$triplet" --overlay-triplets=/workspace/ci/triplets --x-install-root="$VCPKG_INSTALLED_ROOT"; then
         python3.13 /workspace/ci/native_failure.py "$VCPKG_ROOT/buildtrees"
         exit 1
     fi
