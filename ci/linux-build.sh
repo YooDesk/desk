@@ -6,7 +6,7 @@ target="$3"
 triplet="$4"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
-apt-get install -y --no-install-recommends build-essential gcc-8 g++-8 ca-certificates curl git unzip zip xz-utils pkg-config libssl-dev zlib1g-dev libffi-dev libbz2-dev liblzma-dev libreadline-dev libsqlite3-dev autoconf automake libtool ninja-build nasm musl
+apt-get install -y --no-install-recommends build-essential gcc-8 g++-8 ca-certificates curl git unzip zip xz-utils pkg-config libssl-dev zlib1g-dev libffi-dev libbz2-dev liblzma-dev libreadline-dev libsqlite3-dev autoconf autoconf-archive automake libtool ninja-build nasm musl
 export CC=gcc-8 CXX=g++-8
 export VCPKG_MAX_CONCURRENCY=3 CARGO_BUILD_JOBS=3
 # Never acquire host executables built against a newer glibc.
