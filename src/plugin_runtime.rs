@@ -292,7 +292,7 @@ unsafe extern "C" fn worker(input: *const u8, len: usize, output: *mut Buffer) -
                 #[cfg(windows)]
                 let result = crate::windows_worker::run_worker(pipe, parent);
                 #[cfg(target_os = "linux")]
-                let result = if mode == "--rustdesk-privileged-worker" {
+                let result = if mode == "--privileged-worker" {
                     crate::unix_worker::run_privileged_worker(pipe, parent)
                 } else {
                     crate::unix_worker::run_worker(pipe, parent)
