@@ -72,6 +72,7 @@ fn link_engine() {
             "avutil",
             "x264",
             "x265",
+            "z",
         ];
         println!("cargo:rerun-if-env-changed=YOODESK_STATIC_CODEC_DIR");
         println!("cargo:rerun-if-env-changed=YOODESK_STATIC_FFMPEG_DIR");
@@ -171,11 +172,9 @@ fn link_engine() {
             }
         }
         if static_ffmpeg.is_some() {
-            for name in ["x264", "x265"] {
+            for name in ["x264", "x265", "z"] {
                 println!("cargo:rustc-link-lib=static=yoodesk_{name}");
             }
-            // FFmpeg's ID3 compressed metadata parser uses zlib's uncompress.
-            println!("cargo:rustc-link-lib=static=z");
             // Drivers remain provided by the host; FFmpeg's VAAPI glue needs their ABI.
             for name in ["va-drm", "va", "atomic"] {
                 println!("cargo:rustc-link-lib={name}");

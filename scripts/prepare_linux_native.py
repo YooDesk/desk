@@ -27,5 +27,7 @@ names={item if isinstance(item,str) else item['name'] for item in data['dependen
 for name in ['x264','x265']:
     if name not in names:
         data['dependencies'].append({'name':name,'platform':'linux | (windows & !uwp)'})
+if 'zlib' not in names:
+    data['dependencies'].append({'name':'zlib','platform':'linux'})
 manifest.write_text(json.dumps(data,indent=2)+'\n',encoding="utf-8")
 print('Linux software codecs enabled in isolated RustDesk source')
