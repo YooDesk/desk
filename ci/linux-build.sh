@@ -57,6 +57,16 @@ if [[ "$kind" == desk ]]; then
         make install
         popd
     fi
+    if [[ "$platform" == linux-x64 && ! -x /opt/yoodesk-tools/bin/nasm ]]; then
+        # CMake's NASM include flags require the modern directory handling used by vcpkg.
+        curl -fL --retry 3 https://www.nasm.us/pub/nasm/releasebuilds/3.01/nasm-3.01.tar.xz -o /tmp/nasm.tar.xz
+        tar -xf /tmp/nasm.tar.xz -C /tmp
+        pushd /tmp/nasm-3.01
+        ./configure --prefix=/opt/yoodesk-tools --disable-doc
+        make -j3
+        make install
+        popd
+    fi
     python3.13 scripts/prepare_sources.py
     python3.13 scripts/prepare_linux_native.py
     export VCPKG_ROOT=/workspace/artifacts/vcpkg
