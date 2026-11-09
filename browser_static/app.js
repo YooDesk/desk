@@ -1152,37 +1152,57 @@
   }
   // 只合并相邻且尚未发送的绝对坐标；按钮、滚轮和键盘都是顺序屏障。
   var pendingMouseMove = null;
-  // 一个组合键先占据整个串行任务，物理 keyup 只能排在组合之后，不能插进网络 await 之间。
+  var queuedInputBatch = null;
+  var inputBatchLimit = 32;
+  var inputQueueLimit = 128;
   function sendInputs(payloads) {
-    if (!state.sessionId || state.readonly || state.modePending || !state.inputController) { return Promise.resolve(); }
+    if (!payloads.length || !state.sessionId || state.readonly || state.modePending || !state.inputController) { return Promise.resolve(); }
     var session = state.sessionId;
     var signal = state.inputController.signal;
     var version = state.inputVersion;
+    function sameGeneration(batch) {
+      return batch && batch.session === session && batch.version === version && batch.signal === signal;
+    }
     var motion = payloads.length === 1 && payloads[0].type === 'mouse' && payloads[0].mask === 0;
-    if (motion && pendingMouseMove && pendingMouseMove.session === session &&
-        pendingMouseMove.version === version && pendingMouseMove.signal === signal) {
-      pendingMouseMove.payloads[0] = payloads[0];
-      return pendingMouseMove.promise;
+    if (motion && pendingMouseMove && sameGeneration(pendingMouseMove.batch)) {
+      pendingMouseMove.batch.events[pendingMouseMove.index] = payloads[0];
+      return pendingMouseMove.batch.done;
     }
     pendingMouseMove = null;
-    if (inputPending + payloads.length > 64) {
+    if (inputPending + payloads.length > inputQueueLimit) {
       // 无法保留按下/抬起顺序时结束会话，由服务端释放按键，避免丢掉抬起后卡键。
-      restartConnection();
+      restartConnection(true, 'input_queue_overflow');
       return Promise.resolve();
     }
     inputPending += payloads.length;
-    var queuedMove = motion ? { session: session, signal: signal, version: version, payloads: payloads } : null;
-    if (queuedMove) { pendingMouseMove = queuedMove; }
-    // HTTP 请求可以乱序到达；按下/抬起必须串行，且旧会话的排队输入不能进入新会话。
-    inputTail = inputTail.then(async function () {
-      // 开始发送后立即移出合并槽，后续鼠移不得改写已发请求的对象。
-      if (pendingMouseMove === queuedMove) { pendingMouseMove = null; }
-      for (var payload of payloads) {
-        if (state.sessionId !== session || state.readonly || state.inputVersion !== version || signal.aborted) { return; }
-        await request('POST', api + '/sessions/' + session + '/input/', payload, signal);
+    var offset = 0;
+    while (offset < payloads.length) {
+      var batch = queuedInputBatch;
+      if (!sameGeneration(batch) || batch.events.length === inputBatchLimit) {
+        batch = queuedInputBatch = {session: session, version: version, signal: signal, events: []};
+        batch.done = scheduleInputBatch(batch);
       }
-    }).catch(function (error) { if (state.sessionId === session) { say(error.message, true); } }).then(function () { inputPending -= payloads.length; });
-    if (queuedMove) { queuedMove.promise = inputTail; }
+      var count = Math.min(inputBatchLimit - batch.events.length, payloads.length - offset);
+      if (motion) { pendingMouseMove = {batch: batch, index: batch.events.length}; }
+      batch.events.push.apply(batch.events, payloads.slice(offset, offset + count));
+      offset += count;
+    }
+    return batch.done;
+  }
+  function scheduleInputBatch(batch) {
+    // 同时只发送一个请求；等响应期间收集后续事件，不让每次按键都等待网络往返。
+    inputTail = inputTail.then(async function () {
+      if (queuedInputBatch === batch) { queuedInputBatch = null; }
+      if (pendingMouseMove && pendingMouseMove.batch === batch) { pendingMouseMove = null; }
+      if (state.sessionId !== batch.session || state.readonly || state.inputVersion !== batch.version || batch.signal.aborted) { return; }
+      var body = batch.events.length === 1 ? batch.events[0] : {type: 'batch', events: batch.events};
+      await request('POST', api + '/sessions/' + batch.session + '/input/', body, batch.signal);
+    }).catch(function (error) {
+      if (state.sessionId !== batch.session || state.inputVersion !== batch.version || batch.signal.aborted) { return; }
+      say(error.message, true);
+      // 执行结果不明时不能重放。关闭旧会话以释放可能仍按下的键和按钮。
+      restartConnection(true, 'input_batch_failed');
+    }).finally(function () { inputPending -= batch.events.length; });
     return inputTail;
   }
 

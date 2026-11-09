@@ -20,7 +20,7 @@ use super::AppState;
 use crate::access::{extract_ticket_candidate, AccessContext, TicketChannel};
 use crate::business::desk_session::CreateOptions;
 use crate::business::model::{CapabilitiesData, TargetAuthentication};
-use crate::desk::input::{parse_mouse, KeyInput};
+use crate::desk::input::{parse_mouse, KeyInput, MouseInput};
 use crate::json::{codes, ApiError};
 
 static DESKTOP_SLOTS: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(16);
@@ -424,7 +424,20 @@ pub async fn input(
         Ok(session) => session,
         Err(err) => return failure(&err, &request_id).into_response(),
     };
-    let result = desktop_call(move || apply_input(&session, &value)).await;
+    let events = match parse_input_events(&value) {
+        Ok(events) => events,
+        Err(err) => return failure(&err, &request_id).into_response(),
+    };
+    let result = desktop_call(move || {
+        for event in events {
+            match event {
+                DeskInputEvent::Mouse(input) => session.mouse(input)?,
+                DeskInputEvent::Key(input) => session.key(input)?,
+            }
+        }
+        Ok(())
+    })
+    .await;
     match result {
         Ok(()) => success(json!({"applied": true}), &request_id).into_response(),
         Err(err) => failure(&err, &request_id).into_response(),
@@ -715,7 +728,28 @@ fn base64_decode(text: &str) -> Result<Vec<u8>, ApiError> {
         .map_err(|_| ApiError::new(400, codes::INVALID_REQUEST, "invalid base64 image data"))
 }
 
-fn apply_input(session: &Arc<crate::business::DeskSession>, value: &Value) -> Result<(), ApiError> {
+enum DeskInputEvent {
+    Mouse(MouseInput),
+    Key(KeyInput),
+}
+
+const MAX_INPUT_BATCH: usize = 32;
+
+fn parse_input_events(value: &Value) -> Result<Vec<DeskInputEvent>, ApiError> {
+    if value.get("type").and_then(Value::as_str) != Some("batch") {
+        return parse_input_event(value).map(|event| vec![event]);
+    }
+    let events = value
+        .get("events")
+        .and_then(Value::as_array)
+        .filter(|events| (1..=MAX_INPUT_BATCH).contains(&events.len()))
+        .ok_or_else(|| {
+            ApiError::new(400, codes::INVALID_REQUEST, "input batch must contain 1 to 32 events")
+        })?;
+    events.iter().map(parse_input_event).collect()
+}
+
+fn parse_input_event(value: &Value) -> Result<DeskInputEvent, ApiError> {
     let kind = value
         .get("type")
         .and_then(Value::as_str)
@@ -726,7 +760,7 @@ fn apply_input(session: &Arc<crate::business::DeskSession>, value: &Value) -> Re
             let x = int_field(value, "x")?;
             let y = int_field(value, "y")?;
             let event = parse_mouse(mask, x, y).map_err(|err| err.into_api())?;
-            session.mouse(event)
+            Ok(DeskInputEvent::Mouse(event))
         }
         "key" => {
             // 三种形状互斥：
@@ -755,7 +789,7 @@ fn apply_input(session: &Arc<crate::business::DeskSession>, value: &Value) -> Re
                         "text must not be empty",
                     ));
                 }
-                return session.key(KeyInput::Text(text.to_string()));
+                return Ok(DeskInputEvent::Key(KeyInput::Text(text.to_string())));
             }
             let down = value
                 .get("down")
@@ -770,10 +804,10 @@ fn apply_input(session: &Arc<crate::business::DeskSession>, value: &Value) -> Re
                         "layout must be a single character",
                     ));
                 };
-                return session.key(KeyInput::Layout { ch, down });
+                return Ok(DeskInputEvent::Key(KeyInput::Layout { ch, down }));
             }
             let code = int_field(value, "control")?;
-            session.key(KeyInput::Control { code, down })
+            Ok(DeskInputEvent::Key(KeyInput::Control { code, down }))
         }
         _ => Err(ApiError::new(
             400,
@@ -1282,6 +1316,28 @@ const WS_IDLE_TIMEOUT: Duration = Duration::from_secs(24 * 3600);
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn input_batches_validate_all_events_and_preserve_order() {
+        let key = serde_json::json!({"type":"key","layout":"a","down":true});
+        let release = serde_json::json!({"type":"key","layout":"a","down":false});
+        let events = super::parse_input_events(&serde_json::json!({
+            "type":"batch","events":[key.clone(),release]
+        })).unwrap();
+        assert!(matches!(events.as_slice(), [
+            super::DeskInputEvent::Key(super::KeyInput::Layout { ch: 'a', down: true }),
+            super::DeskInputEvent::Key(super::KeyInput::Layout { ch: 'a', down: false })
+        ]));
+        for invalid in [
+            serde_json::json!({"type":"batch","events":[]}),
+            serde_json::json!({"type":"batch","events":vec![key.clone(); 33]}),
+            serde_json::json!({"type":"batch","events":[key.clone(),{"type":"key","layout":"a"}]}),
+            serde_json::json!({"type":"batch","events":[{"type":"batch","events":[key.clone()]}]}),
+        ] {
+            assert!(super::parse_input_events(&invalid).is_err());
+        }
+        assert!(super::parse_input_events(&key).is_ok());
+    }
+
     #[tokio::test]
     async fn cleanup_can_run_when_an_ordinary_budget_is_exhausted() {
         let _permit = super::DESKTOP_SLOTS.acquire_many(16).await.unwrap();
