@@ -126,6 +126,10 @@ def main() -> int:
 
     # 先获取锁定源码，再应用原生低延迟/Linux FFmpeg 补丁，避免复用旧原生产物。
     subprocess.run([sys.executable, str(ROOT / "scripts" / "patch_hwcodec.py")], env=env, check=True)
+    # The patched nix crate is a path dependency outside the lockfile; it must
+    # exist before cargo resolves the workspace, and adding it requires letting
+    # cargo refresh the lock once.
+    subprocess.run([sys.executable, str(ROOT / "scripts" / "prepare_nix.py")], env=env, check=True)
     fetch = ["cargo", "fetch", "--locked"]
     if os.name == "nt":
         target = env.get("CARGO_BUILD_TARGET")

@@ -262,6 +262,8 @@ echo "--- end probe ---"
 python3.13 scripts/prepare_sources.py
 python3.13 scripts/prepare_linux_native.py
 python3.13 scripts/patch_hwcodec.py
+# Materialize the patched nix crate (adds loongarch64 ioctl constants)
+python3.13 scripts/prepare_nix.py
 
 # Build the engine static library for the cross target.
 python3.13 scripts/build_engine.py
