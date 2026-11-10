@@ -129,12 +129,12 @@ linux-loong64)
     export CARGO_TARGET_LOONGARCH64_UNKNOWN_LINUX_GNU_AR="$AR"
     # Pass the foreign sysroot to the GCC linker driver only (rustc's own
     # --sysroot would redirect std discovery away from the installed target).
-    export CARGO_TARGET_LOONGARCH64_UNKNOWN_LINUX_GNU_RUSTFLAGS="-C link-arg=--sysroot=$tools/sysroot-loong64 -C link-arg=-L$sysroot_loong/lib/loong64-linux-gnu -C link-arg=-Wl,-rpath-link,$sysroot_loong/lib/loong64-linux-gnu"
+    export CARGO_TARGET_LOONGARCH64_UNKNOWN_LINUX_GNU_RUSTFLAGS="-C link-arg=--sysroot=$tools/sysroot-loong64 -C link-arg=-L$sysroot_loong/lib/loongarch64-linux-gnu -C link-arg=-Wl,-rpath-link,$sysroot_loong/lib/loongarch64-linux-gnu"
     export QEMU="$tools/bin/qemu-loongarch64"
     export QEMU_LD_PREFIX="$tools/sysroot-loong64/usr"
-    export PKG_CONFIG_PATH="$sysroot_loong/lib/loong64-linux-gnu/pkgconfig:$sysroot_loong/share/pkgconfig"
+    export PKG_CONFIG_PATH="$sysroot_loong/lib/loongarch64-linux-gnu/pkgconfig:$sysroot_loong/share/pkgconfig"
     export PKG_CONFIG_SYSROOT_DIR="$tools/sysroot-loong64"
-    export PKG_CONFIG_LIBDIR="$sysroot_loong/lib/loong64-linux-gnu/pkgconfig"
+    export PKG_CONFIG_LIBDIR="$sysroot_loong/lib/loongarch64-linux-gnu/pkgconfig"
     # bindgen parses vpx/aom/yuv headers with clang-10, which has no
     # loongarch target. All our targets are LP64 little-endian, so layouts
     # match x86_64; parse with that triple using the sysroot headers.
@@ -149,7 +149,7 @@ strip = '$tools/cross-tools/bin/loongarch64-unknown-linux-gnu-strip'
 pkgconfig = 'pkg-config'
 [properties]
 needs_exe_wrapper = true
-pkg_config_path = '$sysroot_loong/lib/loong64-linux-gnu/pkgconfig:$sysroot_loong/share/pkgconfig'
+pkg_config_path = '$sysroot_loong/lib/loongarch64-linux-gnu/pkgconfig:$sysroot_loong/share/pkgconfig'
 [host_machine]
 system = 'linux'
 cpu_family = 'loongarch64'
