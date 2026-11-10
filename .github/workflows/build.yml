@@ -9,7 +9,7 @@ on:
         description: Build one platform for diagnosis, or all platforms for release
         type: choice
         default: all
-        options: [all, windows-x64, windows-arm64, linux-x64, linux-arm64]
+        options: [all, windows-x64, windows-arm64, linux-x64, linux-arm64, linux-loong64, linux-mips64el]
 
 permissions:
   contents: read
@@ -71,7 +71,7 @@ jobs:
         id: linux-tools
         with:
           path: .ci-cache/tools/
-          key: ubuntu18-desk-tools-${{ matrix.platform }}-rust199-python3135-openssl354-cmake440-vcpkg9e593-glibc-nasm301-v4
+          key: ubuntu18-desk-tools-${{ matrix.platform }}-rust199-python3135-openssl354-cmake440-vcpkg9e593-glibc-nasm301-cross-v5
           restore-keys: |
             ubuntu18-desk-tools-${{ matrix.platform }}-rust199-python3135-openssl354-cmake440-vcpkg9e593-glibc-v3
             ubuntu18-desk-tools-${{ matrix.platform }}-rust199-python3135-openssl354-cmake440-vcpkg9e593-dl-v2
@@ -82,7 +82,7 @@ jobs:
             .ci-cache/vcpkg/
             target/
             desk-engine/target/
-          key: native-desk-${{ matrix.platform }}-rust199-ubuntu18-v2-${{ hashFiles('**/Cargo.lock', 'engine-patches/**', 'scripts/*.py', 'ci/linux-build.sh', 'ci/*.py', 'ci/triplets/**') }}-${{ github.run_id }}
+          key: native-desk-${{ matrix.platform }}-rust199-ubuntu18-v2-${{ hashFiles('**/Cargo.lock', 'engine-patches/**', 'scripts/*.py', 'ci/linux-build.sh', 'ci/*.py', 'ci/cross-*.sh', 'ci/triplets/**') }}-${{ github.run_id }}
           restore-keys: native-desk-${{ matrix.platform }}-rust199-ubuntu18-v2-
       - uses: actions/setup-python@v5
         if: runner.os == 'Windows'
@@ -156,7 +156,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python ci/package.py desk --platform '${{ matrix.platform }}'
       - name: Build every Linux native dependency and binary on Ubuntu 18.04
-        if: runner.os == 'Linux'
+        if: runner.os == 'Linux' && !matrix.cross
         shell: bash
         run: |
           # Same disposable runner cleanup as the RustDesk Linux workflow.
@@ -166,6 +166,18 @@ jobs:
             -e GITHUB_SHA -e RELEASE_VERSION \
             -v "$PWD:/workspace" -v "$PWD/.ci-cache/tools:/opt/yoodesk-tools" \
             ubuntu:18.04 bash /workspace/ci/linux-build.sh desk '${{ matrix.platform }}' '${{ matrix.target }}' '${{ matrix.triplet }}'
+      - name: Cross-compile loong64/mips64el desk plugin with the RustDesk engine and verify under QEMU
+        if: matrix.cross
+        timeout-minutes: 360
+        shell: bash
+        run: |
+          # Same disposable runner cleanup as the RustDesk Linux workflow.
+          sudo rm -rf /opt/ghc /usr/local/lib/android /usr/share/dotnet
+          mkdir -p .ci-cache/tools
+          docker run --rm \
+            -e GITHUB_SHA -e RELEASE_VERSION -e RUST_VERSION='${{ env.RUST_VERSION }}' \
+            -v "$PWD:/workspace" -v "$PWD/.ci-cache/tools:/opt/yoodesk-tools" \
+            ubuntu:18.04 bash /workspace/ci/cross-engine-build.sh '${{ matrix.platform }}' '${{ matrix.target }}'
       - uses: actions/upload-artifact@v4
         with:
           name: native-${{ matrix.platform }}
@@ -202,7 +214,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: .ci-cache/tools/
-          key: ubuntu18-desk-tools-${{ matrix.platform }}-rust199-python3135-openssl354-cmake440-vcpkg9e593-glibc-nasm301-v4
+          key: ubuntu18-desk-tools-${{ matrix.platform }}-rust199-python3135-openssl354-cmake440-vcpkg9e593-glibc-nasm301-cross-v5
   release:
     if: github.event_name != 'pull_request' && (github.event_name != 'workflow_dispatch' || inputs.platform == 'all')
     needs: native
@@ -217,7 +229,7 @@ jobs:
           merge-multiple: true
       - name: Require all four platform archives before publishing
         run: |
-          for platform in windows-x64 windows-arm64 linux-x64 linux-arm64; do
+          for platform in windows-x64 windows-arm64 linux-x64 linux-arm64 linux-loong64 linux-mips64el; do
             test -s "dist/yoodesk-desk-$platform.zip"
             (cd dist && sha256sum -c "yoodesk-desk-$platform.zip.sha256")
           done

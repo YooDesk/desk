@@ -1,0 +1,56 @@
+# Pinned Loongnix "DaoXiangHu" (Debian 10 fork for Loongson 2K mips64el)
+# sysroot packages, fetched by direct URL because the archive's apt indexes
+# are empty. These are the exact versions shipping on Loongnix 20 systems,
+# so the linked binaries match the target systems' runtime libraries.
+# Checksums recorded 2026-11-10 from
+# https://ftp.loongnix.cn/os/loongnix/20/mips64el/pool/main/
+# The glibc 2.28 sysroot itself (libc6-dev etc.) comes from the Debian
+# buster cross packages pinned in cross-tools.sh — same archive Loongnix
+# forked from.
+# Base dir: pool/main/
+f/ffmpeg/libavcodec-dev_4.1.6-1.lnd.5~deb10u1_mips64el.deb 70c69e3746d9c699a1eabcf5cb5860ce9e3774827ce4a8bcbaf910fdc8aea83e
+f/ffmpeg/libavcodec58_4.1.6-1.lnd.5~deb10u1_mips64el.deb 4b773378d37b1bcb70008e717eccb6d0d52886671e03a160565c6e04da824dee
+f/ffmpeg/libavformat-dev_4.1.6-1.lnd.5~deb10u1_mips64el.deb 4a6ea0665a41044eb9dbb15391432f44e9d124640c7af930856be1d7dae4f438
+f/ffmpeg/libavformat58_4.1.6-1.lnd.5~deb10u1_mips64el.deb 420bab3f6cbd40974de679844f7f68609ecb15abacb171b6326472258466cf38
+f/ffmpeg/libavutil-dev_4.1.6-1.lnd.5~deb10u1_mips64el.deb a64aa4a9be2e1a707a103c440e7b34c4da15f448d5a394a22c0b269b218bf62d
+f/ffmpeg/libavutil56_4.1.6-1.lnd.5~deb10u1_mips64el.deb bd6df9ea5d1082bbb0adb89f32be3127f42541858e65aeed7291509c767fbd52
+f/ffmpeg/libswresample-dev_4.1.6-1.lnd.5~deb10u1_mips64el.deb 6d8c1d7899052a30473f9afaf22c09143ecf03da93eff07f760173331547d823
+f/ffmpeg/libswresample3_4.1.6-1.lnd.5~deb10u1_mips64el.deb 61d4f95c796d9c58b9e2dc10bffb228be987c35104bea9f8c8ada320a0ef9dff
+o/opus/libopus-dev_1.3-1_mips64el.deb 91fe9e0c15b0d859b035d9d8eb79cc7be3489c65ee34762376ca3e33bf1c2f83
+o/opus/libopus0_1.3-1_mips64el.deb 0f621f3f105141432071f0e77152fc83cd4a606d53a271fe617bf687cc6532f2
+x/x264/libx264-dev_0.155.2917+git0a84d98-2.lnd.7_mips64el.deb a4863d5fef50bd849e6dfb7504d55aa0f6b40d9d9baa401c912392eecededbfa
+x/x264/libx264-155_0.155.2917+git0a84d98-2.lnd.7_mips64el.deb 7e023d7d8fb4e141da1ebd39af18e0474726d5de70646432d3d881161c56c06d
+x/x265/libx265-dev_2.9-4_mips64el.deb 6ae58669cd20d33f388870fe5f04029831c9f4f7e2f66f7dacd1a882ccc3fee1
+x/x265/libx265-165_2.9-4_mips64el.deb e9caf450d662a4a45dc35420f9349712bf1b955d14ea2a23e5c34569107a954d
+a/aom/libaom-dev_1.0.0-3_mips64el.deb 8d1bad2b00a43bdf92cc2538825c8119ae9bd3d77a2880b5065a2c5729e4fd32
+a/aom/libaom0_1.0.0-3_mips64el.deb 85c8907e226c259a2a8d60eb50093c426b929d1e8cc4fa9c38ef0247318d2247
+g/gtk+3.0/libgtk-3-dev_3.24.5-1_mips64el.deb 287de90784e5824f6cf7aa3533a6cf40df5bc8d95e628a34cf55d8a03e116269
+g/gtk+3.0/libgtk-3-0_3.24.5-1_mips64el.deb 46bf17eab93e80829c4f60b79bfbcf2b8cfc046e6d17781f3cdb908bb5c4c3e1
+g/gstreamer1.0/libgstreamer1.0-dev_1.14.4-1_mips64el.deb 5ab2fe8677383cfb6a3f05eaf2bb69120247dec99e3da15d3557bf2a8761d0cf
+g/gstreamer1.0/libgstreamer1.0-0_1.14.4-1_mips64el.deb b5e1e32c29439dd440a553a71ee93c0abfcbee1514c3cc9134d209465d15d1a2
+g/gst-plugins-base1.0/libgstreamer-plugins-base1.0-dev_1.14.4-2_mips64el.deb a98af2311bde7fca644f72558ea49f75e3d0c6e1d1890ee21e76e42ad08fe966
+g/gst-plugins-base1.0/libgstreamer-plugins-base1.0-0_1.14.4-2_mips64el.deb 28b9d986867e46c886e56c7032bc41e985cb1690775d82e89982b4869b680da2
+p/pulseaudio/libpulse-dev_12.2-4+deb10u1_mips64el.deb 78fd5ed23199acf331e8410d0dad8704c44605aa4220cefda9661257040d3db5
+p/pulseaudio/libpulse0_12.2-4+deb10u1_mips64el.deb 98a230cc26e6b3504b853ae10b423edc939d1b8419b35886266ed11fa2c1bc7d
+a/alsa-lib/libasound2-dev_1.1.8-1_mips64el.deb 438bab612648343c935e1a77cf1b7b2eb02496a2acf62ce0c6dec4a86cd33389
+a/alsa-lib/libasound2_1.1.8-1_mips64el.deb 8710d3803cff86df51b4b04c15258fe704cc16416109ecea3a9905cc25e121a7
+d/dbus/libdbus-1-dev_1.12.16-1_mips64el.deb 860963e7f65c7a7135c6483cb7584326eae27d785f3a4d422b6cf7ae067ceb80
+d/dbus/libdbus-1-3_1.12.16-1_mips64el.deb 8170b3a0818906d939de5b3dc388a573d1a19b9d8b414b7de82a823cca452bba
+g/glib2.0/libglib2.0-dev_2.58.3-2+deb10u2_mips64el.deb 690a9892322f369d8a7cf1fc718fd60c5270f0ba38ff530c985267d9036bbf58
+g/glib2.0/libglib2.0-0_2.58.3-2+deb10u2_mips64el.deb 3e85c8775087e236f32557fe1e69814f2059245e98dd3baf401d93e17317e59b
+g/glib2.0/libglib2.0-dev-bin_2.58.3-2+deb10u2_mips64el.deb 45fa85fa4fe65419e8cda5b60ca8171da33a8b236079c17cc27a898bbdf0f484
+libx/libx11/libx11-dev_1.6.7-1_mips64el.deb d9fa41d37f98e1acfb6d5bc06a3b536e4dbeb3d15cc7ce08668a9188c10de1f0
+libx/libx11/libx11-6_1.6.7-1_mips64el.deb 437f4c2bc92300670454aa8932e532f191546e179633bc652b9619a7ee1cf201
+libx/libxcb/libxcb1-dev_1.13.1-2_mips64el.deb 1f8ea2bd405427c8c577a8a97c9281dc8afc359a9a01b4e631b1a84914117cbf
+libx/libxcb/libxcb1_1.13.1-2_mips64el.deb df437e2c9cc5f8195e83e3ae57548f91f43ccb65cfed465c4ab88e02180a66ed
+m/mesa/libegl1-mesa-dev_18.3.6-2+deb10u1.lnd.5_mips64el.deb 2af197927886608552197388b03702aeb9c23dd8cd0cbe4f2eafa35656034ab0
+m/mesa/libegl-mesa0_18.3.6-2+deb10u1.lnd.5_mips64el.deb 750a5c9b50046bda3b9934935c472fab59c6803b2defe78399ddc4b188bd0b97
+m/mesa/libgles2-mesa-dev_18.3.6-2+deb10u1.lnd.5_mips64el.deb 363bb8282d61e8b4fcf0e806fbb039b59ba6cea367093a9a94a9b79746998653
+m/mesa/libgbm-dev_18.3.6-2+deb10u1.lnd.5_mips64el.deb bf1f7044663b3ed5c2db0fa4e8d4c2a0d4db6042d8371118127fb817153083ea
+m/mesa/libgbm1_18.3.6-2+deb10u1.lnd.5_mips64el.deb a614427f4eabfd2974f348d1f7db98061b43e90a244349d41bfa1aa9f5b12ca1
+libv/libvpx/libvpx-dev_1.7.0-4+deb10u1_mips64el.deb a9cf28c6144d6458261224dd15ab4e3561d9c1c4c7c7c1a6d3c1cdec7cf90c44
+libv/libvpx/libvpx5_1.7.0-4+deb10u1_mips64el.deb 13c10ac6e16c483b64494b78e5b0bb0cdf198a485081be56f5b128020bb0aaf3
+libs/libsodium/libsodium-dev_1.0.17-1_mips64el.deb cc737f139b1f615af3ace4bdf4f4ce8a2a4ff2615021e1812b8fad9005bb8a6d
+libs/libsodium/libsodium23_1.0.17-1_mips64el.deb 9a7fc3d78dc604e812b15a10c375c283de5767b2a7a5ebf246797f50ca24c7c0
+libd/libdrm/libdrm-dev_2.4.97-1.lnd.4_mips64el.deb 4f49d48cd90b1ea94b2bd8b2435a8bb791e24366ebc94c651bd47ccca8aa55ad
+libd/libdrm/libdrm2_2.4.97-1.lnd.4_mips64el.deb e2c0f2b5dc5d18dede42ae57b16eff00e515645619d56a1620a157d61a199b91

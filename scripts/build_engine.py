@@ -56,7 +56,7 @@ def main() -> int:
             return 1
 
     for name in ("rustdesk-headless-trusted-devices.patch", "rustdesk-x265-pixel-format.patch",
-                 "rustdesk-build-version-host.patch"):
+                 "rustdesk-build-version-host.patch", "rustdesk-scrap-va-vdpau-optional.patch"):
         overlay = PATCH.parent / name
         if subprocess.run(["git", "-C", str(tree), "apply", "--reverse", "--check", "--ignore-space-change", str(overlay)], capture_output=True).returncode:
             subprocess.run(["git", "-C", str(tree), "apply", "--ignore-space-change", str(overlay)], check=True)

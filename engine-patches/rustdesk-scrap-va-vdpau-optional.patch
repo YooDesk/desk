@@ -1,0 +1,25 @@
+diff --git a/libs/scrap/build.rs b/libs/scrap/build.rs
+--- a/libs/scrap/build.rs
++++ b/libs/scrap/build.rs
+@@ -199,7 +199,20 @@ fn main() {
+     let dyn_libs: Vec<&str> = if target_os == "windows" {
+         ["User32", "bcrypt", "ole32", "advapi32"].to_vec()
+     } else if target_os == "linux" {
+-        let mut v = ["va", "va-drm", "va-x11", "vdpau", "X11", "stdc++"].to_vec();
++        // VA-API and VDPAU are hardware decode stacks that distros ship only
++        // for GPUs present on the machine. Some YooDesk cross targets
++        // (Loongson 2K mips64el) have no such stack at all, so link them
++        // only when the linker can find them.
++        let mut v = ["X11", "stdc++"].to_vec();
++        for hw in ["va", "va-drm", "va-x11", "vdpau"] {
++            let probe = std::process::Command::new("sh")
++                .arg("-c")
++                .arg(format!("printf 'int main(){{}}' | {} -x c - -o /dev/null -l{} >/dev/null 2>&1", std::env::var("CC").unwrap_or_else(|_| "cc".to_owned()), hw))
++                .status();
++            if probe.map(|s| s.success()).unwrap_or(false) {
++                v.push(hw);
++            }
++        }
+         if target_arch == "x86_64" {
+             v.push("z");
+         }
