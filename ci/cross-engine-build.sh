@@ -59,6 +59,30 @@ export PATH="$tools/bin:$PATH"
 export LIBCLANG_PATH=/usr/lib/llvm-10/lib
 export VCPKG_MAX_CONCURRENCY=3 CARGO_BUILD_JOBS=3
 
+# Wrappers, not compiler arrays: meson caches the compiler command in an
+# existing build directory and also drops extra elements for some
+# toolchains. The wrapper always injects the target sysroot, which resolves
+# both the headers (xf86drm.h) and the absolute paths inside GNU ld scripts
+# such as the sysroot libc.so.
+mkdir -p "$tools"
+cat > "$tools/meson-cc-loong64" <<'WRAP'
+#!/bin/sh
+exec /opt/yoodesk-tools/cross-tools/bin/loongarch64-unknown-linux-gnu-gcc --sysroot=/opt/yoodesk-tools/sysroot-loong64 "$@"
+WRAP
+cat > "$tools/meson-cxx-loong64" <<'WRAP'
+#!/bin/sh
+exec /opt/yoodesk-tools/cross-tools/bin/loongarch64-unknown-linux-gnu-g++ --sysroot=/opt/yoodesk-tools/sysroot-loong64 "$@"
+WRAP
+cat > "$tools/meson-cc-mips64el" <<'WRAP'
+#!/bin/sh
+exec /opt/yoodesk-tools/bin/mips64el-linux-gnuabi64-gcc --sysroot=/opt/yoodesk-tools/sysroot-mips64el "$@"
+WRAP
+cat > "$tools/meson-cxx-mips64el" <<'WRAP'
+#!/bin/sh
+exec /opt/yoodesk-tools/bin/mips64el-linux-gnu-g++ --sysroot=/opt/yoodesk-tools/sysroot-mips64el "$@"
+WRAP
+chmod +x "$tools"/meson-cc-* "$tools"/meson-cxx-*
+
 case "$platform" in
 linux-loong64)
     kind=loongarch64
@@ -142,8 +166,8 @@ linux-loong64)
     # meson cross file for libdrmtap: meson must not run target probes.
     cat > "$tools/meson-cross-loong64.ini" <<EOF
 [binaries]
-c = ['$tools/cross-tools/bin/loongarch64-unknown-linux-gnu-gcc', '--sysroot=$tools/sysroot-loong64']
-cpp = ['$tools/cross-tools/bin/loongarch64-unknown-linux-gnu-g++', '--sysroot=$tools/sysroot-loong64']
+c = '$tools/meson-cc-loong64'
+cpp = '$tools/meson-cxx-loong64'
 ar = '$tools/cross-tools/bin/loongarch64-unknown-linux-gnu-ar'
 strip = '$tools/cross-tools/bin/loongarch64-unknown-linux-gnu-strip'
 pkg-config = 'pkg-config'
@@ -185,8 +209,8 @@ linux-mips64el)
     export BINDGEN_EXTRA_CLANG_ARGS="--target=mips64el-linux-gnuabi64 --sysroot=$sysroot_mips"
     cat > "$tools/meson-cross-mips64el.ini" <<EOF
 [binaries]
-c = ['$tools/bin/mips64el-linux-gnuabi64-gcc', '--sysroot=$tools/sysroot-mips64el']
-cpp = ['$tools/bin/mips64el-linux-gnu-g++', '--sysroot=$tools/sysroot-mips64el']
+c = '$tools/meson-cc-mips64el'
+cpp = '$tools/meson-cxx-mips64el'
 ar = '$tools/bin/mips64el-linux-gnuabi64-ar'
 strip = '$tools/bin/mips64el-linux-gnuabi64-strip'
 pkg-config = 'pkg-config'
