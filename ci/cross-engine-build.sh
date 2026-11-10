@@ -20,16 +20,33 @@ platform="$1"
 target="$2"
 
 export DEBIAN_FRONTEND=noninteractive
-apt-get update
-apt-get install -y --no-install-recommends \
-    build-essential gcc-8 g++-8 ca-certificates curl git unzip zip xz-utils \
-    pkg-config python3 binutils file dpkg autoconf automake libtool ninja-build nasm \
-    clang-10 libclang-10-dev llvm-10-dev libasound2-dev libgstreamer1.0-dev \
-    libgstreamer-plugins-base1.0-dev libgtk-3-dev libpulse-dev libva-dev \
-    libxcb-randr0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxcb-shm0-dev \
-    libxdo-dev libxfixes-dev libxrandr-dev libxtst-dev libxkbcommon-dev \
-    libudev-dev libdbus-1-dev libegl1-mesa-dev libgles2-mesa-dev libgbm-dev \
-    libdrm-dev meson python3-pip zlib1g-dev libffi-dev libssl-dev libbz2-dev liblzma-dev libreadline-dev libsqlite3-dev
+# archive.ubuntu.com occasionally refuses connections from runners; retry
+# the index update before declaring the build environment unusable.
+for attempt in 1 2 3; do
+    apt-get update && break
+    if [[ "$attempt" == 3 ]]; then
+        echo "apt-get update failed after 3 attempts" >&2
+        exit 1
+    fi
+    sleep $((attempt * 15))
+done
+for attempt in 1 2 3; do
+    apt-get install -y --no-install-recommends \
+        build-essential gcc-8 g++-8 ca-certificates curl git unzip zip xz-utils \
+        pkg-config python3 binutils file dpkg autoconf automake libtool ninja-build nasm \
+        clang-10 libclang-10-dev llvm-10-dev libasound2-dev libgstreamer1.0-dev \
+        libgstreamer-plugins-base1.0-dev libgtk-3-dev libpulse-dev libva-dev \
+        libxcb-randr0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxcb-shm0-dev \
+        libxdo-dev libxfixes-dev libxrandr-dev libxtst-dev libxkbcommon-dev \
+        libudev-dev libdbus-1-dev libegl1-mesa-dev libgles2-mesa-dev libgbm-dev \
+        libdrm-dev meson python3-pip zlib1g-dev libffi-dev libssl-dev libbz2-dev \
+        liblzma-dev libreadline-dev libsqlite3-dev && break
+    if [[ "$attempt" == 3 ]]; then
+        echo "dependency install failed after 3 attempts" >&2
+        exit 1
+    fi
+    apt-get update && sleep $((attempt * 15))
+done
 
 tools=/opt/yoodesk-tools
 mkdir -p "$tools"
