@@ -59,6 +59,24 @@ prepare_sysroot() {
     # Run this for cached and freshly unpacked roots alike: an archive's
     # .done marker does not supply the development metadata or linker inputs.
     if [[ "$multiarch" == mips64el-linux-gnuabi64 ]]; then
+        if [[ ! -f "$root/.buster-dev-complete" ]]; then
+            local index="$prefix/buster-mips64el-Packages"
+            local manifest="$prefix/buster-mips64el-supplement"
+            curl -fsL --retry 3 --connect-timeout 30 'https://archive.debian.org/debian/dists/buster/main/binary-mips64el/Packages.gz' | gzip -dc > "$index"
+            python3 "$(dirname "$0")/cross-sysroot-roots.py" "$index" mips64el-supplement > "$manifest"
+            local file sha deb stage="$prefix/mips-supplement-stage"
+            while read -r file sha; do
+                deb="$prefix/mips-supplement.deb"
+                fetch "https://archive.debian.org/debian/$file" "$sha" "$deb"
+                mkdir -p "$stage"
+                dpkg-deb -x "$deb" "$stage"
+                # Keep the pinned Loongnix media stack and add missing inputs only.
+                cp -an "$stage/." "$root/"
+                rm -rf "$stage"
+            done < "$manifest"
+            rm -f "$index" "$manifest" "$prefix/mips-supplement.deb"
+            touch "$root/.buster-dev-complete"
+        fi
         mkdir -p "$root/usr/$multiarch" "$root/usr/include"
         cp -a "$prefix/mips-root/usr/$multiarch/." "$root/usr/$multiarch/"
         cp -a "$prefix/mips-root/usr/$multiarch/include/." "$root/usr/include/"
@@ -67,6 +85,20 @@ prepare_sysroot() {
         # The prebuilt Loongnix archive contains the distro packages only;
         # it does not include libyuv, so the fast/cache paths need this too.
         bash "$(dirname "$0")/cross-sysroot-build-mips64el.sh" "$root"
+    elif [[ ! -f "$root/usr/lib/$multiarch/pkgconfig/aom.pc" ]]; then
+        # libaom-dev was absent from the original prebuilt snapshot closure.
+        # Supply matching headers and runtime from that same immutable snapshot.
+        local file sha
+        while read -r file sha; do
+            if ! fetch "https://snapshot.debian.org/archive/debian/20261108T000000Z/$file" "$sha" "$prefix/aom-loong64.deb"; then
+                fetch "https://deb.debian.org/debian/$file" "$sha" "$prefix/aom-loong64.deb"
+            fi
+            dpkg-deb -x "$prefix/aom-loong64.deb" "$root"
+        done <<'EOF'
+pool/main/a/aom/libaom3_3.14.1-1_loong64.deb 91ead1bae6b8df413d97fac103fdffb10196587077d4e1bf0c8cda037ebcb7e6
+pool/main/a/aom/libaom-dev_3.14.1-1_loong64.deb ca50e327ed7fcdb2c7152fad282b3a6953a758931940cd25538186f0dc676532
+EOF
+        rm -f "$prefix/aom-loong64.deb"
     fi
     local libdir="$root/usr/lib/$multiarch"
     restore_so_links "$libdir"

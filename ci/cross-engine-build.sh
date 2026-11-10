@@ -283,6 +283,20 @@ ls -1 "$PKG_CONFIG_LIBDIR" 2>/dev/null | head -5 || echo "(libdir missing)"
 PKG_CONFIG_PATH="$PKG_CONFIG_PATH" PKG_CONFIG_SYSROOT_DIR="$PKG_CONFIG_SYSROOT_DIR" pkg-config --modversion libdrm || echo "libdrm.pc NOT FOUND"
 pkg-config --variable pc_path pkg-config 2>/dev/null | head -1 || true
 echo "--- end probe ---"
+# Check the entire engine dependency set together so an incomplete sysroot
+# lists every missing pkg-config dependency before the engine build starts.
+missing_packages=()
+for package in libyuv vpx aom opus libsodium libavcodec libavutil libavformat \
+    gstreamer-app-1.0 gstreamer-video-1.0 gio-2.0 gtk+-3.0 libudev \
+    alsa libpulse libpulse-simple dbus-1 libdrm gbm x11 xext xfixes xrandr \
+    xtst xkbcommon xcb xcb-shm xcb-randr xcb-xfixes; do
+    pkg-config --exists "$package" || missing_packages+=("$package")
+done
+if (( ${#missing_packages[@]} )); then
+    printf 'Incomplete engine sysroot: %s\n' "${missing_packages[*]}" >&2
+    pkg-config --print-errors --exists "${missing_packages[@]}" || true
+    exit 1
+fi
 python3.13 scripts/prepare_sources.py
 python3.13 scripts/prepare_linux_native.py
 python3.13 scripts/patch_hwcodec.py

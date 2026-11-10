@@ -44,7 +44,7 @@ def depends(names):
 LOONG64_ROOTS = [
     'libc6-dev', 'linux-libc-dev', 'libstdc++-14-dev', 'libstdc++6',
     'libavcodec-dev', 'libavformat-dev', 'libavutil-dev', 'libswresample-dev',
-    'libyuv-dev', 'libopus-dev', 'libsodium-dev', 'libx264-dev', 'libx265-dev',
+    'libyuv-dev', 'libaom-dev', 'libopus-dev', 'libsodium-dev', 'libx264-dev', 'libx265-dev',
     'libvpx-dev', 'libgtk-3-dev', 'libasound2-dev', 'libpulse-dev',
     'libgstreamer1.0-dev', 'libgstreamer-plugins-base1.0-dev',
     'libgbm-dev', 'libdrm-dev', 'libxkbcommon-dev', 'libxdo-dev', 'libudev-dev',
@@ -55,12 +55,25 @@ LOONG64_ROOTS = [
     'libxinerama-dev', 'libxcursor-dev', 'libxrender-dev', 'libxss-dev',
 ]
 
+# Complete the development packages absent from the prebuilt Loongnix root.
+# Existing Loongnix files are preserved when this Debian buster closure is merged.
+MIPS64EL_SUPPLEMENT_ROOTS = [
+    'libudev-dev', 'libxrandr-dev', 'libxtst-dev', 'libxkbcommon-dev',
+    'libxcb-shm0-dev', 'libxcb-randr0-dev', 'libxcb-xfixes0-dev',
+    'libcairo2-dev', 'libfontconfig1-dev', 'libgdk-pixbuf2.0-dev',
+    'libatk-bridge2.0-dev', 'libwayland-dev', 'wayland-protocols',
+    'libepoxy-dev', 'libxcomposite-dev', 'libxi-dev', 'libxinerama-dev',
+    'libxcursor-dev', 'libxft-dev',
+]
+
 
 def main():
     index_path, flavor = sys.argv[1], sys.argv[2]
     packages = load(index_path)
     if flavor == 'loong64':
         roots = LOONG64_ROOTS
+    elif flavor == 'mips64el-supplement':
+        roots = MIPS64EL_SUPPLEMENT_ROOTS
     else:
         raise SystemExit('unknown flavor: ' + flavor)
     seen = set()
@@ -72,7 +85,11 @@ def main():
         seen.add(name)
         queue.extend(depends(packages[name].get('Depends', '')))
     for name in sorted(seen):
-        print(packages[name]['Filename'])
+        fields = packages[name]
+        if flavor == 'mips64el-supplement':
+            print(fields['Filename'], fields['SHA256'])
+        else:
+            print(fields['Filename'])
 
 
 if __name__ == '__main__':
