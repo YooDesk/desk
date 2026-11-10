@@ -1,5 +1,12 @@
 {
   "schema_version": 1,
   "version": "v1",
-  "platforms": {}
+  "platforms": {
+    "linux-loong64": {
+      "url": "https://github.com/YooDesk/desk/releases/download/native-sdk-v1-linux-loong64/native-sdk-v1-linux-loong64.tar.xz",
+      "sha256": "1f20cf5c0dc57552774e6cc88cac0720a66ea1ad261beef761dc614053cc7b20",
+      "headers_url": "https://github.com/YooDesk/desk/releases/download/native-sdk-v1-linux-loong64/native-sdk-v1-linux-loong64-openh264-headers.tar.xz",
+      "headers_sha256": "a111c2e66cee745f7658e97fa31cdb74689ea57d2e223a2a10c72e7f415f04ed"
+    }
+  }
 }

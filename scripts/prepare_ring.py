@@ -39,9 +39,12 @@ def prepare():
             target = tree / filename
             target.write_bytes(target.read_text(encoding="utf-8").encode("utf-8"))
         subprocess.run(["git", "-C", str(tree), "init", "-q"], check=True)
-        payload = (ROOT / "engine-patches/ring-engine-symbol-namespace.patch").read_text(encoding="utf-8").encode()
-        for options in (["--check"], []):
-            subprocess.run(["git", "-C", str(tree), "apply", *options, "-"], input=payload, check=True)
+        portable = os.environ.get("CARGO_BUILD_TARGET") in (
+            "loongarch64-unknown-linux-gnu", "mips64el-unknown-linux-gnuabi64")
+        if portable:
+            payload = (ROOT / "engine-patches/ring-engine-symbol-namespace.patch").read_text(encoding="utf-8").encode()
+            for options in (["--check"], []):
+                subprocess.run(["git", "-C", str(tree), "apply", *options, "-"], input=payload, check=True)
         for original in tree.rglob("*"):
             relative = original.relative_to(tree)
             if relative.parts[0] == ".git" or not original.is_file():
@@ -50,7 +53,7 @@ def prepare():
             output.parent.mkdir(parents=True, exist_ok=True)
             if not output.is_file() or output.read_bytes() != original.read_bytes():
                 shutil.copy2(original, output)
-    print(f"ring {VERSION} engine namespace prepared at {destination}")
+    print(f"ring {VERSION} {'private portable' if portable else 'upstream assembly'} namespace prepared at {destination}")
 
 
 if __name__ == "__main__":

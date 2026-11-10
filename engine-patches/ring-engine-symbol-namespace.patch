@@ -31,3 +31,14 @@
  include = [
      "LICENSE",
      "LICENSE-other-bits",
+--- a/build.rs
++++ b/build.rs
+@@ -357,3 +357,7 @@
+-    let generated_dir = if !is_git {
++    let generated_dir = if asm_target.is_none() {
++        // Portable targets need headers matching this copy's private namespace.
++        generate_prefix_symbols_headers(&out_dir, core_name_and_version).unwrap();
++        out_dir.clone()
++    } else if !is_git {
+         c_root_dir.join(PREGENERATED)
+     } else {
