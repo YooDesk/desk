@@ -163,6 +163,8 @@ linux-loong64)
     fi
     export CC="$tools/meson-cc-loong64"
     export CXX="$tools/meson-cxx-loong64"
+    export CC_loongarch64_unknown_linux_gnu="$tools/meson-cc-loong64"
+    export CXX_loongarch64_unknown_linux_gnu="$tools/meson-cxx-loong64"
     export AR="$tools/cross-tools/bin/loongarch64-unknown-linux-gnu-ar"
     export CARGO_TARGET_LOONGARCH64_UNKNOWN_LINUX_GNU_LINKER="$CC"
     export CARGO_TARGET_LOONGARCH64_UNKNOWN_LINUX_GNU_AR="$AR"
@@ -205,6 +207,8 @@ linux-mips64el)
     fi
     export CC="$tools/meson-cc-mips64el"
     export CXX="$tools/meson-cxx-mips64el"
+    export CC_mips64el_unknown_linux_gnuabi64="$tools/meson-cc-mips64el"
+    export CXX_mips64el_unknown_linux_gnuabi64="$tools/meson-cxx-mips64el"
     export AR="$tools/bin/mips64el-linux-gnuabi64-ar"
     export CARGO_TARGET_MIPS64EL_UNKNOWN_LINUX_GNUABI64_LINKER="$CC"
     export CARGO_TARGET_MIPS64EL_UNKNOWN_LINUX_GNUABI64_AR="$AR"
