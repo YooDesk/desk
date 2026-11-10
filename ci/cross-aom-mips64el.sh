@@ -35,7 +35,7 @@ cmake --fresh -S "$work/source" -B "$work/build" \
     -DAOM_TARGET_CPU=generic -DBUILD_SHARED_LIBS=OFF \
     -DENABLE_DOCS=OFF -DENABLE_EXAMPLES=OFF -DENABLE_TESTDATA=OFF \
     -DENABLE_TESTS=OFF -DENABLE_TOOLS=OFF
-cmake --build "$work/build" --target aom --parallel "$(nproc)"
+cmake --build "$work/build" --parallel "$(nproc)"
 DESTDIR="$root" cmake --install "$work/build"
 # AOM versions differ in whether GNUInstallDirs is honored.
 if [[ -f "$root/usr/lib/libaom.a" ]]; then
