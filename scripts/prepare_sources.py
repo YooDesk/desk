@@ -28,6 +28,7 @@ def checkout(name, target, modules=()):
 
 
 def main():
+    subprocess.run([sys.executable, str(ROOT / "scripts/prepare_openh264.py")], check=True)
     tree = ROOT / "artifacts/rustdesk-engine-src"
     checkout("rustdesk", tree, ["libs/hbb_common"])
     checkout("hwcodec", ROOT / "deps/hwcodec", ["externals"])

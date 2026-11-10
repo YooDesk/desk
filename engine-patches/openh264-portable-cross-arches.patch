@@ -1,0 +1,20 @@
+--- a/build.rs
++++ b/build.rs
+@@ -51,6 +51,8 @@ mod source_build {
+         Arm,
+         Aarch64,
+         Mips,
++        Mips64,
++        Loongarch64,
+         Powerpc,
+         Powerpc64,
+         S390x,
+@@ -102,6 +104,8 @@ mod source_build {
+                 "arm" => TargetArch::Arm,
+                 "aarch64" => TargetArch::Aarch64,
+                 "mips" => TargetArch::Mips,
++                "mips64" => TargetArch::Mips64,
++                "loongarch64" => TargetArch::Loongarch64,
+                 "powerpc" => TargetArch::Powerpc,
+                 "powerpc64" => TargetArch::Powerpc64,
+                 "s390x" => TargetArch::S390x,

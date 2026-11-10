@@ -100,3 +100,6 @@ unsafe_code = "warn"
 all = "warn"
 
 # Protocol-specific implementation; the host is never linked as a Rust crate.
+
+[patch.crates-io]
+openh264-sys2 = { path = "artifacts/openh264-sys2-patched" }
