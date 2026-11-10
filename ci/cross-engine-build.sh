@@ -55,41 +55,48 @@ done
 
 tools=/opt/yoodesk-tools
 mkdir -p "$tools"
-export PATH="$tools/bin:$PATH"
-export LIBCLANG_PATH=/usr/lib/llvm-10/lib
-export VCPKG_MAX_CONCURRENCY=3 CARGO_BUILD_JOBS=3
-
-# Wrappers, not compiler arrays: meson caches the compiler command in an
-# existing build directory and also drops extra elements for some
-# toolchains. The wrapper always injects the target sysroot, which resolves
-# both the headers (xf86drm.h) and the absolute paths inside GNU ld scripts
-# such as the sysroot libc.so.
-mkdir -p "$tools"
-cat > "$tools/meson-cc-loong64" <<'WRAP'
-#!/bin/sh
-exec /opt/yoodesk-tools/cross-tools/bin/loongarch64-unknown-linux-gnu-gcc     --sysroot=/opt/yoodesk-tools/sysroot-loong64     -isystem /opt/yoodesk-tools/sysroot-loong64/usr/include/loongarch64-linux-gnu     -L/opt/yoodesk-tools/sysroot-loong64/usr/lib/loongarch64-linux-gnu     -Wl,-rpath-link,/opt/yoodesk-tools/sysroot-loong64/usr/lib/loongarch64-linux-gnu "$@"
-WRAP
-cat > "$tools/meson-cxx-loong64" <<'WRAP'
-#!/bin/sh
-exec /opt/yoodesk-tools/cross-tools/bin/loongarch64-unknown-linux-gnu-g++     --sysroot=/opt/yoodesk-tools/sysroot-loong64     -isystem /opt/yoodesk-tools/sysroot-loong64/usr/include/loongarch64-linux-gnu     -L/opt/yoodesk-tools/sysroot-loong64/usr/lib/loongarch64-linux-gnu     -Wl,-rpath-link,/opt/yoodesk-tools/sysroot-loong64/usr/lib/loongarch64-linux-gnu "$@"
-WRAP
-cat > "$tools/meson-cc-mips64el" <<'WRAP'
-#!/bin/sh
-exec /opt/yoodesk-tools/bin/mips64el-linux-gnuabi64-gcc \
-    --sysroot=/opt/yoodesk-tools/sysroot-mips64el \
-    -isystem /opt/yoodesk-tools/sysroot-mips64el/usr/include/mips64el-linux-gnuabi64 \
-    -L/opt/yoodesk-tools/sysroot-mips64el/usr/lib/mips64el-linux-gnuabi64 \
-    -Wl,-rpath-link,/opt/yoodesk-tools/sysroot-mips64el/usr/lib/mips64el-linux-gnuabi64 "$@"
-WRAP
-cat > "$tools/meson-cxx-mips64el" <<'WRAP'
-#!/bin/sh
-exec /opt/yoodesk-tools/bin/mips64el-linux-gnuabi64-g++ \
-    --sysroot=/opt/yoodesk-tools/sysroot-mips64el \
-    -isystem /opt/yoodesk-tools/sysroot-mips64el/usr/include/mips64el-linux-gnuabi64 \
-    -L/opt/yoodesk-tools/sysroot-mips64el/usr/lib/mips64el-linux-gnuabi64 \
-    -Wl,-rpath-link,/opt/yoodesk-tools/sysroot-mips64el/usr/lib/mips64el-linux-gnuabi64 "$@"
-WRAP
-chmod +x "$tools"/meson-cc-* "$tools"/meson-cxx-*
+# Wrappers instead of compiler arrays: meson caches the compiler command in
+# an existing build directory and drops extra elements for some toolchains.
+# They inject the target sysroot (headers under usr/include/<multiarch>, the
+# C library under usr/lib/<multiarch>, and absolute paths inside GNU ld
+# scripts) and drop -m64, which cc-rs adds from the build host but neither
+# cross gcc accepts.
+for triple in loongarch64:loongarch64-linux-gnu mips64el:mips64el-linux-gnuabi64; do
+    arch="${triple%%:*}"
+    multiarch="${triple#*:}"
+    if [[ "$arch" == loongarch64 ]]; then
+        bindir="/opt/yoodesk-tools/cross-tools/bin"
+        sysroot="/opt/yoodesk-tools/sysroot-loong64"
+        cprefix="loongarch64-unknown-linux-gnu"
+    else
+        bindir="/opt/yoodesk-tools/bin"
+        sysroot="/opt/yoodesk-tools/sysroot-mips64el"
+        cprefix="mips64el-linux-gnuabi64"
+    fi
+    tool_suffix=loong64
+    [[ "$arch" == mips64el ]] && tool_suffix=mips64el
+    for lang in cc cxx; do
+        case "$lang" in
+            cc) compiler="$bindir/$cprefix-gcc" ;;
+            cxx) compiler="$bindir/$cprefix-g++" ;;
+        esac
+        out="$tools/meson-${lang}-${tool_suffix}"
+        {
+            echo '#!/bin/sh'
+            echo '# Drop -m64: cc-rs adds it from the build host and this gcc rejects it.'
+            echo 'args=""'
+            echo 'for a in "$@"; do'
+            echo '    case "$a" in -m64) ;; *) args="$args $a" ;; esac'
+            echo 'done'
+            echo "exec $compiler \\"
+            echo "    --sysroot=$sysroot \\"
+            echo "    -isystem $sysroot/usr/include/$multiarch \\"
+            echo "    -L$sysroot/usr/lib/$multiarch \\"
+            echo "    -Wl,-rpath-link,$sysroot/usr/lib/$multiarch \$args"
+        } > "$out"
+        chmod +x "$out"
+    done
+done
 
 case "$platform" in
 linux-loong64)
@@ -154,8 +161,8 @@ linux-loong64)
         tar -xf /tmp/rust-std.tar.xz -C /tmp
         "/tmp/rust-std-${RUST_VERSION:-1.99.0}-loongarch64-unknown-linux-gnu/install.sh" --prefix="$tools" --without=rust-docs
     fi
-    export CC="$tools/cross-tools/bin/loongarch64-unknown-linux-gnu-gcc"
-    export CXX="$tools/cross-tools/bin/loongarch64-unknown-linux-gnu-g++"
+    export CC="$tools/meson-cc-loong64"
+    export CXX="$tools/meson-cxx-loong64"
     export AR="$tools/cross-tools/bin/loongarch64-unknown-linux-gnu-ar"
     export CARGO_TARGET_LOONGARCH64_UNKNOWN_LINUX_GNU_LINKER="$CC"
     export CARGO_TARGET_LOONGARCH64_UNKNOWN_LINUX_GNU_AR="$AR"
@@ -196,8 +203,8 @@ linux-mips64el)
         tar -xf /tmp/rust-src.tar.xz -C /tmp
         "/tmp/rust-src-${RUST_VERSION:-1.99.0}/install.sh" --prefix="$tools"
     fi
-    export CC="$tools/bin/mips64el-linux-gnuabi64-gcc"
-    export CXX="$tools/bin/mips64el-linux-gnuabi64-g++"
+    export CC="$tools/meson-cc-mips64el"
+    export CXX="$tools/meson-cxx-mips64el"
     export AR="$tools/bin/mips64el-linux-gnuabi64-ar"
     export CARGO_TARGET_MIPS64EL_UNKNOWN_LINUX_GNUABI64_LINKER="$CC"
     export CARGO_TARGET_MIPS64EL_UNKNOWN_LINUX_GNUABI64_AR="$AR"
