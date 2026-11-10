@@ -119,7 +119,7 @@ mips64el)
     mkdir -p "$root"
     # Fast path: pre-built from the same pinned Loongnix packages.
     mips_url='https://github.com/YooDesk/desk/releases/download/sysroot-mips64el-loongnix-d10/sysroot-mips64el-loongnix.tar.xz'
-    mips_sha='42b591e69f0e1a87c6180fb0a4512854df7ab2c887ab50af0fd89e936bed8c12'
+    mips_sha='7ddc16199f5a7bc9d9f44409e93accb425b59736626c7a6a6637aae3066f7b77'
     if curl -fL --retry 3 --connect-timeout 30 "$mips_url" -o /tmp/mips-sysroot.tar.xz; then
         if echo "$mips_sha  /tmp/mips-sysroot.tar.xz" | sha256sum -c -; then
             tar -xJf /tmp/mips-sysroot.tar.xz -C "$root"
