@@ -30,18 +30,22 @@ if [[ ! -e "$root/usr/lib/mips64el-linux-gnuabi64/libyuv.a" && ! -e "$root/usr/l
         -DCMAKE_SYSTEM_PROCESSOR=mips64el \
         -DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY \
         -DCMAKE_C_COMPILER="$cc" -DCMAKE_CXX_COMPILER="$cxx" \
-        -DCMAKE_SYSROOT="$root/usr/mips64el-linux-gnuabi64" \
+        -DCMAKE_SYSROOT="$root" \
+        -DCMAKE_EXE_LINKER_FLAGS="-L$root/usr/mips64el-linux-gnuabi64/lib -Wl,-rpath-link,$root/usr/mips64el-linux-gnuabi64/lib" \
+        -DCMAKE_SHARED_LINKER_FLAGS="-L$root/usr/mips64el-linux-gnuabi64/lib -Wl,-rpath-link,$root/usr/mips64el-linux-gnuabi64/lib" \
         -DCMAKE_INSTALL_PREFIX=/usr \
         -DCMAKE_INSTALL_LIBDIR=lib/mips64el-linux-gnuabi64 \
         -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON
     make -j"$(nproc)" yuv
-    make install
+    DESTDIR="$root" make install
     # Move from the plain /usr/lib layout into the multiarch dir if cmake
     # ignored CMAKE_INSTALL_LIBDIR above.
-    if [[ -e "$root/usr/lib/libyuv.so" ]]; then
+    if [[ -e "$root/usr/lib/libyuv.so" || -e "$root/usr/lib/libyuv.a" ]]; then
         mkdir -p "$root/usr/lib/mips64el-linux-gnuabi64"
-        mv "$root/usr/lib/libyuv.so"* "$root/usr/lib/mips64el-linux-gnuabi64/"
-        mv "$root/usr/lib/libyuv.a" "$root/usr/lib/mips64el-linux-gnuabi64/" 2>/dev/null || true
+        for library in "$root/usr/lib"/libyuv.*; do
+            [[ -e "$library" || -L "$library" ]] || continue
+            mv "$library" "$root/usr/lib/mips64el-linux-gnuabi64/"
+        done
     fi
 fi
 

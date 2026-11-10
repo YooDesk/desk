@@ -104,6 +104,10 @@ linux-mips64el)
 esac
 
 bash "$(dirname "$0")/cross-tools.sh" "$kind" "$tools"
+if [[ "$kind" == mips64el ]]; then
+    # The native cross binutils libraries are needed during sysroot builds too.
+    export LD_LIBRARY_PATH="$tools/mips-root/usr/lib/x86_64-linux-gnu${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+fi
 
 # Prebuilt CPython (python-build-standalone) instead of a 13-minute source
 # build: the build runs in a fresh container on every job, and the standalone
@@ -262,6 +266,10 @@ esac
 
 rustc --version
 "$QEMU" --version | head -n1
+# Fail early with the linker's actual diagnostic if the cached sysroot or
+# C++ toolchain is incomplete, before Cargo builds the large engine graph.
+printf '#include <stdio.h>\nint main(void) { return puts("C toolchain ready") < 0; }\n' | "$CC" -x c - -o /tmp/yoodesk-cross-c
+printf '#include <vector>\nint main() { std::vector<int> v(1, 0); return v[0]; }\n' | "$CXX" -x c++ - -o /tmp/yoodesk-cross-cxx
 
 # Source preparation shared with the native Linux flow: engine patches,
 # hwcodec source, libdrmtap. linux-pkg-config probes resolve through the

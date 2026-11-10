@@ -54,13 +54,55 @@ restore_so_links() { # restore_so_links <lib-dir>
     done
 }
 
+prepare_sysroot() {
+    local root="$1" multiarch="$2"
+    # Run this for cached and freshly unpacked roots alike: an archive's
+    # .done marker does not supply the development metadata or linker inputs.
+    if [[ "$multiarch" == mips64el-linux-gnuabi64 ]]; then
+        mkdir -p "$root/usr/$multiarch" "$root/usr/include"
+        cp -a "$prefix/mips-root/usr/$multiarch/." "$root/usr/$multiarch/"
+        cp -a "$prefix/mips-root/usr/$multiarch/include/." "$root/usr/include/"
+        mkdir -p "$root/lib64"
+        cp -L "$prefix/mips-root/usr/$multiarch/lib64/ld.so.1" "$root/lib64/ld.so.1"
+        # The prebuilt Loongnix archive contains the distro packages only;
+        # it does not include libyuv, so the fast/cache paths need this too.
+        bash "$(dirname "$0")/cross-sysroot-build-mips64el.sh" "$root"
+    fi
+    local libdir="$root/usr/lib/$multiarch"
+    restore_so_links "$libdir"
+    restore_so_links "$root/usr/lib64"
+    # Debian libyuv-dev and the upstream CMake install omit a .pc file,
+    # but scrap's linux-pkg-config feature requires it.
+    if [[ ! -f "$libdir/pkgconfig/libyuv.pc" ]]; then
+        test -f "$root/usr/include/libyuv.h"
+        test -e "$libdir/libyuv.so" || test -f "$libdir/libyuv.a"
+        mkdir -p "$libdir/pkgconfig"
+        local version
+        version=$(awk '/^#define LIBYUV_VERSION / {print $3}' "$root/usr/include/libyuv/version.h")
+        cat > "$libdir/pkgconfig/libyuv.pc" <<EOF
+prefix=/usr
+libdir=\${prefix}/lib/$multiarch
+includedir=\${prefix}/include
+
+Name: libyuv
+Description: YUV conversion and scaling library
+Version: ${version:-0}
+Libs: -L\${libdir} -lyuv
+Cflags: -I\${includedir}
+EOF
+    fi
+}
+
 case "$kind" in
 loongarch64)
     root="$prefix/sysroot-loong64"
     # The marker alone is not enough: a cached tree can exist without the
     # pkg-config files the engine needs, and the marker then pins the
     # broken state for every later run.
-    if [[ -f "$root/.done" && -d "$root/usr/lib/loongarch64-linux-gnu/pkgconfig" ]]; then exit 0; fi
+    if [[ -f "$root/.done" && -d "$root/usr/lib/loongarch64-linux-gnu/pkgconfig" ]]; then
+        prepare_sysroot "$root" loongarch64-linux-gnu
+        exit 0
+    fi
     rm -f "$root/.done"
     mkdir -p "$root"
     # Fast path: the pre-built sysroot is one tarball. It was assembled from
@@ -82,6 +124,7 @@ loongarch64)
                 fi
                 restore_so_links "$root/usr/lib/loongarch64-linux-gnu"
                 restore_so_links "$root/usr/lib64"
+                prepare_sysroot "$root" loongarch64-linux-gnu
                 touch "$root/.done"
                 exit 0
             fi
@@ -130,11 +173,15 @@ loongarch64)
         ls -l "$root/usr/lib" 2>&1 | head -5 >&2
         exit 1
     fi
+    prepare_sysroot "$root" loongarch64-linux-gnu
     touch "$root/.done"
     ;;
 mips64el)
     root="$prefix/sysroot-mips64el"
-    if [[ -f "$root/.done" && -d "$root/usr/lib/mips64el-linux-gnuabi64/pkgconfig" ]]; then exit 0; fi
+    if [[ -f "$root/.done" && -d "$root/usr/lib/mips64el-linux-gnuabi64/pkgconfig" ]]; then
+        prepare_sysroot "$root" mips64el-linux-gnuabi64
+        exit 0
+    fi
     rm -f "$root/.done"
     mkdir -p "$root"
     # Fast path: pre-built from the same pinned Loongnix packages.
@@ -148,6 +195,7 @@ mips64el)
                 mkdir -p "$root/lib64"
                 cp -L "$prefix/mips-root/usr/mips64el-linux-gnuabi64/lib64/ld.so.1" "$root/lib64/ld.so.1" 2>/dev/null || true
                 restore_so_links "$root/usr/lib/mips64el-linux-gnuabi64"
+                prepare_sysroot "$root" mips64el-linux-gnuabi64
                 touch "$root/.done"
                 exit 0
             fi
@@ -178,6 +226,9 @@ mips64el)
     rm -rf "$prefix/mips-debs" "$prefix/mips-files"
     # libyuv is absent from the archive; build it with the buster cross GCC
     # into the same sysroot.
+    mkdir -p "$root/usr/mips64el-linux-gnuabi64" "$root/usr/include"
+    cp -a "$prefix/mips-root/usr/mips64el-linux-gnuabi64/." "$root/usr/mips64el-linux-gnuabi64/"
+    cp -a "$prefix/mips-root/usr/mips64el-linux-gnuabi64/include/." "$root/usr/include/"
     bash "$(dirname "$0")/cross-sysroot-build-mips64el.sh" "$root"
     test -d "$root/usr/lib/mips64el-linux-gnuabi64/pkgconfig"
     # Unify the QEMU runtime prefix: the absolute loader path is
@@ -197,6 +248,7 @@ mips64el)
     mkdir -p "$root/lib64"
     cp -L "$prefix/mips-root/usr/mips64el-linux-gnuabi64/lib64/ld.so.1" "$root/lib64/ld.so.1"
 
+    prepare_sysroot "$root" mips64el-linux-gnuabi64
     touch "$root/.done"
     ;;
 *)

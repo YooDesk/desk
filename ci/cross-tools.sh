@@ -46,7 +46,7 @@ mips64el)
     # Debian buster cross GCC 8.3.0 with a glibc 2.28 sysroot. The buster
     # archive is frozen, so these pins are stable forever. Package set and
     # hashes verified against the archive Packages index.
-    if [[ ! -x "$prefix/bin/mips64el-linux-gnuabi64-gcc" ]]; then
+    if [[ ! -x "$prefix/bin/mips64el-linux-gnuabi64-gcc" || ! -x "$prefix/bin/mips64el-linux-gnuabi64-g++" ]]; then
         mkdir -p "$prefix/debs"
         while read -r sha name; do
             fetch "https://archive.debian.org/debian/${name}" "$sha" "$prefix/debs/$(basename "$name")"
@@ -55,6 +55,9 @@ mips64el)
 c2058dcc74a9cf8bba4da98809ed1725e11fd34d55ddd8191a4f71ca27bf4b45 pool/main/g/gcc-8-cross/cpp-8-mips64el-linux-gnuabi64_8.3.0-2cross1_amd64.deb
 a62264aa8b32c0c996b7aaed3fa03412631f7e15b0a3488c796e1759909ea69d pool/main/g/gcc-8-cross/gcc-8-mips64el-linux-gnuabi64-base_8.3.0-2cross1_amd64.deb
 3c5c67a62350b5717e30ba3ce6c77556d8ea7e941ca644437e39118f8f89a8fc pool/main/g/gcc-8-cross/gcc-8-mips64el-linux-gnuabi64_8.3.0-2cross1_amd64.deb
+01d51e58a4b108e758d1b7e4e4e6cf01bd6d340a309a0b69d406460736fd9816 pool/main/g/gcc-8-cross/g++-8-mips64el-linux-gnuabi64_8.3.0-2cross1_amd64.deb
+6fb901d6607967affc8934fccf7cadc4f5907fba54003ebff63db6205f525ce5 pool/main/g/gcc-8-cross/libstdc++-8-dev-mips64el-cross_8.3.0-2cross1_all.deb
+bdd4ed46dcfade8627f3b0f532cf8e85b2f689862978cf803bc5c0a0d327e191 pool/main/g/gcc-8-cross/libstdc++6-mips64el-cross_8.3.0-2cross1_all.deb
 98af5ac95e4ddcc883b601cc98c61bd20b08675f913540a09c9e1f92c853b139 pool/main/g/gcc-8-cross/libgcc-8-dev-mips64el-cross_8.3.0-2cross1_all.deb
 4d192abfaeb60fad524d3dfa351bded9b757ab36c549f6a22a13c322ca967b83 pool/main/g/gcc-8-cross/libgcc1-mips64el-cross_8.3.0-2cross1_all.deb
 d60da2b8d88624fe3b4d2c5c5b28f45fcff66865c34d92204a7438be80849b12 pool/main/c/cross-toolchain-base/libc6-dev-mips64el-cross_2.28-7cross1_all.deb
