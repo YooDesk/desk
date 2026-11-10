@@ -142,8 +142,8 @@ linux-loong64)
     # meson cross file for libdrmtap: meson must not run target probes.
     cat > "$tools/meson-cross-loong64.ini" <<EOF
 [binaries]
-c = '$tools/cross-tools/bin/loongarch64-unknown-linux-gnu-gcc'
-cpp = '$tools/cross-tools/bin/loongarch64-unknown-linux-gnu-g++'
+c = ['$tools/cross-tools/bin/loongarch64-unknown-linux-gnu-gcc', '--sysroot=$tools/sysroot-loong64']
+cpp = ['$tools/cross-tools/bin/loongarch64-unknown-linux-gnu-g++', '--sysroot=$tools/sysroot-loong64']
 ar = '$tools/cross-tools/bin/loongarch64-unknown-linux-gnu-ar'
 strip = '$tools/cross-tools/bin/loongarch64-unknown-linux-gnu-strip'
 pkg-config = 'pkg-config'
@@ -185,8 +185,8 @@ linux-mips64el)
     export BINDGEN_EXTRA_CLANG_ARGS="--target=mips64el-linux-gnuabi64 --sysroot=$sysroot_mips"
     cat > "$tools/meson-cross-mips64el.ini" <<EOF
 [binaries]
-c = '$tools/bin/mips64el-linux-gnuabi64-gcc'
-cpp = '$tools/bin/mips64el-linux-gnu-g++'
+c = ['$tools/bin/mips64el-linux-gnuabi64-gcc', '--sysroot=$tools/sysroot-mips64el']
+cpp = ['$tools/bin/mips64el-linux-gnu-g++', '--sysroot=$tools/sysroot-mips64el']
 ar = '$tools/bin/mips64el-linux-gnuabi64-ar'
 strip = '$tools/bin/mips64el-linux-gnuabi64-strip'
 pkg-config = 'pkg-config'
