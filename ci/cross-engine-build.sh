@@ -146,6 +146,7 @@ strip = '$tools/cross-tools/bin/loongarch64-unknown-linux-gnu-strip'
 pkgconfig = 'pkg-config'
 [properties]
 needs_exe_wrapper = true
+pkg_config_path = '$sysroot_loong/lib/loong64-linux-gnu/pkgconfig:$sysroot_loong/share/pkgconfig'
 [host_machine]
 system = 'linux'
 cpu_family = 'loongarch64'
@@ -189,6 +190,7 @@ strip = '$tools/bin/mips64el-linux-gnuabi64-strip'
 pkgconfig = 'pkg-config'
 [properties]
 needs_exe_wrapper = true
+pkg_config_path = '$sysroot_mips/lib/pkgconfig:$sysroot_mips/lib/mips64el-linux-gnuabi64/pkgconfig'
 [host_machine]
 system = 'linux'
 cpu_family = 'mips64el'
