@@ -320,6 +320,7 @@ native_sdk_root="$tools/sysroot-${platform#linux-}"
 if [[ -f "$native_sdk_root/yoodesk-native-sdk.json" ]]; then
     python3.13 ci/native_sdk.py verify "$platform" "$native_sdk_root"
     export OPENH264_LIB_DIR="$native_sdk_root/yoodesk-native/openh264"
+    export MOZJPEG_LIB_DIR="$native_sdk_root/yoodesk-native/mozjpeg"
     if [[ "$platform" == linux-loong64 ]]; then
         export YOODESK_PREBUILT_DRMTAP_DIR="$native_sdk_root/yoodesk-native/drmtap"
     fi

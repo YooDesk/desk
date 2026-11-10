@@ -1,0 +1,35 @@
+--- a/src/build.rs
++++ b/src/build.rs
+@@ -198,7 +198,7 @@
+     let nasm_needed_for_arch = target_arch == "x86_64" || target_arch == "x86";
+ 
+     let with_simd = cfg!(feature = "with_simd")
+-        && target_arch != "wasm32" // no WASM-SIMD support here
++        && matches!(target_arch.as_str(), "x86" | "x86_64" | "arm" | "aarch64" | "mips" | "powerpc" | "powerpc64")
+         && if nasm_needed_for_arch { nasm_supported() } else { gas_supported(&c) };
+ 
+     #[cfg(feature = "with_simd")]
+--- a/src/build.rs
++++ b/src/build.rs
+@@ -25,6 +25,21 @@
+ 
+ fn main() {
+     let root = PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR not set"));
++    println!("cargo:rerun-if-env-changed=MOZJPEG_LIB_DIR");
++    if let Ok(directory) = env::var("MOZJPEG_LIB_DIR") {
++        assert_eq!(env::var("CARGO_CFG_TARGET_OS").unwrap(), "linux");
++        assert!(!cfg!(feature = "jpeg70_abi") && !cfg!(feature = "jpeg80_abi"));
++        let directory = Path::new(&directory);
++        assert_eq!(fs::read_to_string(directory.join("VERSION")).unwrap().trim(), "2.2.2");
++        assert!(directory.join("libmozjpeg62.a").is_file());
++        println!("cargo:rustc-link-search=native={}", directory.display());
++        println!("cargo:rustc-link-lib=static=mozjpeg62");
++        println!("cargo:lib_version=62");
++        println!("cargo:include={}", directory.join("include").display());
++        println!("cargo:rerun-if-changed={}", directory.join("libmozjpeg62.a").display());
++        return;
++    }
++
+     let root = dunce::canonicalize(root).expect("root dir");
+     let out_dir = PathBuf::from(env::var_os("OUT_DIR").expect("outdir"));
+     let config_dir = out_dir.join("include");

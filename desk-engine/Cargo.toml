@@ -46,6 +46,7 @@ serde_json = "1"
 # 由本 workspace 根声明；与 web-service 的依赖图互不影响。
 [patch.crates-io]
 ring = { path = "../artifacts/ring-engine-patched" }
+mozjpeg-sys = { path = "../artifacts/mozjpeg-engine-patched" }
 libxdo-sys = { path = "../artifacts/rustdesk-engine-src/libs/libxdo-sys-stub" }
 # Older nix versions omit LoongArch from their generic ioctl constant group.
 # Keep each locked version and add its missing architecture declaration.

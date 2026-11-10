@@ -25,6 +25,8 @@ def verify(root, platform):
         raise ValueError("Native SDK version/platform mismatch")
     if manifest["openh264_source_sha256"] != OPENH264_SHA or manifest["drmtap_revision"] != DRM_REVISION:
         raise ValueError("Native SDK dependency versions changed; rebuild the SDK")
+    if manifest.get("mozjpeg_sys_version") != "2.2.2":
+        raise ValueError("Native SDK mozjpeg version mismatch")
     for name, checksum in manifest["files"].items():
         if digest(root / name) != checksum:
             raise ValueError("Native SDK checksum mismatch: " + name)
@@ -49,7 +51,20 @@ def package(platform):
         if not (h264 / name).is_file():
             raise ValueError("OpenH264 archive is not complete: " + name)
     (h264 / "VERSION").write_text("0.9.9\n", encoding="utf-8")
-    shutil.copy2(ROOT / "artifacts/openh264-sys2-patched/LICENSE", h264 / "LICENSE")
+    shutil.copy2(ROOT / "artifacts/openh264-sys2-patched/upstream/LICENSE", h264 / "LICENSE")
+    jpeg = extras / "mozjpeg"
+    jpeg.mkdir(exist_ok=True)
+    outputs = list((ROOT / "desk-engine/target" / target / "release/build").glob("mozjpeg-sys-*/out/libmozjpeg62.a"))
+    if outputs:
+        built = max(outputs, key=lambda item: item.stat().st_mtime)
+        shutil.copy2(built, jpeg / built.name)
+        shutil.copytree(built.parent / "include", jpeg / "include", dirs_exist_ok=True)
+        for header in (ROOT / "artifacts/mozjpeg-engine-patched/vendor").glob("*.h"):
+            shutil.copy2(header, jpeg / "include" / header.name)
+    if not (jpeg / "libmozjpeg62.a").is_file():
+        raise ValueError("Native mozjpeg SDK is incomplete")
+    (jpeg / "VERSION").write_text("2.2.2\n", encoding="utf-8")
+    shutil.copy2(ROOT / "artifacts/mozjpeg-engine-patched/LICENSE", jpeg / "LICENSE")
     if platform == "linux-loong64":
         drm = extras / "drmtap"
         drm.mkdir(exist_ok=True)
@@ -59,7 +74,7 @@ def package(platform):
              for path in extras.rglob("*") if path.is_file()}
     manifest = {"schema_version": 1, "version": VERSION, "platform": platform,
                 "target": target, "openh264_source_sha256": OPENH264_SHA,
-                "drmtap_revision": DRM_REVISION, "files": files,
+                "drmtap_revision": DRM_REVISION, "mozjpeg_sys_version": "2.2.2", "files": files,
                 "aom_version": "3.14.1", "runtime_baseline": "2.43" if platform == "linux-loong64" else "2.28"}
     (root / "yoodesk-native-sdk.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     output = ROOT / "artifacts/native-sdk"
