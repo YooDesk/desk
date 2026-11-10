@@ -184,7 +184,9 @@ linux-loong64)
     # --sysroot would redirect std discovery away from the installed target).
     # Link paths come from the compiler wrapper (target-only).
     export QEMU="$tools/bin/qemu-loongarch64"
-    export QEMU_LD_PREFIX="$tools/sysroot-loong64/usr"
+    # Keep guest /usr paths inside the full sysroot, including private
+    # runtime libraries under usr/lib/<multiarch>/pulseaudio.
+    export QEMU_LD_PREFIX="$tools/sysroot-loong64"
     export PKG_CONFIG_PATH="$sysroot_loong/lib/loongarch64-linux-gnu/pkgconfig:$sysroot_loong/share/pkgconfig"
     export PKG_CONFIG_SYSROOT_DIR="$tools/sysroot-loong64"
     export PKG_CONFIG_LIBDIR="$sysroot_loong/lib/loongarch64-linux-gnu/pkgconfig:$sysroot_loong/share/pkgconfig"

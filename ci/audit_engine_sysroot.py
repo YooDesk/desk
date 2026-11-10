@@ -260,6 +260,13 @@ def main():
         )
         if result.returncode:
             report["link_compile_errors"].append(result.stderr)
+        elif os.environ.get("QEMU"):
+            runtime = subprocess.run(
+                [os.environ["QEMU"], "/tmp/yoodesk-engine-link-probe"],
+                text=True, capture_output=True, timeout=60,
+            )
+            if runtime.returncode:
+                report["link_compile_errors"].append(f"QEMU runtime probe: {runtime.stderr}")
         result = subprocess.run(
             [*shlex.split(os.environ["CXX"]), "-fPIC", "-shared", "-Wl,-z,defs",
              "-x", "c++", "-", "-o", "/tmp/yoodesk-engine-cxx-link-probe.so"],
