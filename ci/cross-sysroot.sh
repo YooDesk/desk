@@ -39,7 +39,11 @@ fetch() { # fetch <url> <sha256> <output>
 case "$kind" in
 loongarch64)
     root="$prefix/sysroot-loong64"
-    if [[ -f "$root/.done" ]]; then exit 0; fi
+    # The marker alone is not enough: a cached tree can exist without the
+    # pkg-config files the engine needs, and the marker then pins the
+    # broken state for every later run.
+    if [[ -f "$root/.done" && -d "$root/usr/lib/loongarch64-linux-gnu/pkgconfig" ]]; then exit 0; fi
+    rm -f "$root/.done"
     mkdir -p "$root"
     snapshot='https://snapshot.debian.org/archive/debian/20261108T000000Z'
     # Resolve the dev-package closure from the same immutable index.
@@ -58,11 +62,14 @@ loongarch64)
         dpkg-deb -x "$prefix/debs/$file" "$root"
     done < "$prefix/loong64-files"
     rm -rf "$prefix/debs" "$index" "$prefix/loong64-files"
+    # Refuse to mark an incomplete tree as done.
+    test -d "$root/usr/lib/loongarch64-linux-gnu/pkgconfig"
     touch "$root/.done"
     ;;
 mips64el)
     root="$prefix/sysroot-mips64el"
-    if [[ -f "$root/.done" ]]; then exit 0; fi
+    if [[ -f "$root/.done" && -d "$root/usr/lib/mips64el-linux-gnuabi64/pkgconfig" ]]; then exit 0; fi
+    rm -f "$root/.done"
     mkdir -p "$root"
     # ftp.loongnix.cn is unreachable from GitHub Actions, so the pinned
     # packages are mirrored on the desk repository's sysroot release. The
@@ -88,6 +95,7 @@ mips64el)
     # libyuv is absent from the archive; build it with the buster cross GCC
     # into the same sysroot.
     bash "$(dirname "$0")/cross-sysroot-build-mips64el.sh" "$root"
+    test -d "$root/usr/lib/mips64el-linux-gnuabi64/pkgconfig"
     # Unify the QEMU runtime prefix: the absolute loader path is
     # /lib64/ld.so.1 and glibc itself comes from the buster cross sysroot
     # (same 2.28 the Loongnix libraries were built against).
