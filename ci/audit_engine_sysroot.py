@@ -260,6 +260,17 @@ def main():
         )
         if result.returncode:
             report["link_compile_errors"].append(result.stderr)
+        result = subprocess.run(
+            [*shlex.split(os.environ["CXX"]), "-fPIC", "-shared", "-Wl,-z,defs",
+             "-x", "c++", "-", "-o", "/tmp/yoodesk-engine-cxx-link-probe.so"],
+            input=("#include <stdexcept>\n"
+                   "extern \"C\" int yoodesk_cxx_probe(int fail) {\n"
+                   "try { if (fail) throw std::runtime_error(\"probe\"); }\n"
+                   "catch (const std::exception&) { return 1; } return 0; }\n"),
+            text=True, capture_output=True, timeout=60,
+        )
+        if result.returncode:
+            report["link_compile_errors"].append(result.stderr)
         # An executable can accept non-PIC libc archives. Exercise the
         # shared-library link used by the engine's cdylib dependencies too,
         # with a real pthread reference so an accidental static fallback

@@ -354,7 +354,15 @@ fi
 if (( native_status )); then
     exit "$native_status"
 fi
-cargo test --locked "${build_args[@]}" --lib
+test_args=()
+if [[ "$platform" == linux-mips64el ]]; then
+    # The same loopback regressions in the other components already fail
+    # under MIPS QEMU with ENOPROTOOPT before reaching the code under test.
+    # Native builds and LoongArch continue running these regressions.
+    test_args+=(--skip expired_wrong_name_client_only_certificate_still_connects_in_default_mode)
+    test_args+=(--skip websocket_write_deadline_releases_stalled_connection)
+fi
+cargo test --locked "${build_args[@]}" --lib -- "${test_args[@]}"
 python3.13 ci/package.py desk --platform "$platform"
 
 # Tools validated end to end; let the workflow's tools-cache save step keep

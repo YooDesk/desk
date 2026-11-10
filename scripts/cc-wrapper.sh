@@ -24,12 +24,17 @@ for argument in "$@"; do
 done
 
 extra_search=()
+linker_options=()
 if [[ "$multiarch" == mips64el-linux-gnuabi64 ]]; then
     # Prefer Buster's complete dynamic libc/pthread inputs. The distro
     # development directory can contain a static archive before its dynamic
     # link is available; searching it first silently links non-PIC pthread
     # objects into Rust cdylibs.
     extra_search=(-L"$sysroot/usr/$multiarch/lib" -Wl,-rpath-link,"$sysroot/usr/$multiarch/lib")
+    # GCC 8 emits MIPS64 exception-frame relocations that Rust's default
+    # LLVM linker rejects even for -fPIC C++ objects. Use the matching GNU
+    # linker for the complete target, retaining C++ exception support.
+    linker_options=(-fuse-ld=bfd)
 fi
 
 exec "$compiler" \
@@ -38,4 +43,5 @@ exec "$compiler" \
     "${extra_search[@]}" \
     -L"$sysroot/usr/lib/$multiarch" \
     -Wl,-rpath-link,"$sysroot/usr/lib/$multiarch" \
-    "${arguments[@]}"
+    "${arguments[@]}" \
+    "${linker_options[@]}"
