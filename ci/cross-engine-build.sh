@@ -104,6 +104,23 @@ linux-loong64)
     # loongarch target. All our targets are LP64 little-endian, so layouts
     # match x86_64; parse with that triple using the sysroot headers.
     export BINDGEN_EXTRA_CLANG_ARGS="--target=x86_64-unknown-linux-gnu --sysroot=$tools/sysroot-loong64"
+    # meson cross file for libdrmtap: meson must not run target probes.
+    cat > "$tools/meson-cross-loong64.ini" <<EOF
+[binaries]
+c = '$tools/cross-tools/bin/loongarch64-unknown-linux-gnu-gcc'
+cpp = '$tools/cross-tools/bin/loongarch64-unknown-linux-gnu-g++'
+ar = '$tools/cross-tools/bin/loongarch64-unknown-linux-gnu-ar'
+strip = '$tools/cross-tools/bin/loongarch64-unknown-linux-gnu-strip'
+pkgconfig = 'pkg-config'
+[properties]
+needs_exe_wrapper = true
+[host_machine]
+system = 'linux'
+cpu_family = 'loongarch64'
+cpu = 'loongarch64'
+endian = 'little'
+EOF
+    export YOODESK_MESON_CROSS_FILE="$tools/meson-cross-loong64.ini"
     build_args=()
     ;;
 linux-mips64el)
@@ -125,6 +142,22 @@ linux-mips64el)
     export PKG_CONFIG_LIBDIR="$sysroot_mips/lib/pkgconfig:$sysroot_mips/lib/mips64el-linux-gnuabi64/pkgconfig"
     # clang-10 supports mips64el directly.
     export BINDGEN_EXTRA_CLANG_ARGS="--target=mips64el-linux-gnuabi64 --sysroot=$sysroot_mips"
+    cat > "$tools/meson-cross-mips64el.ini" <<EOF
+[binaries]
+c = '$tools/bin/mips64el-linux-gnuabi64-gcc'
+cpp = '$tools/bin/mips64el-linux-gnu-g++'
+ar = '$tools/bin/mips64el-linux-gnuabi64-ar'
+strip = '$tools/bin/mips64el-linux-gnuabi64-strip'
+pkgconfig = 'pkg-config'
+[properties]
+needs_exe_wrapper = true
+[host_machine]
+system = 'linux'
+cpu_family = 'mips64el'
+cpu = 'mips64'
+endian = 'little'
+EOF
+    export YOODESK_MESON_CROSS_FILE="$tools/meson-cross-mips64el.ini"
     export RUSTC_BOOTSTRAP=1
     build_args=(-Z build-std=std,panic_abort)
     ;;

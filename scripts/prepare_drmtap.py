@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -32,7 +33,13 @@ def prepare(tree: Path, destination: Path) -> Path:
     if (build / "build.ninja").exists():
         subprocess.run(["meson", "configure", str(build), "-Dhelper=disabled"], check=True)
     else:
-        subprocess.run(["meson", "setup", str(build), str(source), "--buildtype=release", "-Dhelper=disabled"], check=True)
+        command = ["meson", "setup", str(build), str(source), "--buildtype=release", "-Dhelper=disabled"]
+        # Cross builds pass a meson cross file through YOODESK_MESON_CROSS_FILE:
+        # meson must not execute target binaries during its compiler probes.
+        cross_file = os.environ.get("YOODESK_MESON_CROSS_FILE")
+        if cross_file:
+            command += ["--cross-file", cross_file]
+        subprocess.run(command, check=True)
     subprocess.run(["meson", "compile", "-C", str(build), "drmtap:shared_library",
                     "drmtap:static_library"], check=True)
     # Meson strips the build RUNPATH when installing the library into a staging root.
