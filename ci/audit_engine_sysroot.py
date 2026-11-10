@@ -266,7 +266,7 @@ def main():
             runtime = subprocess.run([qemu, probe], text=True, capture_output=True, timeout=60)
             if runtime.returncode:
                 trace = subprocess.run(
-                    [qemu, "-strace", "-E", "LD_DEBUG=libs", probe],
+                    [qemu, "-strace", "-d", "in_asm", "-E", "LD_DEBUG=libs", probe],
                     text=True, capture_output=True, timeout=60,
                 )
                 report["link_compile_errors"].append(

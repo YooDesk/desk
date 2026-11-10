@@ -231,6 +231,8 @@ linux-mips64el)
     mips_libdir="$tools/mips-root/usr/mips64el-linux-gnuabi64/lib"
     # Link paths come from the compiler wrapper (target-only).
     export QEMU="$tools/bin/qemu-mips64el"
+    # The Loongnix runtime executes Loongson instructions before main().
+    export QEMU_CPU=Loongson-3A1000
     # Debian's cross binutils keeps libopcodes/libbfd for the host in the
     # multiarch directory; `as` and `ld` fail to start without it.
     export LD_LIBRARY_PATH="$tools/mips-root/usr/lib/x86_64-linux-gnu${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
