@@ -146,10 +146,9 @@ c = '$tools/cross-tools/bin/loongarch64-unknown-linux-gnu-gcc'
 cpp = '$tools/cross-tools/bin/loongarch64-unknown-linux-gnu-g++'
 ar = '$tools/cross-tools/bin/loongarch64-unknown-linux-gnu-ar'
 strip = '$tools/cross-tools/bin/loongarch64-unknown-linux-gnu-strip'
-pkgconfig = 'pkg-config'
+pkg-config = 'pkg-config'
 [properties]
 needs_exe_wrapper = true
-pkg_config_path = '$sysroot_loong/lib/loongarch64-linux-gnu/pkgconfig:$sysroot_loong/share/pkgconfig'
 [host_machine]
 system = 'linux'
 cpu_family = 'loongarch64'
@@ -190,10 +189,9 @@ c = '$tools/bin/mips64el-linux-gnuabi64-gcc'
 cpp = '$tools/bin/mips64el-linux-gnu-g++'
 ar = '$tools/bin/mips64el-linux-gnuabi64-ar'
 strip = '$tools/bin/mips64el-linux-gnuabi64-strip'
-pkgconfig = 'pkg-config'
+pkg-config = 'pkg-config'
 [properties]
 needs_exe_wrapper = true
-pkg_config_path = '$sysroot_mips/lib/pkgconfig:$sysroot_mips/lib/mips64el-linux-gnuabi64/pkgconfig'
 [host_machine]
 system = 'linux'
 cpu_family = 'mips64el'
@@ -216,6 +214,10 @@ rustc --version
 # sysroot via PKG_CONFIG_* set above.
 # Diagnose pkg-config resolution once, so a failure names the missing path.
 echo "--- pkg-config probe (loong64/mips64el sysroot) ---"
+echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH"
+echo "PKG_CONFIG_LIBDIR=$PKG_CONFIG_LIBDIR"
+echo "PKG_CONFIG_SYSROOT_DIR=$PKG_CONFIG_SYSROOT_DIR"
+ls -1 "$PKG_CONFIG_LIBDIR" 2>/dev/null | head -5 || echo "(libdir missing)"
 PKG_CONFIG_PATH="$PKG_CONFIG_PATH" PKG_CONFIG_SYSROOT_DIR="$PKG_CONFIG_SYSROOT_DIR" pkg-config --modversion libdrm || echo "libdrm.pc NOT FOUND"
 pkg-config --variable pc_path pkg-config 2>/dev/null | head -1 || true
 echo "--- end probe ---"
