@@ -214,6 +214,11 @@ rustc --version
 # Source preparation shared with the native Linux flow: engine patches,
 # hwcodec source, libdrmtap. linux-pkg-config probes resolve through the
 # sysroot via PKG_CONFIG_* set above.
+# Diagnose pkg-config resolution once, so a failure names the missing path.
+echo "--- pkg-config probe (loong64/mips64el sysroot) ---"
+PKG_CONFIG_PATH="$PKG_CONFIG_PATH" PKG_CONFIG_SYSROOT_DIR="$PKG_CONFIG_SYSROOT_DIR" pkg-config --modversion libdrm || echo "libdrm.pc NOT FOUND"
+pkg-config --variable pc_path pkg-config 2>/dev/null | head -1 || true
+echo "--- end probe ---"
 python3.13 scripts/prepare_sources.py
 python3.13 scripts/prepare_linux_native.py
 python3.13 scripts/patch_hwcodec.py
