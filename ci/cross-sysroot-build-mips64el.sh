@@ -23,8 +23,12 @@ if [[ ! -e "$root/usr/lib/mips64el-linux-gnuabi64/libyuv.a" && ! -e "$root/usr/l
     tar -xzf "$work/src/libyuv.tar.gz" -C "$work/libyuv" --strip-components=1
     cd "$work/libyuv"
     mkdir -p build && cd build
+    # CMAKE_TRY_COMPILE_TARGET_TYPE must be a static library: the compiler
+    # checks otherwise try to *run* the target binary, which cannot execute
+    # on the x86_64 build host.
     cmake .. -DCMAKE_SYSTEM_NAME=Linux \
         -DCMAKE_SYSTEM_PROCESSOR=mips64el \
+        -DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY \
         -DCMAKE_C_COMPILER="$cc" -DCMAKE_CXX_COMPILER="$cxx" \
         -DCMAKE_SYSROOT="$root/usr/mips64el-linux-gnuabi64" \
         -DCMAKE_INSTALL_PREFIX=/usr \
