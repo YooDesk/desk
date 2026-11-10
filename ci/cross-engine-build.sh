@@ -113,7 +113,7 @@ git config --global --add safe.directory /workspace
 git config --global --add safe.directory /workspace/desk-engine/target/drmtap/source
 
 sysroot_loong="$tools/sysroot-loong64/usr"
-sysroot_mips="$tools/sysroot-mips64el/usr/mips64el-linux-gnuabi64"
+sysroot_mips="$tools/sysroot-mips64el/usr/lib/mips64el-linux-gnuabi64"
 
 case "$platform" in
 linux-loong64)
@@ -178,9 +178,9 @@ linux-mips64el)
     # multiarch directory; `as` and `ld` fail to start without it.
     export LD_LIBRARY_PATH="$tools/mips-root/usr/lib/x86_64-linux-gnu${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
     export QEMU_LD_PREFIX="$tools/sysroot-mips64el"
-    export PKG_CONFIG_PATH="$sysroot_mips/lib/pkgconfig:$sysroot_mips/lib/mips64el-linux-gnuabi64/pkgconfig"
+    export PKG_CONFIG_PATH="$sysroot_mips/pkgconfig:$tools/sysroot-mips64el/usr/share/pkgconfig"
     export PKG_CONFIG_SYSROOT_DIR="$tools/sysroot-mips64el"
-    export PKG_CONFIG_LIBDIR="$sysroot_mips/lib/pkgconfig:$sysroot_mips/lib/mips64el-linux-gnuabi64/pkgconfig"
+    export PKG_CONFIG_LIBDIR="$sysroot_mips/pkgconfig"
     # clang-10 supports mips64el directly.
     export BINDGEN_EXTRA_CLANG_ARGS="--target=mips64el-linux-gnuabi64 --sysroot=$sysroot_mips"
     cat > "$tools/meson-cross-mips64el.ini" <<EOF
