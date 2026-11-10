@@ -41,6 +41,10 @@ if [[ "$multiarch" == mips64el-linux-gnuabi64 ]]; then
     # LLVM linker rejects even for -fPIC C++ objects. Use the matching GNU
     # linker for the complete target, retaining C++ exception support.
     linker_options=(-fuse-ld=bfd)
+elif [[ "$multiarch" == loongarch64-linux-gnu ]]; then
+    # GCC resolves PIE startup objects before invoking the linker; -L
+    # alone does not let it find Debian's multiarch Scrt1.o.
+    extra_search=(-B"$sysroot/usr/lib/$multiarch/")
 fi
 
 exec "$compiler" \

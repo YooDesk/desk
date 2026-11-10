@@ -254,7 +254,7 @@ def main():
             if result.returncode:
                 report["header_compile_errors"].append({"bindgen_header": header, "error": result.stderr})
         result = subprocess.run(
-            [*compiler, "-Wl,--no-as-needed", "-x", "c", "-", "-o", "/tmp/yoodesk-engine-link-probe",
+            [*compiler, "-fPIE", "-pie", "-Wl,--no-as-needed", "-x", "c", "-", "-o", "/tmp/yoodesk-engine-link-probe",
              *[f"-l{library}" for library in LIBRARIES]],
             input="int main(void) { return 0; }\n", text=True, capture_output=True, timeout=60,
         )
