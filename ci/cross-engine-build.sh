@@ -67,19 +67,27 @@ export VCPKG_MAX_CONCURRENCY=3 CARGO_BUILD_JOBS=3
 mkdir -p "$tools"
 cat > "$tools/meson-cc-loong64" <<'WRAP'
 #!/bin/sh
-exec /opt/yoodesk-tools/cross-tools/bin/loongarch64-unknown-linux-gnu-gcc     --sysroot=/opt/yoodesk-tools/sysroot-loong64     -isystem /opt/yoodesk-tools/sysroot-loong64/usr/include/loongarch64-linux-gnu "$@"
+exec /opt/yoodesk-tools/cross-tools/bin/loongarch64-unknown-linux-gnu-gcc     --sysroot=/opt/yoodesk-tools/sysroot-loong64     -isystem /opt/yoodesk-tools/sysroot-loong64/usr/include/loongarch64-linux-gnu     -L/opt/yoodesk-tools/sysroot-loong64/usr/lib/loongarch64-linux-gnu     -Wl,-rpath-link,/opt/yoodesk-tools/sysroot-loong64/usr/lib/loongarch64-linux-gnu "$@"
 WRAP
 cat > "$tools/meson-cxx-loong64" <<'WRAP'
 #!/bin/sh
-exec /opt/yoodesk-tools/cross-tools/bin/loongarch64-unknown-linux-gnu-g++     --sysroot=/opt/yoodesk-tools/sysroot-loong64     -isystem /opt/yoodesk-tools/sysroot-loong64/usr/include/loongarch64-linux-gnu "$@"
+exec /opt/yoodesk-tools/cross-tools/bin/loongarch64-unknown-linux-gnu-g++     --sysroot=/opt/yoodesk-tools/sysroot-loong64     -isystem /opt/yoodesk-tools/sysroot-loong64/usr/include/loongarch64-linux-gnu     -L/opt/yoodesk-tools/sysroot-loong64/usr/lib/loongarch64-linux-gnu     -Wl,-rpath-link,/opt/yoodesk-tools/sysroot-loong64/usr/lib/loongarch64-linux-gnu "$@"
 WRAP
 cat > "$tools/meson-cc-mips64el" <<'WRAP'
 #!/bin/sh
-exec /opt/yoodesk-tools/bin/mips64el-linux-gnuabi64-gcc --sysroot=/opt/yoodesk-tools/sysroot-mips64el "$@"
+exec /opt/yoodesk-tools/bin/mips64el-linux-gnuabi64-gcc \
+    --sysroot=/opt/yoodesk-tools/sysroot-mips64el \
+    -isystem /opt/yoodesk-tools/sysroot-mips64el/usr/include/mips64el-linux-gnuabi64 \
+    -L/opt/yoodesk-tools/sysroot-mips64el/usr/lib/mips64el-linux-gnuabi64 \
+    -Wl,-rpath-link,/opt/yoodesk-tools/sysroot-mips64el/usr/lib/mips64el-linux-gnuabi64 "$@"
 WRAP
 cat > "$tools/meson-cxx-mips64el" <<'WRAP'
 #!/bin/sh
-exec /opt/yoodesk-tools/bin/mips64el-linux-gnu-g++ --sysroot=/opt/yoodesk-tools/sysroot-mips64el "$@"
+exec /opt/yoodesk-tools/bin/mips64el-linux-gnuabi64-g++ \
+    --sysroot=/opt/yoodesk-tools/sysroot-mips64el \
+    -isystem /opt/yoodesk-tools/sysroot-mips64el/usr/include/mips64el-linux-gnuabi64 \
+    -L/opt/yoodesk-tools/sysroot-mips64el/usr/lib/mips64el-linux-gnuabi64 \
+    -Wl,-rpath-link,/opt/yoodesk-tools/sysroot-mips64el/usr/lib/mips64el-linux-gnuabi64 "$@"
 WRAP
 chmod +x "$tools"/meson-cc-* "$tools"/meson-cxx-*
 
