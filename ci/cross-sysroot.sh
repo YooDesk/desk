@@ -50,7 +50,7 @@ loongarch64)
     # to contain the full pkg-config set; fetching it avoids 400+ archive
     # requests that snapshot.debian.org rate-limits.
     sysroot_url='https://github.com/YooDesk/desk/releases/download/sysroot-mips64el-loongnix-d10/sysroot-loong64-sid.tar.xz'
-    sysroot_sha='6ae70f8155940189075ce011853c15a5d31552ca7333d1c4f51952877b49a15b'
+    sysroot_sha='9456b6f566f54794110c9dd46e369e3f584f3e51bc7ae63703fc59d9bf5c5b82'
     if curl -fL --retry 3 --connect-timeout 30 "$sysroot_url" -o /tmp/loong64-sysroot.tar.xz; then
         if echo "$sysroot_sha  /tmp/loong64-sysroot.tar.xz" | sha256sum -c -; then
             tar -xJf /tmp/loong64-sysroot.tar.xz -C "$root"
