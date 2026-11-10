@@ -45,6 +45,24 @@ loongarch64)
     if [[ -f "$root/.done" && -d "$root/usr/lib/loongarch64-linux-gnu/pkgconfig" ]]; then exit 0; fi
     rm -f "$root/.done"
     mkdir -p "$root"
+    # Fast path: the pre-built sysroot is one tarball. It was assembled from
+    # the same pinned snapshot packages (see the comment below) and verified
+    # to contain the full pkg-config set; fetching it avoids 400+ archive
+    # requests that snapshot.debian.org rate-limits.
+    sysroot_url='https://github.com/YooDesk/desk/releases/download/sysroot-mips64el-loongnix-d10/sysroot-loong64-sid.tar.xz'
+    sysroot_sha='6ae70f8155940189075ce011853c15a5d31552ca7333d1c4f51952877b49a15b'
+    if curl -fL --retry 3 --connect-timeout 30 "$sysroot_url" -o /tmp/loong64-sysroot.tar.xz; then
+        if echo "$sysroot_sha  /tmp/loong64-sysroot.tar.xz" | sha256sum -c -; then
+            tar -xJf /tmp/loong64-sysroot.tar.xz -C "$root"
+            rm -f /tmp/loong64-sysroot.tar.xz
+            if [[ -d "$root/usr/lib/loongarch64-linux-gnu/pkgconfig" ]]; then
+                touch "$root/.done"
+                exit 0
+            fi
+            echo "prebuilt loong64 sysroot lacks pkg-config; falling back to per-package fetch" >&2
+        fi
+        rm -f /tmp/loong64-sysroot.tar.xz
+    fi
     snapshot='https://snapshot.debian.org/archive/debian/20261108T000000Z'
     # Resolve the dev-package closure from the same immutable index.
     index="$prefix/loong64-Packages"
