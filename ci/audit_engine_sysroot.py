@@ -32,7 +32,8 @@ HEADERS = (
     "libudev.h xf86drm.h gbm.h alsa/asoundlib.h pulse/pulseaudio.h "
     "dbus-1.0/dbus/dbus.h X11/Xlib.h X11/extensions/XTest.h "
     "X11/extensions/Xrandr.h xkbcommon/xkbcommon.h xcb/xcb.h xcb/shm.h "
-    "xcb/randr.h xcb/xfixes.h xcb/shape.h wayland-client.h"
+    "xcb/randr.h xcb/xfixes.h xcb/shape.h wayland-client.h "
+    "linux/videodev2.h linux/input.h linux/uinput.h sys/ioctl.h"
 ).split()
 
 
@@ -244,6 +245,14 @@ def main():
             )
             if result.returncode:
                 report["header_compile_errors"].append({"header": header, "error": result.stderr})
+        clang_args = shlex.split(os.environ.get("BINDGEN_EXTRA_CLANG_ARGS", ""))
+        for header in ("linux/videodev2.h", "linux/input.h", "linux/uinput.h"):
+            result = subprocess.run(
+                ["clang-10", *clang_args, *shlex.split(flags), "-fsyntax-only", "-x", "c", "-"],
+                input=f"#include <{header}>\n", text=True, capture_output=True, timeout=60,
+            )
+            if result.returncode:
+                report["header_compile_errors"].append({"bindgen_header": header, "error": result.stderr})
         result = subprocess.run(
             [*compiler, "-Wl,--no-as-needed", "-x", "c", "-", "-o", "/tmp/yoodesk-engine-link-probe",
              *[f"-l{library}" for library in LIBRARIES]],

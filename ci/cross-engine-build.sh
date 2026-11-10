@@ -239,7 +239,7 @@ linux-mips64el)
     # the X11 protocol .pc files live under usr/share/pkgconfig.
     export PKG_CONFIG_LIBDIR="$sysroot_mips/pkgconfig:$tools/sysroot-mips64el/usr/share/pkgconfig"
     # clang-10 supports mips64el directly.
-    export BINDGEN_EXTRA_CLANG_ARGS="--target=mips64el-linux-gnuabi64 --sysroot=$sysroot_mips"
+    export BINDGEN_EXTRA_CLANG_ARGS="--target=mips64el-linux-gnuabi64 --sysroot=$tools/sysroot-mips64el -isystem $tools/sysroot-mips64el/usr/include/mips64el-linux-gnuabi64"
     cat > "$tools/meson-cross-mips64el.ini" <<EOF
 [binaries]
 c = '$tools/meson-cc-mips64el'
