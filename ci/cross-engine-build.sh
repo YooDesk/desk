@@ -134,6 +134,11 @@ export CC_x86_64_unknown_linux_gnu=/usr/bin/gcc-8
 export CXX_x86_64_unknown_linux_gnu=/usr/bin/g++-8
 export AR_x86_64_unknown_linux_gnu=/usr/bin/ar
 export CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER=/usr/bin/gcc-8
+# Native build dependencies (libgit2/libz) must probe the Ubuntu host,
+# while the engine's target dependencies keep the foreign PKG_CONFIG_*.
+export HOST_PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/share/pkgconfig
+export HOST_PKG_CONFIG_LIBDIR="$HOST_PKG_CONFIG_PATH"
+export HOST_PKG_CONFIG_SYSROOT_DIR=/
 
 cd /workspace
 git config --global --add safe.directory /workspace

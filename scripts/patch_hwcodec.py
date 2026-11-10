@@ -51,6 +51,9 @@ def prepare():
             patches.append("hwcodec-windows-software-encoder-link.patch")
         if sys.platform == "linux":
             patches.insert(0, "hwcodec-linux-ffmpeg.patch")
+            # Keep the pinned codec compatible with FFmpeg 7+ profile names
+            # and the AVFrame flags used after key_frame was removed.
+            patches.append("hwcodec-ffmpeg9-compat.patch")
         for patch in patches:
             # Windows检出补丁可能带CRLF，Git归档始终LF；规范补丁换行后严格检查。
             payload = (patch_dir / patch).read_text(encoding="utf-8").encode("utf-8")
