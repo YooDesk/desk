@@ -155,12 +155,14 @@ if [[ -n "$sdk_record" ]]; then
     runtime_record=$(python3 "$(dirname "$0")/native_sdk.py" runtime-location "$kind")
     if [[ -n "$runtime_record" ]]; then
         read -r runtime_url runtime_sha <<< "$runtime_record"
-        if [[ ! -f "$root/.sdk-runtime-$sdk_sha-$runtime_sha" ]]; then
+        qemu_runtime_marker="$root/.sdk-runtime-qemu-v1-$sdk_sha-$runtime_sha"
+        if [[ ! -f "$qemu_runtime_marker" ]]; then
             fetch "$runtime_url" "$runtime_sha" "$prefix/native-sdk-runtime.deb"
             dpkg-deb -x "$prefix/native-sdk-runtime.deb" "$root"
+            python3 "$(dirname "$0")/prepare_mips_qemu_runtime.py" "$root"
             # Keep the loader symlink within the sysroot on the CI host.
             ln -sfn ../lib/mips64el-linux-gnuabi64/ld-2.28.so "$root/lib64/ld.so.1"
-            touch "$root/.sdk-runtime-$sdk_sha-$runtime_sha"
+            touch "$qemu_runtime_marker"
             rm -f "$prefix/native-sdk-runtime.deb"
         fi
     fi
