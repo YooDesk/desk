@@ -126,9 +126,14 @@ fi
 export PATH="$tools/bin:$PATH"
 export CARGO_HOME=/workspace/.ci-cache/cargo
 export CARGO_BUILD_TARGET="$target"
-# Build scripts are compiled for the host and must use the host compiler.
+# Build scripts are compiled for the host; pin the host compiler under the
+# name cc-rs actually reads so they never inherit the target cross compiler.
 export HOST_CC=/usr/bin/gcc-8
 export HOST_CXX=/usr/bin/g++-8
+export CC_x86_64_unknown_linux_gnu=/usr/bin/gcc-8
+export CXX_x86_64_unknown_linux_gnu=/usr/bin/g++-8
+export AR_x86_64_unknown_linux_gnu=/usr/bin/ar
+export CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER=/usr/bin/gcc-8
 
 cd /workspace
 git config --global --add safe.directory /workspace
