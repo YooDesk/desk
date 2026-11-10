@@ -27,7 +27,10 @@ fetch() { # fetch <url> <sha256> <output>
     if [[ -s "$out" && "$(sha256sum "$out" | cut -d' ' -f1)" == "$want" ]]; then
         return 0
     fi
-    curl -fL --retry 3 "$url" -o "$out"
+    if ! curl -fL --retry 3 --connect-timeout 30 "$url" -o "$out"; then
+        rm -f "$out"
+        return 1
+    fi
     local got
     got="$(sha256sum "$out" | cut -d' ' -f1)"
     [[ "$got" == "$want" ]] || { echo "Checksum mismatch for $url: $got" >&2; exit 1; }
@@ -61,15 +64,25 @@ mips64el)
     root="$prefix/sysroot-mips64el"
     if [[ -f "$root/.done" ]]; then exit 0; fi
     mkdir -p "$root"
-    base='https://ftp.loongnix.cn/os/loongnix/20/mips64el/pool/main'
+    # ftp.loongnix.cn is unreachable from GitHub Actions, so the pinned
+    # packages are mirrored on the desk repository's sysroot release. The
+    # original archive stays as a fallback (it serves the same bytes).
+    base='https://github.com/YooDesk/desk/releases/download/sysroot-mips64el-loongnix-d10'
+    fallback='https://ftp.loongnix.cn/os/loongnix/20/mips64el/pool/main'
     # Checksummed direct downloads from the frozen Loongnix pool (see
     # ci/cross-toolchains.md for how the list was produced and validated).
     # Manifest lines are "<pool-path> <sha256>"; comments are skipped.
     mkdir -p "$prefix/mips-debs"
     grep -vE '^\s*(#|$)' "$(dirname "$0")/cross-sysroot-mips64el.debs" > "$prefix/mips-files"
     while read -r name sha; do
-        fetch "$base/$name" "$sha" "$prefix/mips-debs/$(basename "$name")"
-        dpkg-deb -x "$prefix/mips-debs/$(basename "$name")" "$root"
+        file="$prefix/mips-debs/$(basename "$name")"
+        if ! fetch "$base/$(basename "$name")" "$sha" "$file"; then
+            # GitHub normalises '~' in asset names to '_'; the upstream
+            # archive uses the original name.
+            original="$(echo "$name" | sed 's/_deb10u1/~deb10u1/')"
+            fetch "$fallback/$original" "$sha" "$file"
+        fi
+        dpkg-deb -x "$file" "$root"
     done < "$prefix/mips-files"
     rm -rf "$prefix/mips-debs" "$prefix/mips-files"
     # libyuv is absent from the archive; build it with the buster cross GCC

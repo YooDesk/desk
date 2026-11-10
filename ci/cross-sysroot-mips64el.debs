@@ -8,14 +8,14 @@
 # buster cross packages pinned in cross-tools.sh — same archive Loongnix
 # forked from.
 # Base dir: pool/main/
-f/ffmpeg/libavcodec-dev_4.1.6-1.lnd.5~deb10u1_mips64el.deb 70c69e3746d9c699a1eabcf5cb5860ce9e3774827ce4a8bcbaf910fdc8aea83e
-f/ffmpeg/libavcodec58_4.1.6-1.lnd.5~deb10u1_mips64el.deb 4b773378d37b1bcb70008e717eccb6d0d52886671e03a160565c6e04da824dee
-f/ffmpeg/libavformat-dev_4.1.6-1.lnd.5~deb10u1_mips64el.deb 4a6ea0665a41044eb9dbb15391432f44e9d124640c7af930856be1d7dae4f438
-f/ffmpeg/libavformat58_4.1.6-1.lnd.5~deb10u1_mips64el.deb 420bab3f6cbd40974de679844f7f68609ecb15abacb171b6326472258466cf38
-f/ffmpeg/libavutil-dev_4.1.6-1.lnd.5~deb10u1_mips64el.deb a64aa4a9be2e1a707a103c440e7b34c4da15f448d5a394a22c0b269b218bf62d
-f/ffmpeg/libavutil56_4.1.6-1.lnd.5~deb10u1_mips64el.deb bd6df9ea5d1082bbb0adb89f32be3127f42541858e65aeed7291509c767fbd52
-f/ffmpeg/libswresample-dev_4.1.6-1.lnd.5~deb10u1_mips64el.deb 6d8c1d7899052a30473f9afaf22c09143ecf03da93eff07f760173331547d823
-f/ffmpeg/libswresample3_4.1.6-1.lnd.5~deb10u1_mips64el.deb 61d4f95c796d9c58b9e2dc10bffb228be987c35104bea9f8c8ada320a0ef9dff
+f/ffmpeg/libavcodec-dev_4.1.6-1.lnd.5_deb10u1_mips64el.deb 70c69e3746d9c699a1eabcf5cb5860ce9e3774827ce4a8bcbaf910fdc8aea83e
+f/ffmpeg/libavcodec58_4.1.6-1.lnd.5_deb10u1_mips64el.deb 4b773378d37b1bcb70008e717eccb6d0d52886671e03a160565c6e04da824dee
+f/ffmpeg/libavformat-dev_4.1.6-1.lnd.5_deb10u1_mips64el.deb 4a6ea0665a41044eb9dbb15391432f44e9d124640c7af930856be1d7dae4f438
+f/ffmpeg/libavformat58_4.1.6-1.lnd.5_deb10u1_mips64el.deb 420bab3f6cbd40974de679844f7f68609ecb15abacb171b6326472258466cf38
+f/ffmpeg/libavutil-dev_4.1.6-1.lnd.5_deb10u1_mips64el.deb a64aa4a9be2e1a707a103c440e7b34c4da15f448d5a394a22c0b269b218bf62d
+f/ffmpeg/libavutil56_4.1.6-1.lnd.5_deb10u1_mips64el.deb bd6df9ea5d1082bbb0adb89f32be3127f42541858e65aeed7291509c767fbd52
+f/ffmpeg/libswresample-dev_4.1.6-1.lnd.5_deb10u1_mips64el.deb 6d8c1d7899052a30473f9afaf22c09143ecf03da93eff07f760173331547d823
+f/ffmpeg/libswresample3_4.1.6-1.lnd.5_deb10u1_mips64el.deb 61d4f95c796d9c58b9e2dc10bffb228be987c35104bea9f8c8ada320a0ef9dff
 o/opus/libopus-dev_1.3-1_mips64el.deb 91fe9e0c15b0d859b035d9d8eb79cc7be3489c65ee34762376ca3e33bf1c2f83
 o/opus/libopus0_1.3-1_mips64el.deb 0f621f3f105141432071f0e77152fc83cd4a606d53a271fe617bf687cc6532f2
 x/x264/libx264-dev_0.155.2917+git0a84d98-2.lnd.7_mips64el.deb a4863d5fef50bd849e6dfb7504d55aa0f6b40d9d9baa401c912392eecededbfa
