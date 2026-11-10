@@ -91,8 +91,20 @@ mips64el)
     # Unify the QEMU runtime prefix: the absolute loader path is
     # /lib64/ld.so.1 and glibc itself comes from the buster cross sysroot
     # (same 2.28 the Loongnix libraries were built against).
+    # The Loongnix sysroot has the runtime libraries, but the final link also
+    # needs the C runtime startup files (crt1.o, libc_nonshared.a, libc.so
+    # linker script) from the buster cross sysroot.
+    buster_lib="$prefix/mips-root/usr/mips64el-linux-gnuabi64/lib"
+    for name in crt1.o crti.o crtn.o crtbegin.o crtend.o libc_nonshared.a libc.so libm.so libpthread.so libdl.so librt.so libutil.so; do
+        if [[ -e "$buster_lib/$name" && ! -e "$root/usr/mips64el-linux-gnuabi64/lib/$name" ]]; then
+            mkdir -p "$root/usr/mips64el-linux-gnuabi64/lib"
+            cp -L "$buster_lib/$name" "$root/usr/mips64el-linux-gnuabi64/lib/" 2>/dev/null || true
+        fi
+    done
+    # libc.so references /lib64/ld.so.1; make sure the loader is present.
     mkdir -p "$root/lib64"
     cp -L "$prefix/mips-root/usr/mips64el-linux-gnuabi64/lib64/ld.so.1" "$root/lib64/ld.so.1"
+
     touch "$root/.done"
     ;;
 *)
