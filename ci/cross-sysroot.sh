@@ -50,6 +50,8 @@ loongarch64)
     index="$prefix/loong64-Packages"
     curl -fsL --retry 3 "$snapshot/dists/sid/main/binary-loong64/Packages.gz" | gunzip > "$index"
     python3 - "$(dirname "$0")/cross-sysroot-roots.py" "$index" loong64 > "$prefix/loong64-files"
+    echo "loong64 sysroot: $(wc -l < "$prefix/loong64-files") packages resolved"
+    count=0
     while read -r file; do
         mkdir -p "$prefix/debs/$(dirname "$file")"
         # snapshot serves /archive/<ts>/<path>; fall back to the live archive
@@ -60,10 +62,16 @@ loongarch64)
             fi
         fi
         dpkg-deb -x "$prefix/debs/$file" "$root"
+        count=$((count + 1))
+        if (( count % 50 == 0 )); then echo "loong64 sysroot: $count packages unpacked"; fi
     done < "$prefix/loong64-files"
     rm -rf "$prefix/debs" "$index" "$prefix/loong64-files"
     # Refuse to mark an incomplete tree as done.
-    test -d "$root/usr/lib/loongarch64-linux-gnu/pkgconfig"
+    if [[ ! -d "$root/usr/lib/loongarch64-linux-gnu/pkgconfig" ]]; then
+        echo "loong64 sysroot incomplete: no pkgconfig directory after extraction" >&2
+        ls -l "$root/usr/lib" 2>&1 | head -5 >&2
+        exit 1
+    fi
     touch "$root/.done"
     ;;
 mips64el)
