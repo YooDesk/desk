@@ -189,6 +189,13 @@ jobs:
             -e GITHUB_SHA -e RELEASE_VERSION -e YOODESK_SYSROOT_AUDIT_ONLY -e RUST_VERSION='${{ env.RUST_VERSION }}' \
             -v "$PWD:/workspace" -v "$PWD/.ci-cache/tools:/opt/yoodesk-tools" \
             ubuntu:18.04 bash /workspace/ci/cross-engine-build.sh '${{ matrix.platform }}' '${{ matrix.target }}'
+      - name: Upload the complete cross sysroot audit report
+        if: always() && matrix.cross && inputs.audit_only
+        uses: actions/upload-artifact@v4
+        with:
+          name: sysroot-audit-${{ matrix.platform }}
+          path: artifacts/sysroot-audit-${{ matrix.platform }}.json
+          if-no-files-found: warn
       - uses: actions/upload-artifact@v4
         with:
           name: native-${{ matrix.platform }}

@@ -86,6 +86,7 @@ prepare_sysroot() {
         # The prebuilt Loongnix archive contains the distro packages only;
         # it does not include libyuv, so the fast/cache paths need this too.
         bash "$(dirname "$0")/cross-sysroot-build-mips64el.sh" "$root"
+        bash "$(dirname "$0")/cross-aom-mips64el.sh" "$root"
     elif [[ ! -f "$root/usr/lib/$multiarch/pkgconfig/aom.pc" ]]; then
         # libaom-dev was absent from the original prebuilt snapshot closure.
         # Supply matching headers and runtime from that same immutable snapshot.

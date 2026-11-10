@@ -257,6 +257,12 @@ EOF
     # DRM capture runtime is not built for this port. X11/Wayland capture
     # inside the engine still works.
     export YOODESK_SKIP_DRMTAP=1
+    # Embed the libraries absent from the target system or too old for the
+    # engine API. Other distro media libraries keep their original ABI.
+    export AOM_STATIC=1
+    export LIBYUV_STATIC=1
+    export YOODESK_STATIC_AOM_DIR="$sysroot_mips"
+    export YOODESK_STATIC_YUV_DIR="$sysroot_mips"
     export RUSTC_BOOTSTRAP=1
     # The engine workspace builds std from source too: no prebuilt mips64 std.
     export YOODESK_ENGINE_CARGO_ARGS="-Z build-std=std,panic_abort"
@@ -309,6 +315,10 @@ if [[ "${YOODESK_SYSROOT_AUDIT_ONLY:-0}" == 1 ]]; then
 fi
 python3.13 scripts/prepare_sources.py
 python3.13 scripts/prepare_linux_native.py
+if [[ "$platform" == linux-mips64el ]]; then
+    mkdir -p target/release
+    cp "$tools/sysroot-mips64el/usr/share/doc/libaom-dev/LICENSE.static-aom" target/release/LICENSE.static-aom
+fi
 python3.13 scripts/patch_hwcodec.py
 # Materialize the patched nix crate (adds loongarch64 ioctl constants)
 python3.13 scripts/prepare_nix.py

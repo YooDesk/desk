@@ -78,13 +78,17 @@ fn link_engine() {
         println!("cargo:rerun-if-env-changed=YOODESK_STATIC_FFMPEG_DIR");
         let static_codecs = std::env::var_os("YOODESK_STATIC_CODEC_DIR");
         let static_ffmpeg = std::env::var_os("YOODESK_STATIC_FFMPEG_DIR");
+        println!("cargo:rerun-if-env-changed=YOODESK_STATIC_AOM_DIR");
+        println!("cargo:rerun-if-env-changed=YOODESK_STATIC_YUV_DIR");
+        let static_aom = std::env::var_os("YOODESK_STATIC_AOM_DIR");
+        let static_yuv = std::env::var_os("YOODESK_STATIC_YUV_DIR");
         let static_search =
             std::path::PathBuf::from(std::env::var_os("OUT_DIR").unwrap()).join("static-native");
-        if static_ffmpeg.is_some() || static_codecs.is_some() {
+        if static_ffmpeg.is_some() || static_codecs.is_some() || static_aom.is_some() || static_yuv.is_some() {
             std::fs::create_dir_all(&static_search).expect("Create static archive directory");
             println!("cargo:rustc-link-search=native={}", static_search.display());
         }
-        for (dir, libraries) in [(&static_ffmpeg, FFMPEG), (&static_codecs, CODECS)] {
+        for (dir, libraries) in [(&static_ffmpeg, FFMPEG), (&static_codecs, CODECS), (&static_aom, &["aom"][..]), (&static_yuv, &["yuv"][..])] {
             if let Some(dir) = dir {
                 let dir = std::path::Path::new(dir);
                 for name in libraries {
@@ -104,6 +108,8 @@ fn link_engine() {
         let link_static = |name: &str| {
             (static_codecs.is_some() && CODECS.contains(&name))
                 || (static_ffmpeg.is_some() && FFMPEG.contains(&name))
+                || (static_aom.is_some() && name == "aom")
+                || (static_yuv.is_some() && name == "yuv")
         };
         let flags = std::process::Command::new("pkg-config")
             .args([

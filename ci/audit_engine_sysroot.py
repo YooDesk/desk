@@ -89,6 +89,7 @@ class Inventory:
         self.files = set()
         self.links = {}
         self.packages = {}
+        self.versions = {}
         self.libraries = {}
 
     def add(self, filename, link, reader):
@@ -98,6 +99,11 @@ class Inventory:
             self.links[filename] = posixpath.normpath(
                 link if link.startswith("/") else posixpath.join(posixpath.dirname(filename), link)
             )
+            if filename.endswith(".pc"):
+                alias = PurePosixPath(filename).stem
+                target = PurePosixPath(self.links[filename]).stem
+                if alias != target:
+                    self.packages[alias] = [target]
             return
         basename = PurePosixPath(filename).name
         if filename.endswith(".pc"):
@@ -110,6 +116,9 @@ class Inventory:
                         line.split(":", 1)[1],
                     )
             self.packages[basename[:-3]] = requirements
+            version = re.search(r"(?m)^Version:\s*(.+)$", text)
+            if version:
+                self.versions[basename[:-3]] = version.group(1).strip()
         elif re.match(r".+\.so(?:\..+)?$", basename):
             metadata = elf_metadata(reader())
             if metadata:
@@ -207,6 +216,8 @@ def audit(inventory, platform):
         "missing_link_libraries": sorted(missing_links),
         "missing_runtime_libraries": sorted(missing_runtime),
         "wrong_architecture": sorted(wrong_architecture),
+        "incompatible_api_versions": ["AOM 3.14.1 is required by the pinned engine API"]
+        if tuple(map(int, re.findall(r"\d+", inventory.versions.get("aom", "0"))[:3])) < (3, 14, 1) else [],
     }
 
 
@@ -222,6 +233,7 @@ def main():
     inventory = inventory_archive(args.archive) if args.archive else inventory_root(args.root)
     report = audit(inventory, args.platform)
     report["header_compile_errors"] = []
+    report["link_compile_errors"] = []
     if args.check_headers and not report["missing_pkg_config"]:
         flags = subprocess.check_output(["pkg-config", "--cflags", *PACKAGES], text=True)
         compiler = shlex.split(os.environ["CC"])
@@ -232,11 +244,18 @@ def main():
             )
             if result.returncode:
                 report["header_compile_errors"].append({"header": header, "error": result.stderr})
+        result = subprocess.run(
+            [*compiler, "-Wl,--no-as-needed", "-x", "c", "-", "-o", "/tmp/yoodesk-engine-link-probe",
+             *[f"-l{library}" for library in LIBRARIES]],
+            input="int main(void) { return 0; }\n", text=True, capture_output=True, timeout=60,
+        )
+        if result.returncode:
+            report["link_compile_errors"].append(result.stderr)
     if args.report:
         args.report.parent.mkdir(parents=True, exist_ok=True)
         args.report.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(report, ensure_ascii=True, indent=2))
-    return int(any(report[key] for key in report if key.startswith("missing_") or key in ("wrong_architecture", "header_compile_errors")))
+    return int(any(report[key] for key in report if key.startswith("missing_") or key in ("wrong_architecture", "header_compile_errors", "link_compile_errors", "incompatible_api_versions")))
 
 
 if __name__ == "__main__":

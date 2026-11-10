@@ -122,12 +122,14 @@ def plugin(root, platform, kind, output):
         if kind == "rdp":
             wasm = browser / "ironrdp" if (browser / "ironrdp").is_dir() else root / "assets/ironrdp"
             shutil.copytree(wasm, stage / "assets/rdp/ironrdp", dirs_exist_ok=True)
-        if kind == "desk" and platform.startswith("linux") and os.environ.get("YOODESK_DESK_ENGINE", "1") == "1":
+        if kind == "desk" and platform.startswith("linux") and platform != "linux-mips64el" and os.environ.get("YOODESK_DESK_ENGINE", "1") == "1":
             for name in ["libdrmtap.so.0", "libdrmtap.manifest.json", "LICENSE.libdrmtap"]:
                 source = root / "target/release" / name
                 if not source.is_file(): raise ValueError(f"Missing desktop runtime attachment: {source}")
                 shutil.copy2(source, stage / name)
             verify_binary(stage / "libdrmtap.so.0", platform)
+        if kind == "desk" and (root / "target/release/LICENSE.static-aom").is_file():
+            shutil.copy2(root / "target/release/LICENSE.static-aom", stage / "LICENSE.static-aom")
         for name in ["LICENSE", "SOURCE.json"]:
             if (root / name).is_file(): shutil.copy2(root / name, stage / name)
         metadata = {"schema_version":1, "abi_version":1, "id":kind, "platform":platform, "library":filename, "sha256":digest(library), "source_commit":os.environ.get("GITHUB_SHA", "local")}
