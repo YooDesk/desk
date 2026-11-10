@@ -160,6 +160,9 @@ linux-mips64el)
     # Same linker-driver-only sysroot passing as the loong64 branch above.
     export CARGO_TARGET_MIPS64EL_UNKNOWN_LINUX_GNUABI64_RUSTFLAGS="-C link-arg=--sysroot=$tools/sysroot-mips64el -C link-arg=-L$sysroot_mips/lib -C link-arg=-L$sysroot_mips/lib/mips64el-linux-gnuabi64 -C link-arg=-Wl,-rpath-link,$sysroot_mips/lib"
     export QEMU="$tools/bin/qemu-mips64el"
+    # Debian's cross binutils keeps libopcodes/libbfd for the host in the
+    # multiarch directory; `as` and `ld` fail to start without it.
+    export LD_LIBRARY_PATH="$tools/mips-root/usr/lib/x86_64-linux-gnu${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
     export QEMU_LD_PREFIX="$tools/sysroot-mips64el"
     export PKG_CONFIG_PATH="$sysroot_mips/lib/pkgconfig:$sysroot_mips/lib/mips64el-linux-gnuabi64/pkgconfig"
     export PKG_CONFIG_SYSROOT_DIR="$tools/sysroot-mips64el"
