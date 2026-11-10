@@ -97,6 +97,7 @@ linux-loong64)
     # --sysroot would redirect std discovery away from the installed target).
     export CARGO_TARGET_LOONGARCH64_UNKNOWN_LINUX_GNU_RUSTFLAGS="-C link-arg=--sysroot=$tools/sysroot-loong64 -C link-arg=-L$sysroot_loong/lib/loong64-linux-gnu -C link-arg=-Wl,-rpath-link,$sysroot_loong/lib/loong64-linux-gnu"
     export QEMU="$tools/bin/qemu-loongarch64"
+    export QEMU_LD_PREFIX="$tools/sysroot-loong64/usr"
     export PKG_CONFIG_PATH="$sysroot_loong/lib/loong64-linux-gnu/pkgconfig:$sysroot_loong/share/pkgconfig"
     export PKG_CONFIG_SYSROOT_DIR="$tools/sysroot-loong64"
     export PKG_CONFIG_LIBDIR="$sysroot_loong/lib/loong64-linux-gnu/pkgconfig"
@@ -137,6 +138,7 @@ linux-mips64el)
     # Same linker-driver-only sysroot passing as the loong64 branch above.
     export CARGO_TARGET_MIPS64EL_UNKNOWN_LINUX_GNUABI64_RUSTFLAGS="-C link-arg=--sysroot=$tools/sysroot-mips64el -C link-arg=-L$sysroot_mips/lib -C link-arg=-L$sysroot_mips/lib/mips64el-linux-gnuabi64 -C link-arg=-Wl,-rpath-link,$sysroot_mips/lib"
     export QEMU="$tools/bin/qemu-mips64el"
+    export QEMU_LD_PREFIX="$tools/sysroot-mips64el"
     export PKG_CONFIG_PATH="$sysroot_mips/lib/pkgconfig:$sysroot_mips/lib/mips64el-linux-gnuabi64/pkgconfig"
     export PKG_CONFIG_SYSROOT_DIR="$tools/sysroot-mips64el"
     export PKG_CONFIG_LIBDIR="$sysroot_mips/lib/pkgconfig:$sysroot_mips/lib/mips64el-linux-gnuabi64/pkgconfig"
