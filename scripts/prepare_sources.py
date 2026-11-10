@@ -34,6 +34,13 @@ def main():
     checkout("hwcodec", ROOT / "deps/hwcodec", ["externals"])
     environment = dict(os.environ, YOODESK_RUSTDESK_DIR=str(tree))
     subprocess.run([sys.executable, str(ROOT / "scripts/build_engine.py"), "--prepare-only"], env=environment, check=True)
+    overlay = ROOT / "engine-patches/rustdesk-mfx-local-cstdint.patch"
+    apply = ["git", "-C", str(tree), "apply", "--ignore-space-change"]
+    if subprocess.run([*apply, "--reverse", "--check", str(overlay)], capture_output=True).returncode:
+        subprocess.run([*apply, str(overlay)], check=True)
+    # The pinned upstream patch is checked in so vcpkg need not download it.
+    patch = (ROOT / "engine-patches/mfx-dispatch-d6241243.patch").read_bytes()
+    (tree / "res/vcpkg/mfx-dispatch/fix-missing-cstdint-import.patch").write_bytes(patch)
     if sys.platform == "win32":
         subprocess.run([sys.executable, str(ROOT / "scripts/prepare_windows_native.py"), str(tree)], check=True)
 
