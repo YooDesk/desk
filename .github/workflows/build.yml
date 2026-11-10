@@ -75,8 +75,10 @@ jobs:
         id: linux-tools
         with:
           path: .ci-cache/tools/
-          key: ubuntu18-desk-tools-${{ matrix.platform }}-rust199-python3135-openssl354-cmake440-vcpkg9e593-glibc-nasm301-cross-v7
+          key: ubuntu18-desk-tools-${{ matrix.platform }}-rust199-python3135-openssl354-cmake440-vcpkg9e593-glibc-nasm301-cross-v8-${{ hashFiles('ci/cross-*.sh', 'ci/audit_engine_sysroot.py', 'ci/cross-sysroot-roots.py') }}
           restore-keys: |
+            ubuntu18-desk-tools-${{ matrix.platform }}-rust199-python3135-openssl354-cmake440-vcpkg9e593-glibc-nasm301-cross-v8-
+            ubuntu18-desk-tools-${{ matrix.platform }}-rust199-python3135-openssl354-cmake440-vcpkg9e593-glibc-nasm301-cross-v7
             ubuntu18-desk-tools-${{ matrix.platform }}-rust199-python3135-openssl354-cmake440-vcpkg9e593-glibc-v3
             ubuntu18-desk-tools-${{ matrix.platform }}-rust199-python3135-openssl354-cmake440-vcpkg9e593-dl-v2
       - uses: actions/cache/restore@v4
@@ -232,7 +234,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: .ci-cache/tools/
-          key: ubuntu18-desk-tools-${{ matrix.platform }}-rust199-python3135-openssl354-cmake440-vcpkg9e593-glibc-nasm301-cross-v7
+          key: ${{ steps.linux-tools.outputs.cache-primary-key }}
   release:
     if: github.event_name != 'pull_request' && !inputs.audit_only && (github.event_name != 'workflow_dispatch' || inputs.platform == 'all')
     needs: native

@@ -20,6 +20,8 @@ platform="$1"
 target="$2"
 
 export DEBIAN_FRONTEND=noninteractive
+tools=/opt/yoodesk-tools
+mkdir -p "$tools/apt-archives/partial"
 # Retry individual downloads, rather than fetching the full dependency set
 # again after one HTTP connection fails. Keep downloaded packages for retries.
 cat > /etc/apt/apt.conf.d/80yoodesk-downloads <<'EOF'
@@ -27,6 +29,7 @@ Acquire::Retries "3";
 Acquire::http::Timeout "20";
 Acquire::https::Timeout "20";
 Binary::apt-get::APT::Keep-Downloaded-Packages "true";
+Dir::Cache::archives "/opt/yoodesk-tools/apt-archives";
 EOF
 # archive.ubuntu.com is unreliable from CI runners (connection refused or
 # timeout). Canonical's Azure mirror serves the same bionic archive.
