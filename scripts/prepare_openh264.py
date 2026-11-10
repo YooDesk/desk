@@ -39,6 +39,10 @@ def prepare():
     with tempfile.TemporaryDirectory(dir=destination.parent) as temporary:
         tree = Path(temporary) / "crate"
         shutil.copytree(source(), tree)
+        # The crates.io archive retains CRLF in build.rs. Normalize only the
+        # isolated patch target so Linux applies the same strict diff as Windows.
+        build_script = tree / "build.rs"
+        build_script.write_bytes(build_script.read_text(encoding="utf-8").encode("utf-8"))
         subprocess.run(["git", "-C", str(tree), "init", "-q"], check=True)
         payload = (ROOT / "engine-patches/openh264-portable-cross-arches.patch").read_text(encoding="utf-8").encode()
         for options in (["--check"], []):
