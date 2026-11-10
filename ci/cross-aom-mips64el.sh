@@ -19,12 +19,15 @@ fi
 echo "$sha  $archive" | sha256sum -c -
 mkdir -p "$work/source"
 tar -xJf "$archive" -C "$work/source"
-cmake -S "$work/source" -B "$work/build" \
+cmake --fresh -S "$work/source" -B "$work/build" \
     -DCMAKE_SYSTEM_NAME=Linux -DCMAKE_SYSTEM_PROCESSOR=mips64el \
     -DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY \
     -DCMAKE_C_COMPILER="$tools/bin/mips64el-linux-gnuabi64-gcc" \
     -DCMAKE_CXX_COMPILER="$tools/bin/mips64el-linux-gnuabi64-g++" \
     -DCMAKE_SYSROOT="$root" \
+    -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER \
+    -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY \
+    -DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=ONLY -DPERL_EXECUTABLE=/usr/bin/perl \
     -DCMAKE_EXE_LINKER_FLAGS="-L$root/usr/mips64el-linux-gnuabi64/lib -Wl,-rpath-link,$root/usr/mips64el-linux-gnuabi64/lib" \
     -DCMAKE_SHARED_LINKER_FLAGS="-L$root/usr/mips64el-linux-gnuabi64/lib -Wl,-rpath-link,$root/usr/mips64el-linux-gnuabi64/lib" \
     -DCMAKE_BUILD_TYPE=Release -DCMAKE_POSITION_INDEPENDENT_CODE=ON \

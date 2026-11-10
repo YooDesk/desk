@@ -31,6 +31,9 @@ if [[ ! -e "$root/usr/lib/mips64el-linux-gnuabi64/libyuv.a" && ! -e "$root/usr/l
         -DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY \
         -DCMAKE_C_COMPILER="$cc" -DCMAKE_CXX_COMPILER="$cxx" \
         -DCMAKE_SYSROOT="$root" \
+        -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER \
+        -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY \
+        -DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=ONLY \
         -DCMAKE_EXE_LINKER_FLAGS="-L$root/usr/mips64el-linux-gnuabi64/lib -Wl,-rpath-link,$root/usr/mips64el-linux-gnuabi64/lib" \
         -DCMAKE_SHARED_LINKER_FLAGS="-L$root/usr/mips64el-linux-gnuabi64/lib -Wl,-rpath-link,$root/usr/mips64el-linux-gnuabi64/lib" \
         -DCMAKE_INSTALL_PREFIX=/usr \
