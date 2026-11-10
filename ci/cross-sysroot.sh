@@ -111,6 +111,23 @@ mips64el)
     if [[ -f "$root/.done" && -d "$root/usr/lib/mips64el-linux-gnuabi64/pkgconfig" ]]; then exit 0; fi
     rm -f "$root/.done"
     mkdir -p "$root"
+    # Fast path: pre-built from the same pinned Loongnix packages.
+    mips_url='https://github.com/YooDesk/desk/releases/download/sysroot-mips64el-loongnix-d10/sysroot-mips64el-loongnix.tar.xz'
+    mips_sha='42b591e69f0e1a87c6180fb0a4512854df7ab2c887ab50af0fd89e936bed8c12'
+    if curl -fL --retry 3 --connect-timeout 30 "$mips_url" -o /tmp/mips-sysroot.tar.xz; then
+        if echo "$mips_sha  /tmp/mips-sysroot.tar.xz" | sha256sum -c -; then
+            tar -xJf /tmp/mips-sysroot.tar.xz -C "$root"
+            rm -f /tmp/mips-sysroot.tar.xz
+            if [[ -d "$root/usr/lib/mips64el-linux-gnuabi64/pkgconfig" ]]; then
+                mkdir -p "$root/lib64"
+                cp -L "$prefix/mips-root/usr/mips64el-linux-gnuabi64/lib64/ld.so.1" "$root/lib64/ld.so.1" 2>/dev/null || true
+                touch "$root/.done"
+                exit 0
+            fi
+            echo "prebuilt mips64el sysroot lacks pkg-config; falling back" >&2
+        fi
+        rm -f /tmp/mips-sysroot.tar.xz
+    fi
     # ftp.loongnix.cn is unreachable from GitHub Actions, so the pinned
     # packages are mirrored on the desk repository's sysroot release. The
     # original archive stays as a fallback (it serves the same bytes).
