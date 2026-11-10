@@ -130,6 +130,7 @@ def main() -> int:
     # exist before cargo resolves the workspace, and adding it requires letting
     # cargo refresh the lock once.
     subprocess.run([sys.executable, str(ROOT / "scripts" / "prepare_nix.py")], env=env, check=True)
+    subprocess.run([sys.executable, str(ROOT / "scripts" / "prepare_ring.py")], env=env, check=True)
     fetch = ["cargo", "fetch", "--locked"]
     if os.name == "nt":
         target = env.get("CARGO_BUILD_TARGET")

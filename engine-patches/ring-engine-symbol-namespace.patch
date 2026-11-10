@@ -1,0 +1,33 @@
+--- a/build.rs
++++ b/build.rs
+@@ -274,7 +274,7 @@
+ 
+     // Keep in sync with `core_name_and_version!` in prefixed.rs.
+     let core_name_and_version = [
+-        &env::var("CARGO_PKG_NAME").unwrap(),
++        "yoodesk_engine_ring",
+         "core",
+         &env::var("CARGO_PKG_VERSION_MAJOR").unwrap(),
+         &env::var("CARGO_PKG_VERSION_MINOR").unwrap(),
+--- a/src/prefixed.rs
++++ b/src/prefixed.rs
+@@ -2,7 +2,7 @@
+ macro_rules! core_name_and_version {
+     () => {
+         concat!(
+-            env!("CARGO_PKG_NAME"),
++            "yoodesk_engine_ring",
+             "_core_",
+             env!("CARGO_PKG_VERSION_MAJOR"),
+             "_",
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -15,7 +15,7 @@
+ name = "ring"
+ version = "0.17.14"
+ build = "build.rs"
+-links = "ring_core_0_17_14_"
++links = "yoodesk_engine_ring_core_0_17_14_"
+ include = [
+     "LICENSE",
+     "LICENSE-other-bits",

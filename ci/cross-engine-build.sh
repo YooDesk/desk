@@ -343,8 +343,16 @@ export YOODESK_DESK_ENGINE=1
 runner_var="CARGO_TARGET_$(echo "$target" | tr 'a-z-' 'A-Z_')_RUNNER"
 export "$runner_var=$QEMU"
 
-cargo build --locked --release "${build_args[@]}" --lib
-python3.13 ci/native_sdk.py package "$platform"
+native_status=0
+cargo build --locked --release "${build_args[@]}" --lib || native_status=$?
+# Native libraries are independently complete even if the final Rust plugin
+# link fails; publish them so the next diagnostic run can download the SDK.
+if find "/workspace/target/$target/release/build" -path '*/out/libopenh264_encoder.a' -print -quit | grep -q .; then
+    python3.13 ci/native_sdk.py package "$platform"
+fi
+if (( native_status )); then
+    exit "$native_status"
+fi
 cargo test --locked "${build_args[@]}" --lib
 python3.13 ci/package.py desk --platform "$platform"
 
