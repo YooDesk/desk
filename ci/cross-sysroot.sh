@@ -56,6 +56,12 @@ loongarch64)
             tar -xJf /tmp/loong64-sysroot.tar.xz -C "$root"
             rm -f /tmp/loong64-sysroot.tar.xz
             if [[ -d "$root/usr/lib/loongarch64-linux-gnu/pkgconfig" ]]; then
+                # Debian keeps the arch-specific headers under
+                # usr/include/<multiarch>; gcc's own include search expects
+                # usr/include/bits. Link them so <bits/*.h> resolves.
+                if [[ -d "$root/usr/include/loongarch64-linux-gnu" && ! -e "$root/usr/include/bits" ]]; then
+                    cp -a "$root/usr/include/loongarch64-linux-gnu/." "$root/usr/include/"
+                fi
                 touch "$root/.done"
                 exit 0
             fi

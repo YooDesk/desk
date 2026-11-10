@@ -71,7 +71,11 @@ def main() -> int:
         patch_mouse(tree)
         from prepare_drmtap import patch_loader, prepare
         patch_loader(tree)
-        prepare(tree, ROOT / "target" / "release")
+        # The DRM capture runtime needs libdrm >= 2.4.99 (drmModeFB2). The
+        # Loongson 2K mips64el systems ship 2.4.97, so that backend is not
+        # built for them; X11 and Wayland capture are unaffected.
+        if os.environ.get("YOODESK_SKIP_DRMTAP") != "1":
+            prepare(tree, ROOT / "target" / "release")
         audio_patch = PATCH.parent / "rustdesk-default-audio-monitor.patch"
         audio_source = tree / "src" / "platform" / "linux.rs"
         audio_content = audio_source.read_text(encoding="utf-8")

@@ -67,11 +67,11 @@ export VCPKG_MAX_CONCURRENCY=3 CARGO_BUILD_JOBS=3
 mkdir -p "$tools"
 cat > "$tools/meson-cc-loong64" <<'WRAP'
 #!/bin/sh
-exec /opt/yoodesk-tools/cross-tools/bin/loongarch64-unknown-linux-gnu-gcc --sysroot=/opt/yoodesk-tools/sysroot-loong64 "$@"
+exec /opt/yoodesk-tools/cross-tools/bin/loongarch64-unknown-linux-gnu-gcc     --sysroot=/opt/yoodesk-tools/sysroot-loong64     -isystem /opt/yoodesk-tools/sysroot-loong64/usr/include/loongarch64-linux-gnu "$@"
 WRAP
 cat > "$tools/meson-cxx-loong64" <<'WRAP'
 #!/bin/sh
-exec /opt/yoodesk-tools/cross-tools/bin/loongarch64-unknown-linux-gnu-g++ --sysroot=/opt/yoodesk-tools/sysroot-loong64 "$@"
+exec /opt/yoodesk-tools/cross-tools/bin/loongarch64-unknown-linux-gnu-g++     --sysroot=/opt/yoodesk-tools/sysroot-loong64     -isystem /opt/yoodesk-tools/sysroot-loong64/usr/include/loongarch64-linux-gnu "$@"
 WRAP
 cat > "$tools/meson-cc-mips64el" <<'WRAP'
 #!/bin/sh
@@ -223,6 +223,10 @@ cpu = 'mips64'
 endian = 'little'
 EOF
     export YOODESK_MESON_CROSS_FILE="$tools/meson-cross-mips64el.ini"
+    # Loongnix ships libdrm 2.4.97; drmtap needs drmModeFB2 (2.4.99+), so the
+    # DRM capture runtime is not built for this port. X11/Wayland capture
+    # inside the engine still works.
+    export YOODESK_SKIP_DRMTAP=1
     export RUSTC_BOOTSTRAP=1
     # The engine workspace builds std from source too: no prebuilt mips64 std.
     export YOODESK_ENGINE_CARGO_ARGS="-Z build-std=std,panic_abort"
