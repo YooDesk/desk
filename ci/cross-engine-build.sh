@@ -157,8 +157,10 @@ linux-mips64el)
     export AR="$tools/bin/mips64el-linux-gnuabi64-ar"
     export CARGO_TARGET_MIPS64EL_UNKNOWN_LINUX_GNUABI64_LINKER="$CC"
     export CARGO_TARGET_MIPS64EL_UNKNOWN_LINUX_GNUABI64_AR="$AR"
-    # Same linker-driver-only sysroot passing as the loong64 branch above.
-    export CARGO_TARGET_MIPS64EL_UNKNOWN_LINUX_GNUABI64_RUSTFLAGS="-C link-arg=--sysroot=$tools/sysroot-mips64el -C link-arg=-L$sysroot_mips/lib -C link-arg=-L$sysroot_mips/lib/mips64el-linux-gnuabi64 -C link-arg=-Wl,-rpath-link,$sysroot_mips/lib"
+    # The linker driver gets the Loongnix sysroot plus the toolchain's own
+    # multiarch libdir, which is where libgcc_s.so.1 lives.
+    mips_libdir="$tools/mips-root/usr/mips64el-linux-gnuabi64/lib"
+    export CARGO_TARGET_MIPS64EL_UNKNOWN_LINUX_GNUABI64_RUSTFLAGS="-C link-arg=--sysroot=$tools/sysroot-mips64el -C link-arg=-L$sysroot_mips/lib -C link-arg=-L$sysroot_mips/lib/mips64el-linux-gnuabi64 -C link-arg=-L$mips_libdir -C link-arg=-Wl,-rpath-link,$sysroot_mips/lib -C link-arg=-Wl,-rpath-link,$mips_libdir"
     export QEMU="$tools/bin/qemu-mips64el"
     # Debian's cross binutils keeps libopcodes/libbfd for the host in the
     # multiarch directory; `as` and `ld` fail to start without it.
