@@ -29,7 +29,7 @@ apt-get install -y --no-install-recommends \
     libxcb-randr0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxcb-shm0-dev \
     libxdo-dev libxfixes-dev libxrandr-dev libxtst-dev libxkbcommon-dev \
     libudev-dev libdbus-1-dev libegl1-mesa-dev libgles2-mesa-dev libgbm-dev \
-    libdrm-dev meson python3-pip
+    libdrm-dev meson python3-pip zlib1g-dev libffi-dev libssl-dev libbz2-dev liblzma-dev libreadline-dev libsqlite3-dev
 
 tools=/opt/yoodesk-tools
 mkdir -p "$tools"
