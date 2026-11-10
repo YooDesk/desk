@@ -158,7 +158,7 @@ linux-loong64)
     export QEMU_LD_PREFIX="$tools/sysroot-loong64/usr"
     export PKG_CONFIG_PATH="$sysroot_loong/lib/loongarch64-linux-gnu/pkgconfig:$sysroot_loong/share/pkgconfig"
     export PKG_CONFIG_SYSROOT_DIR="$tools/sysroot-loong64"
-    export PKG_CONFIG_LIBDIR="$sysroot_loong/lib/loongarch64-linux-gnu/pkgconfig"
+    export PKG_CONFIG_LIBDIR="$sysroot_loong/lib/loongarch64-linux-gnu/pkgconfig:$sysroot_loong/share/pkgconfig"
     # bindgen parses vpx/aom/yuv headers with clang-10, which has no
     # loongarch target. All our targets are LP64 little-endian, so layouts
     # match x86_64; parse with that triple using the sysroot headers.
@@ -204,7 +204,9 @@ linux-mips64el)
     export QEMU_LD_PREFIX="$tools/sysroot-mips64el"
     export PKG_CONFIG_PATH="$sysroot_mips/pkgconfig:$tools/sysroot-mips64el/usr/share/pkgconfig"
     export PKG_CONFIG_SYSROOT_DIR="$tools/sysroot-mips64el"
-    export PKG_CONFIG_LIBDIR="$sysroot_mips/pkgconfig"
+    # LIBDIR overrides PATH entirely, so it must list both directories:
+    # the X11 protocol .pc files live under usr/share/pkgconfig.
+    export PKG_CONFIG_LIBDIR="$sysroot_mips/pkgconfig:$tools/sysroot-mips64el/usr/share/pkgconfig"
     # clang-10 supports mips64el directly.
     export BINDGEN_EXTRA_CLANG_ARGS="--target=mips64el-linux-gnuabi64 --sysroot=$sysroot_mips"
     cat > "$tools/meson-cross-mips64el.ini" <<EOF
