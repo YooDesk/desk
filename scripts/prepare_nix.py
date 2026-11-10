@@ -22,7 +22,11 @@ DESTINATION = ROOT / "artifacts" / "nix-patched"
 
 
 def crate_source() -> Path:
-    """Locate the nix 0.26.4 sources in a cargo registry cache."""
+    """Materialize nix 0.26.4 sources, preferring an existing cargo cache.
+
+    The crate is a path dependency, so it must exist before cargo resolves
+    the workspace; a cold cache therefore downloads it from crates.io.
+    """
     import os
 
     bases = []
@@ -37,9 +41,17 @@ def crate_source() -> Path:
         for candidate in base.glob(f"*/nix-{VERSION}"):
             if candidate.is_dir():
                 return candidate
-    raise SystemExit(
-        f"nix {VERSION} sources not found; run `cargo fetch` in desk-engine first"
-    )
+
+    download = ROOT / "artifacts" / f"nix-{VERSION}"
+    if not (download / "Cargo.toml").is_file():
+        url = f"https://static.crates.io/crates/nix/nix-{VERSION}.crate"
+        archive = Path(tempfile.mkdtemp(prefix="nix-crate-")) / "nix.crate"
+        subprocess.run(["curl", "-fL", "--retry", "3", url, "-o", str(archive)], check=True)
+        download.parent.mkdir(parents=True, exist_ok=True)
+        with tarfile.open(archive) as bundle:
+            bundle.extractall(download.parent, filter="data")
+        shutil.rmtree(archive.parent, ignore_errors=True)
+    return download
 
 
 def patch(source: Path, destination: Path) -> None:
