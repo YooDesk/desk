@@ -276,6 +276,9 @@ rustc --version
 # C++ toolchain is incomplete, before Cargo builds the large engine graph.
 printf '#include <stdio.h>\nint main(void) { return puts("C toolchain ready") < 0; }\n' | "$CC" -x c - -o /tmp/yoodesk-cross-c
 printf '#include <vector>\nint main() { std::vector<int> v(1, 0); return v[0]; }\n' | "$CXX" -x c++ - -o /tmp/yoodesk-cross-cxx
+# The compiler and linker are ready. Save their downloads and the resumable
+# sysroot even when a later completeness audit finds a missing dependency.
+printf '%s\n' "rust-1.99.0 cross-$platform compiler-ready" > "$tools/.ready"
 
 # Source preparation shared with the native Linux flow: engine patches,
 # hwcodec source, libdrmtap. linux-pkg-config probes resolve through the
@@ -305,9 +308,6 @@ if (( ${#missing_packages[@]} )); then
 fi
 python3.13 ci/audit_engine_sysroot.py --root "$tools/sysroot-${platform#linux-}" \
     --platform "$platform" --check-headers --report "/workspace/artifacts/sysroot-audit-$platform.json"
-# Compiler probes, package closure and the ELF runtime closure have passed.
-# Preserve these tools even if a later Rust source compilation fails.
-printf '%s\n' "rust-1.99.0 cross-$platform audited-sysroot" > "$tools/.ready"
 if [[ "${YOODESK_SYSROOT_AUDIT_ONLY:-0}" == 1 ]]; then
     mkdir -p /workspace/dist
     cp "/workspace/artifacts/sysroot-audit-$platform.json" /workspace/dist/

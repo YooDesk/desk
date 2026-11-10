@@ -62,7 +62,7 @@ MIPS64EL_SUPPLEMENT_ROOTS = [
     if package not in ('libstdc++-14-dev', 'libyuv-dev')
 ] + [
     'libstdc++-8-dev', 'libharfbuzz-dev', 'libgraphite2-dev',
-    'libxcb-shape0-dev', 'libatk-bridge2.0-dev', 'libxcomposite-dev',
+    'libxcb-shape0-dev', 'libatk-bridge2.0-dev', 'libxcomposite-dev', 'liblz4-dev',
 ]
 
 
