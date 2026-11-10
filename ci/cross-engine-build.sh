@@ -73,7 +73,6 @@ linux-mips64el)
 esac
 
 bash "$(dirname "$0")/cross-tools.sh" "$kind" "$tools"
-bash "$(dirname "$0")/cross-sysroot.sh" "$kind" "$tools"
 
 # Prebuilt CPython (python-build-standalone) instead of a 13-minute source
 # build: the build runs in a fresh container on every job, and the standalone
@@ -95,6 +94,10 @@ python3.13 -m pip install 'meson==1.9.0'
 if [[ ! -x "$tools/bin/cmake" ]]; then
     python3.13 -m pip install 'cmake==3.31.6'
 fi
+
+# The sysroot build compiles libyuv with CMake, so it must run after the
+# tooling above is in place.
+bash "$(dirname "$0")/cross-sysroot.sh" "$kind" "$tools"
 
 if [[ ! -x "$tools/bin/cargo" ]]; then
     curl -fL --retry 3 "https://static.rust-lang.org/dist/rust-${RUST_VERSION:-1.99.0}-x86_64-unknown-linux-gnu.tar.xz" -o /tmp/rust.tar.xz
