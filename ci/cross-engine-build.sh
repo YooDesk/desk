@@ -38,7 +38,7 @@ done
 for attempt in 1 2 3; do
     apt-get install -y --no-install-recommends \
         build-essential gcc-8 g++-8 ca-certificates curl git unzip zip xz-utils \
-        pkg-config python3 binutils file dpkg autoconf automake libtool ninja-build nasm \
+        pkg-config python3 binutils file dpkg autoconf automake libtool ninja-build nasm cmake \
         clang-10 libclang-10-dev llvm-10-dev libasound2-dev libgstreamer1.0-dev \
         libgstreamer-plugins-base1.0-dev libgtk-3-dev libpulse-dev libva-dev \
         libxcb-randr0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxcb-shm0-dev \
