@@ -131,5 +131,10 @@ if __name__ == "__main__":
         record = lock["platforms"].get(platform)
         if record and record.get("headers_url"):
             print(record["headers_url"], record["headers_sha256"])
+    elif action == "runtime-location":
+        lock = json.loads((ROOT / "ci/native-sdk.lock.json").read_text(encoding="utf-8"))
+        record = lock["platforms"].get(platform)
+        if record and record.get("runtime_url"):
+            print(record["runtime_url"], record["runtime_sha256"])
     elif action == "package-headers":
         package_headers(platform)

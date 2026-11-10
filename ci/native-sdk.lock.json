@@ -6,7 +6,9 @@
       "url": "https://github.com/YooDesk/desk/releases/download/native-sdk-v1-linux-mips64el/native-sdk-v1-linux-mips64el.tar.xz",
       "sha256": "1550397cd82d416bfd194291b1ad27464b7c695470429cdc6813680c39dd3c78",
       "headers_url": "https://github.com/YooDesk/desk/releases/download/native-sdk-v1-linux-mips64el/native-sdk-v1-linux-mips64el-openh264-headers.tar.xz",
-      "headers_sha256": "a111c2e66cee745f7658e97fa31cdb74689ea57d2e223a2a10c72e7f415f04ed"
+      "headers_sha256": "a111c2e66cee745f7658e97fa31cdb74689ea57d2e223a2a10c72e7f415f04ed",
+      "runtime_url": "https://github.com/YooDesk/desk/releases/download/native-sdk-v1-linux-mips64el/libc6_2.28-13.lnd.4_mips64el.deb",
+      "runtime_sha256": "700fe7829d87b83ddda1d32365170134a2798c6bcb7cc31c3357a73475f40b56"
     },
     "linux-loong64": {
       "url": "https://github.com/YooDesk/desk/releases/download/native-sdk-v1-linux-loong64/native-sdk-v1-linux-loong64.tar.xz",

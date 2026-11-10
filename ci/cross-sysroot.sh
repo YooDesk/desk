@@ -150,6 +150,20 @@ if [[ -n "$sdk_record" ]]; then
         touch "$root/.sdk-$sdk_sha"
         rm -f "$prefix/native-sdk.tar.xz"
     fi
+    # Loongnix's MIPS media libraries use GNU xhash (ELF ABI version 5).
+    # Install the matching glibc 2.28 runtime as a pair with its own loader.
+    runtime_record=$(python3 "$(dirname "$0")/native_sdk.py" runtime-location "$kind")
+    if [[ -n "$runtime_record" ]]; then
+        read -r runtime_url runtime_sha <<< "$runtime_record"
+        if [[ ! -f "$root/.sdk-runtime-$sdk_sha-$runtime_sha" ]]; then
+            fetch "$runtime_url" "$runtime_sha" "$prefix/native-sdk-runtime.deb"
+            dpkg-deb -x "$prefix/native-sdk-runtime.deb" "$root"
+            # Keep the loader symlink within the sysroot on the CI host.
+            ln -sfn ../lib/mips64el-linux-gnuabi64/ld-2.28.so "$root/lib64/ld.so.1"
+            touch "$root/.sdk-runtime-$sdk_sha-$runtime_sha"
+            rm -f "$prefix/native-sdk-runtime.deb"
+        fi
+    fi
     exit 0
 fi
 
