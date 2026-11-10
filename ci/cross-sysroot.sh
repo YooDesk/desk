@@ -59,7 +59,8 @@ prepare_sysroot() {
     # Run this for cached and freshly unpacked roots alike: an archive's
     # .done marker does not supply the development metadata or linker inputs.
     if [[ "$multiarch" == mips64el-linux-gnuabi64 ]]; then
-        if [[ ! -f "$root/.buster-dev-complete" ]]; then
+        local completion_marker="$root/.buster-dev-$(sha256sum "$(dirname "$0")/cross-sysroot-roots.py" | cut -d' ' -f1)"
+        if [[ ! -f "$completion_marker" ]]; then
             local index="$prefix/buster-mips64el-Packages"
             local manifest="$prefix/buster-mips64el-supplement"
             curl -fsL --retry 3 --connect-timeout 30 'https://archive.debian.org/debian/dists/buster/main/binary-mips64el/Packages.gz' | gzip -dc > "$index"
@@ -75,7 +76,7 @@ prepare_sysroot() {
                 rm -rf "$stage"
             done < "$manifest"
             rm -f "$index" "$manifest" "$prefix/mips-supplement.deb"
-            touch "$root/.buster-dev-complete"
+            touch "$completion_marker"
         fi
         mkdir -p "$root/usr/$multiarch" "$root/usr/include"
         cp -a "$prefix/mips-root/usr/$multiarch/." "$root/usr/$multiarch/"

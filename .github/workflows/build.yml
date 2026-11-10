@@ -10,6 +10,10 @@ on:
         type: choice
         default: all
         options: [all, windows-x64, windows-arm64, linux-x64, linux-arm64, linux-loong64, linux-mips64el]
+      audit_only:
+        description: Audit the selected cross sysroot without compiling the engine
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -175,12 +179,14 @@ jobs:
         if: matrix.cross
         timeout-minutes: 360
         shell: bash
+        env:
+          YOODESK_SYSROOT_AUDIT_ONLY: ${{ inputs.audit_only && '1' || '0' }}
         run: |
           # Same disposable runner cleanup as the RustDesk Linux workflow.
           sudo rm -rf /opt/ghc /usr/local/lib/android /usr/share/dotnet
           mkdir -p .ci-cache/tools
           docker run --rm \
-            -e GITHUB_SHA -e RELEASE_VERSION -e RUST_VERSION='${{ env.RUST_VERSION }}' \
+            -e GITHUB_SHA -e RELEASE_VERSION -e YOODESK_SYSROOT_AUDIT_ONLY -e RUST_VERSION='${{ env.RUST_VERSION }}' \
             -v "$PWD:/workspace" -v "$PWD/.ci-cache/tools:/opt/yoodesk-tools" \
             ubuntu:18.04 bash /workspace/ci/cross-engine-build.sh '${{ matrix.platform }}' '${{ matrix.target }}'
       - uses: actions/upload-artifact@v4
@@ -221,7 +227,7 @@ jobs:
           path: .ci-cache/tools/
           key: ubuntu18-desk-tools-${{ matrix.platform }}-rust199-python3135-openssl354-cmake440-vcpkg9e593-glibc-nasm301-cross-v7
   release:
-    if: github.event_name != 'pull_request' && (github.event_name != 'workflow_dispatch' || inputs.platform == 'all')
+    if: github.event_name != 'pull_request' && !inputs.audit_only && (github.event_name != 'workflow_dispatch' || inputs.platform == 'all')
     needs: native
     runs-on: ubuntu-24.04-arm
     permissions:

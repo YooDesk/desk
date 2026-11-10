@@ -297,6 +297,16 @@ if (( ${#missing_packages[@]} )); then
     pkg-config --print-errors --exists "${missing_packages[@]}" || true
     exit 1
 fi
+python3.13 ci/audit_engine_sysroot.py --root "$tools/sysroot-${platform#linux-}" \
+    --platform "$platform" --check-headers --report "/workspace/artifacts/sysroot-audit-$platform.json"
+# Compiler probes, package closure and the ELF runtime closure have passed.
+# Preserve these tools even if a later Rust source compilation fails.
+printf '%s\n' "rust-1.99.0 cross-$platform audited-sysroot" > "$tools/.ready"
+if [[ "${YOODESK_SYSROOT_AUDIT_ONLY:-0}" == 1 ]]; then
+    mkdir -p /workspace/dist
+    cp "/workspace/artifacts/sysroot-audit-$platform.json" /workspace/dist/
+    exit 0
+fi
 python3.13 scripts/prepare_sources.py
 python3.13 scripts/prepare_linux_native.py
 python3.13 scripts/patch_hwcodec.py

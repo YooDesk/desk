@@ -58,12 +58,11 @@ LOONG64_ROOTS = [
 # Complete the development packages absent from the prebuilt Loongnix root.
 # Existing Loongnix files are preserved when this Debian buster closure is merged.
 MIPS64EL_SUPPLEMENT_ROOTS = [
-    'libudev-dev', 'libxrandr-dev', 'libxtst-dev', 'libxkbcommon-dev',
-    'libxcb-shm0-dev', 'libxcb-randr0-dev', 'libxcb-xfixes0-dev',
-    'libcairo2-dev', 'libfontconfig1-dev', 'libgdk-pixbuf2.0-dev',
-    'libatk-bridge2.0-dev', 'libwayland-dev', 'wayland-protocols',
-    'libepoxy-dev', 'libxcomposite-dev', 'libxi-dev', 'libxinerama-dev',
-    'libxcursor-dev', 'libxft-dev',
+    package for package in LOONG64_ROOTS
+    if package not in ('libstdc++-14-dev', 'libyuv-dev')
+] + [
+    'libstdc++-8-dev', 'libharfbuzz-dev', 'libgraphite2-dev',
+    'libxcb-shape0-dev', 'libatk-bridge2.0-dev', 'libxcomposite-dev',
 ]
 
 

@@ -1,6 +1,6 @@
 """Materialize the patched nix crate used by webrtc-util and zbus.
 
-nix 0.26 hard-codes the ioctl constant layout per architecture and omits
+nix 0.23/0.25/0.26 hard-code the ioctl constant layout per architecture and omit
 loongarch64, so the crate fails to compile for that target (unresolved
 import `self::consts`). The patch adds loongarch64 to the "generic"
 ioctl group, whose layout it shares.
@@ -9,6 +9,7 @@ The crate is vendored into artifacts/ (git-ignored) the same way the
 patched hwcodec tree is, and [patch.crates-io] points at it.
 """
 from pathlib import Path
+import hashlib
 import re
 import shutil
 import subprocess
@@ -17,12 +18,15 @@ import tarfile
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "0.26.4"
-DESTINATION = ROOT / "artifacts" / "nix-patched"
+VERSIONS = {
+    "0.23.2": "8f3790c00a0150112de0f4cd161e3d7fc4b2d8a5542ffc35f099a2562aecb35c",
+    "0.25.1": "f346ff70e7dbfd675fe90590b92d59ef2de15a8779ae305ebcbfd3f0caf59be4",
+    "0.26.4": "598beaf3cc6fdd9a5dfb1630c2800c7acd31df7aaf0f565796fba2b53ca1af1b",
+}
 
 
-def crate_source() -> Path:
-    """Materialize nix 0.26.4 sources, preferring an existing cargo cache.
+def crate_source(version: str) -> Path:
+    """Materialize pinned nix sources, preferring an existing cargo cache.
 
     The crate is a path dependency, so it must exist before cargo resolves
     the workspace; a cold cache therefore downloads it from crates.io.
@@ -38,47 +42,59 @@ def crate_source() -> Path:
     for base in bases:
         if not base.is_dir():
             continue
-        for candidate in base.glob(f"*/nix-{VERSION}"):
+        for candidate in base.glob(f"*/nix-{version}"):
             if candidate.is_dir():
                 return candidate
 
-    download = ROOT / "artifacts" / f"nix-{VERSION}"
+    download = ROOT / "artifacts" / f"nix-{version}"
     if not (download / "Cargo.toml").is_file():
-        url = f"https://static.crates.io/crates/nix/nix-{VERSION}.crate"
-        archive = Path(tempfile.mkdtemp(prefix="nix-crate-")) / "nix.crate"
-        subprocess.run(["curl", "-fL", "--retry", "3", url, "-o", str(archive)], check=True)
-        download.parent.mkdir(parents=True, exist_ok=True)
-        with tarfile.open(archive) as bundle:
-            bundle.extractall(download.parent, filter="data")
-        shutil.rmtree(archive.parent, ignore_errors=True)
+        url = f"https://static.crates.io/crates/nix/nix-{version}.crate"
+        with tempfile.TemporaryDirectory(prefix="nix-crate-") as temporary:
+            archive = Path(temporary) / "nix.crate"
+            subprocess.run(["curl", "-fL", "--retry", "3", url, "-o", str(archive)], check=True)
+            if hashlib.sha256(archive.read_bytes()).hexdigest() != VERSIONS[version]:
+                raise RuntimeError(f"nix {version}: crate checksum mismatch")
+            download.parent.mkdir(parents=True, exist_ok=True)
+            with tarfile.open(archive) as bundle:
+                bundle.extractall(download.parent, filter="data")
     return download
 
 
-def patch(source: Path, destination: Path) -> None:
-    if destination.exists():
-        shutil.rmtree(destination)
-    shutil.copytree(source, destination)
-
+def patch(source: Path, destination: Path, version: str) -> None:
+    destination.mkdir(parents=True, exist_ok=True)
+    for original in source.rglob("*"):
+        if not original.is_file():
+            continue
+        target = destination / original.relative_to(source)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if original.relative_to(source).as_posix() == "src/sys/ioctl/linux.rs":
+            continue
+        if not target.is_file() or original.read_bytes() != target.read_bytes():
+            shutil.copy2(original, target)
+    original_ioctl = source / "src" / "sys" / "ioctl" / "linux.rs"
     ioctl = destination / "src" / "sys" / "ioctl" / "linux.rs"
-    text = ioctl.read_text(encoding="utf-8")
+    text = original_ioctl.read_text(encoding="utf-8")
     if 'target_arch = "loongarch64"' not in text:
         # riscv64 also appears in the mips/powerpc group, which uses a
         # different ioctl layout, so anchor on the "Generic" comment.
         anchor = text.index('// "Generic" ioctl protocol')
         head, tail = text[:anchor], text[anchor:]
-        marker = 'target_arch = "riscv64"\n'
+        marker = 'target_arch = "aarch64",'
         offset = tail.index(marker)
         if tail[:offset].count('mod consts') != 0:
             raise SystemExit("nix ioctl architecture list changed; review the patch")
-        tail = (tail[:offset] + 'target_arch = "riscv64",\n    target_arch = "loongarch64"\n'
+        tail = (tail[:offset] + marker + '\n    target_arch = "loongarch64",'
                 + tail[offset + len(marker):])
-        ioctl.write_text(head + tail, encoding="utf-8")
-    print(f"nix {VERSION} patched at {destination}")
+        text = head + tail
+    if not ioctl.is_file() or ioctl.read_text(encoding="utf-8") != text:
+        ioctl.write_text(text, encoding="utf-8")
+    print(f"nix {version} patched at {destination}")
 
 
 def main() -> int:
-    DESTINATION.parent.mkdir(parents=True, exist_ok=True)
-    patch(crate_source(), DESTINATION)
+    for version in VERSIONS:
+        directory = "nix-patched" if version == "0.26.4" else f"nix-{version}-patched"
+        patch(crate_source(version), ROOT / "artifacts" / directory, version)
     return 0
 
 

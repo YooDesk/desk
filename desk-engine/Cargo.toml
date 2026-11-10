@@ -46,9 +46,11 @@ serde_json = "1"
 # 由本 workspace 根声明；与 web-service 的依赖图互不影响。
 [patch.crates-io]
 libxdo-sys = { path = "../artifacts/rustdesk-engine-src/libs/libxdo-sys-stub" }
-# nix 0.26 lists only some architectures for its ioctl constants; the patched
-# copy adds loongarch64 so webrtc-util/zbus compile for the LoongArch port.
+# Older nix versions omit LoongArch from their generic ioctl constant group.
+# Keep each locked version and add its missing architecture declaration.
 nix = { path = "../artifacts/nix-patched" }
+nix023 = { package = "nix", path = "../artifacts/nix-0.23.2-patched" }
+nix025 = { package = "nix", path = "../artifacts/nix-0.25.1-patched" }
 tungstenite = { git = "https://github.com/rustdesk-org/tungstenite-rs", rev = "efce47e5364f00a63302cf07ab1fb13ded478914" }
 webrtc = { git = "https://github.com/rustdesk-org/webrtc", rev = "49c89bd8d30e6e62e4c1a96cee38fdc11f79ef63" }
 webrtc-util = { git = "https://github.com/rustdesk-org/webrtc", rev = "49c89bd8d30e6e62e4c1a96cee38fdc11f79ef63" }
