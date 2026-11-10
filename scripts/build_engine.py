@@ -10,6 +10,7 @@ from __future__ import annotations
 import os
 import json
 import pathlib
+import shlex
 import subprocess
 import sys
 
@@ -130,7 +131,10 @@ def main() -> int:
         fetch.extend(["--target", target])
     subprocess.run(fetch, cwd=ROOT / "desk-engine", env=env, check=True)
 
+    # Cross ports may need extra flags (e.g. -Z build-std when the Rust
+    # distribution has no prebuilt std for the target).
     command = ["cargo", "build", "--release", "--locked"]
+    command.extend(shlex.split(os.environ.get("YOODESK_ENGINE_CARGO_ARGS", "")))
     print("running:", " ".join(command))
     result = subprocess.run(command, cwd=ROOT / "desk-engine", env=env)
     if result.returncode != 0:

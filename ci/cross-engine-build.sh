@@ -161,6 +161,8 @@ endian = 'little'
 EOF
     export YOODESK_MESON_CROSS_FILE="$tools/meson-cross-mips64el.ini"
     export RUSTC_BOOTSTRAP=1
+    # The engine workspace builds std from source too: no prebuilt mips64 std.
+    export YOODESK_ENGINE_CARGO_ARGS="-Z build-std=std,panic_abort"
     build_args=(-Z build-std=std,panic_abort)
     ;;
 esac
