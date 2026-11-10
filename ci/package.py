@@ -92,7 +92,8 @@ def verify_binary(path, platform):
 
 def archive(stage, output):
     output.parent.mkdir(parents=True, exist_ok=True)
-    with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED, compresslevel=6) as bundle:
+    # SDK tarballs use the Unix epoch; ZIP's earliest timestamp is 1980.
+    with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED, compresslevel=6, strict_timestamps=False) as bundle:
         for path in sorted(stage.rglob("*")):
             if path.is_file(): bundle.write(path, path.relative_to(stage).as_posix())
     output.with_suffix(output.suffix + ".sha256").write_text(f"{digest(output)}  {output.name}\n", encoding="utf-8")
