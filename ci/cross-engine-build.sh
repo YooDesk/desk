@@ -55,46 +55,26 @@ done
 
 tools=/opt/yoodesk-tools
 mkdir -p "$tools"
-# Wrappers instead of compiler arrays: meson caches the compiler command in
-# an existing build directory and drops extra elements for some toolchains.
-# They inject the target sysroot (headers under usr/include/<multiarch>, the
-# C library under usr/lib/<multiarch>, and absolute paths inside GNU ld
-# scripts) and drop -m64, which cc-rs adds from the build host but neither
-# cross gcc accepts.
-for triple in loongarch64:loongarch64-linux-gnu mips64el:mips64el-linux-gnuabi64; do
-    arch="${triple%%:*}"
-    multiarch="${triple#*:}"
-    if [[ "$arch" == loongarch64 ]]; then
-        bindir="/opt/yoodesk-tools/cross-tools/bin"
-        sysroot="/opt/yoodesk-tools/sysroot-loong64"
-        cprefix="loongarch64-unknown-linux-gnu"
-    else
-        bindir="/opt/yoodesk-tools/bin"
-        sysroot="/opt/yoodesk-tools/sysroot-mips64el"
-        cprefix="mips64el-linux-gnuabi64"
-    fi
-    tool_suffix=loong64
-    [[ "$arch" == mips64el ]] && tool_suffix=mips64el
-    for lang in cc cxx; do
-        case "$lang" in
-            cc) compiler="$bindir/$cprefix-gcc" ;;
-            cxx) compiler="$bindir/$cprefix-g++" ;;
+# Compiler wrappers: they add the target sysroot and the multiarch
+# include/library directories, and drop -m64 (which cc-rs derives from the
+# build host). The implementation is scripts/cc-wrapper.sh so the quoting
+# rules are testable; bash arrays keep values like -DOPENSSL_PIC="1" intact,
+# which a plain string join would split.
+cp /workspace/scripts/cc-wrapper.sh "$tools/cc-wrapper"
+chmod +x "$tools/cc-wrapper"
+for entry in     "loong64:/opt/yoodesk-tools/cross-tools/bin/loongarch64-unknown-linux-gnu:/opt/yoodesk-tools/sysroot-loong64:loongarch64-linux-gnu"     "mips64el:/opt/yoodesk-tools/bin/mips64el-linux-gnuabi64:/opt/yoodesk-tools/sysroot-mips64el:mips64el-linux-gnuabi64"; do
+    IFS=: read -r suffix bindir sysroot multiarch <<< "$entry"
+    for language in cc cxx; do
+        case "$language" in
+            cc) compiler="$bindir-gcc" ;;
+            cxx) compiler="$bindir-g++" ;;
         esac
-        out="$tools/meson-${lang}-${tool_suffix}"
+        wrapper="$tools/meson-${language}-${suffix}"
         {
-            echo '#!/bin/sh'
-            echo '# Drop -m64: cc-rs adds it from the build host and this gcc rejects it.'
-            echo 'args=""'
-            echo 'for a in "$@"; do'
-            echo '    case "$a" in -m64) ;; *) args="$args $a" ;; esac'
-            echo 'done'
-            echo "exec $compiler \\"
-            echo "    --sysroot=$sysroot \\"
-            echo "    -isystem $sysroot/usr/include/$multiarch \\"
-            echo "    -L$sysroot/usr/lib/$multiarch \\"
-            echo "    -Wl,-rpath-link,$sysroot/usr/lib/$multiarch \$args"
-        } > "$out"
-        chmod +x "$out"
+            echo '#!/bin/bash'
+            echo "exec /opt/yoodesk-tools/cc-wrapper '$compiler' '$sysroot' '$multiarch' \"\$@\""
+        } > "$wrapper"
+        chmod +x "$wrapper"
     done
 done
 
