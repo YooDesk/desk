@@ -273,14 +273,17 @@ def main():
             report["link_compile_errors"].append(result.stderr)
         # An executable can accept non-PIC libc archives. Exercise the
         # shared-library link used by the engine's cdylib dependencies too,
-        # with a real pthread reference so an accidental static fallback
-        # cannot remain hidden behind an unused -lpthread.
+        # with real pthread and D-Bus references so an accidental static
+        # fallback cannot remain hidden behind an unused library flag.
         result = subprocess.run(
             [*compiler, "-fPIC", "-shared", "-Wl,--no-as-needed", "-Wl,-z,defs",
-             "-x", "c", "-", "-o", "/tmp/yoodesk-engine-shared-link-probe.so",
+             *shlex.split(flags), "-x", "c", "-", "-o", "/tmp/yoodesk-engine-shared-link-probe.so",
              *[f"-l{library}" for library in LIBRARIES]],
             input=("#include <pthread.h>\n"
+                   "#include <dbus/dbus.h>\n"
                    "int yoodesk_probe(pthread_t *thread, void *(*start)(void *)) {\n"
+                   "DBusServer *server = dbus_server_listen(\"unix:tmpdir=/tmp\", 0);\n"
+                   "if (server) dbus_server_unref(server);\n"
                    "return pthread_create(thread, 0, start, 0); }\n"),
             text=True, capture_output=True, timeout=60,
         )

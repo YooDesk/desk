@@ -2,6 +2,12 @@
   "schema_version": 1,
   "version": "v1",
   "platforms": {
+    "linux-mips64el": {
+      "url": "https://github.com/YooDesk/desk/releases/download/native-sdk-v1-linux-mips64el/native-sdk-v1-linux-mips64el.tar.xz",
+      "sha256": "1550397cd82d416bfd194291b1ad27464b7c695470429cdc6813680c39dd3c78",
+      "headers_url": "https://github.com/YooDesk/desk/releases/download/native-sdk-v1-linux-mips64el/native-sdk-v1-linux-mips64el-openh264-headers.tar.xz",
+      "headers_sha256": "a111c2e66cee745f7658e97fa31cdb74689ea57d2e223a2a10c72e7f415f04ed"
+    },
     "linux-loong64": {
       "url": "https://github.com/YooDesk/desk/releases/download/native-sdk-v1-linux-loong64/native-sdk-v1-linux-loong64.tar.xz",
       "sha256": "1f20cf5c0dc57552774e6cc88cac0720a66ea1ad261beef761dc614053cc7b20",
