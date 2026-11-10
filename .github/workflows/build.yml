@@ -146,17 +146,18 @@ jobs:
           $env:VCPKG_DEFAULT_HOST_TRIPLET='${{ matrix.triplet }}'
           if ($env:CARGO_BUILD_TARGET -eq 'aarch64-pc-windows-msvc') {
             $env:SODIUM_LIB_DIR="$env:VCPKG_ROOT/installed/${{ matrix.triplet }}/lib"
-            # Interrupted runs can leave incomplete debug dependencies in the cache.
-            # Keep the expensive release build and rebuild the test profile.
-            cargo clean --profile dev
-            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
           python scripts/build_engine.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $env:YOODESK_DESK_ENGINE_LIB_DIR="$env:GITHUB_WORKSPACE/desk-engine/target/$env:CARGO_BUILD_TARGET/release"
           cargo build --locked --release --lib
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          cargo test --locked --lib
+          if ($env:CARGO_BUILD_TARGET -eq 'aarch64-pc-windows-msvc') {
+            # Use an explicit target and a fresh dependency directory for ARM64 tests.
+            cargo test --locked --lib --target "$env:CARGO_BUILD_TARGET" --target-dir "$env:GITHUB_WORKSPACE/artifacts/arm64-tests" --verbose
+          } else {
+            cargo test --locked --lib
+          }
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python ci/package.py desk --platform '${{ matrix.platform }}'
       - name: Build every Linux native dependency and binary on Ubuntu 18.04
