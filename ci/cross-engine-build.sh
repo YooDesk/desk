@@ -20,6 +20,14 @@ platform="$1"
 target="$2"
 
 export DEBIAN_FRONTEND=noninteractive
+# Retry individual downloads, rather than fetching the full dependency set
+# again after one HTTP connection fails. Keep downloaded packages for retries.
+cat > /etc/apt/apt.conf.d/80yoodesk-downloads <<'EOF'
+Acquire::Retries "3";
+Acquire::http::Timeout "20";
+Acquire::https::Timeout "20";
+Binary::apt-get::APT::Keep-Downloaded-Packages "true";
+EOF
 # archive.ubuntu.com is unreliable from CI runners (connection refused or
 # timeout). Canonical's Azure mirror serves the same bionic archive.
 if [[ -f /etc/apt/sources.list ]]; then
@@ -35,6 +43,10 @@ for attempt in 1 2 3; do
     fi
     sleep $((attempt * 15))
 done
+# The base container has no CA bundle. Bootstrap that small dependency first,
+# then use TLS for the large download to avoid the mirror's HTTP proxy failures.
+apt-get install -y --no-install-recommends ca-certificates
+sed -i 's|http://azure.archive.ubuntu.com/ubuntu|https://azure.archive.ubuntu.com/ubuntu|g' /etc/apt/sources.list
 for attempt in 1 2 3; do
     apt-get install -y --no-install-recommends \
         build-essential gcc-8 g++-8 ca-certificates curl git unzip zip xz-utils \
