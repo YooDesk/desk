@@ -90,6 +90,11 @@ if [[ ! -x "$tools/bin/python3.13" ]]; then
 fi
 export PATH="$tools/bin:$PATH"
 python3.13 -m pip install 'meson==1.9.0'
+# Ubuntu 18.04 ships CMake 3.10, below libyuv's minimum; install a
+# current CMake into the tools prefix and prefer it on PATH.
+if [[ ! -x "$tools/bin/cmake" ]]; then
+    python3.13 -m pip install 'cmake==3.31.6'
+fi
 
 if [[ ! -x "$tools/bin/cargo" ]]; then
     curl -fL --retry 3 "https://static.rust-lang.org/dist/rust-${RUST_VERSION:-1.99.0}-x86_64-unknown-linux-gnu.tar.xz" -o /tmp/rust.tar.xz
