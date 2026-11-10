@@ -49,7 +49,11 @@ loongarch64)
     # Resolve the dev-package closure from the same immutable index.
     index="$prefix/loong64-Packages"
     curl -fsL --retry 3 "$snapshot/dists/sid/main/binary-loong64/Packages.gz" | gunzip > "$index"
-    python3 - "$(dirname "$0")/cross-sysroot-roots.py" "$index" loong64 > "$prefix/loong64-files"
+    # Strip carriage returns: a Windows checkout can leave CRLF in helper
+    # output, and a trailing 
+ breaks every download path.
+    python3 - "$(dirname "$0")/cross-sysroot-roots.py" "$index" loong64 | tr -d '
+' > "$prefix/loong64-files"
     echo "loong64 sysroot: $(wc -l < "$prefix/loong64-files") packages resolved"
     count=0
     while read -r file; do
@@ -57,9 +61,19 @@ loongarch64)
         # snapshot serves /archive/<ts>/<path>; fall back to the live archive
         # if a file is missing there.
         if [[ ! -s "$prefix/debs/$file" ]]; then
-            if ! curl -fsL --retry 3 "$snapshot/$file" -o "$prefix/debs/$file"; then
-                curl -fsL --retry 3 "https://deb.debian.org/debian/$file" -o "$prefix/debs/$file"
-            fi
+            # snapshot.debian.org rate-limits bursts, so retry with backoff and
+            # fall back to the live archive before giving up on a package.
+            fetched=0
+            for attempt in 1 2 3 4; do
+                if curl -fsL --retry 2 --connect-timeout 30 "$snapshot/$file" -o "$prefix/debs/$file"; then
+                    fetched=1; break
+                fi
+                if curl -fsL --retry 2 --connect-timeout 30 "https://deb.debian.org/debian/$file" -o "$prefix/debs/$file"; then
+                    fetched=1; break
+                fi
+                sleep $((attempt * 5))
+            done
+            [[ "$fetched" == 1 ]] || { echo "cannot fetch $file" >&2; exit 1; }
         fi
         dpkg-deb -x "$prefix/debs/$file" "$root"
         count=$((count + 1))
