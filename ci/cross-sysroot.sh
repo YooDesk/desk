@@ -36,6 +36,24 @@ fetch() { # fetch <url> <sha256> <output>
     [[ "$got" == "$want" ]] || { echo "Checksum mismatch for $url: $got" >&2; exit 1; }
 }
 
+
+restore_so_links() { # restore_so_links <lib-dir>
+    local directory="$1"
+    [[ -d "$directory" ]] || return 0
+    local versioned
+    for versioned in "$directory"/*.so.*; do
+        [[ -f "$versioned" ]] || continue
+        local base
+        base="$(basename "$versioned")"
+        # libfoo.so.1.2.3 -> libfoo.so ; skip libfoo.so.6 (already a soname link)
+        local stem="${base%%.so.*}"
+        local link="$directory/$stem.so"
+        if [[ ! -e "$link" ]]; then
+            ln -s "$base" "$link"
+        fi
+    done
+}
+
 case "$kind" in
 loongarch64)
     root="$prefix/sysroot-loong64"
@@ -62,6 +80,8 @@ loongarch64)
                 if [[ -d "$root/usr/include/loongarch64-linux-gnu" && ! -e "$root/usr/include/bits" ]]; then
                     cp -a "$root/usr/include/loongarch64-linux-gnu/." "$root/usr/include/"
                 fi
+                restore_so_links "$root/usr/lib/loongarch64-linux-gnu"
+                restore_so_links "$root/usr/lib64"
                 touch "$root/.done"
                 exit 0
             fi
@@ -127,6 +147,7 @@ mips64el)
             if [[ -d "$root/usr/lib/mips64el-linux-gnuabi64/pkgconfig" ]]; then
                 mkdir -p "$root/lib64"
                 cp -L "$prefix/mips-root/usr/mips64el-linux-gnuabi64/lib64/ld.so.1" "$root/lib64/ld.so.1" 2>/dev/null || true
+                restore_so_links "$root/usr/lib/mips64el-linux-gnuabi64"
                 touch "$root/.done"
                 exit 0
             fi
