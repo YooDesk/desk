@@ -76,11 +76,11 @@ mips64el)
     grep -vE '^\s*(#|$)' "$(dirname "$0")/cross-sysroot-mips64el.debs" > "$prefix/mips-files"
     while read -r name sha; do
         file="$prefix/mips-debs/$(basename "$name")"
+        # The manifest records the mirror's asset names: GitHub rewrites '+'
+        # and '~' in uploaded asset names, so these are not the upstream
+        # file names. Fetch the mirror first, the upstream archive second.
         if ! fetch "$base/$(basename "$name")" "$sha" "$file"; then
-            # GitHub normalises '~' in asset names to '_'; the upstream
-            # archive uses the original name.
-            original="$(echo "$name" | sed 's/_deb10u1/~deb10u1/')"
-            fetch "$fallback/$original" "$sha" "$file"
+            fetch "$fallback/$name" "$sha" "$file"
         fi
         dpkg-deb -x "$file" "$root"
     done < "$prefix/mips-files"
