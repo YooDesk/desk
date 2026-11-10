@@ -17,6 +17,17 @@ REVISION = "5936a7a88b94aa43516a3dd0eb509d2383f31e2d"
 
 def prepare(tree: Path, destination: Path) -> Path:
     """构建并验证固定版本、带 EGL 且禁用特权 helper 的共享库。"""
+    if configured := os.environ.get("YOODESK_PREBUILT_DRMTAP_DIR"):
+        prebuilt = Path(configured)
+        manifest = json.loads((prebuilt / "libdrmtap.manifest.json").read_text(encoding="utf-8"))
+        if manifest["revision"] != REVISION or manifest["helper"] or not manifest["egl"]:
+            raise RuntimeError("Published DRM SDK does not match the pinned runtime contract")
+        if hashlib.sha256((prebuilt / "libdrmtap.so.0").read_bytes()).hexdigest() != manifest["sha256"]:
+            raise RuntimeError("Published DRM SDK checksum mismatch")
+        destination.mkdir(parents=True, exist_ok=True)
+        for name in ("libdrmtap.so.0", "libdrmtap.manifest.json", "LICENSE.libdrmtap"):
+            shutil.copy2(prebuilt / name, destination / name)
+        return destination / "libdrmtap.so.0"
     work = ROOT / "desk-engine" / "target" / "drmtap"
     source = work / "source"
     build = work / "build"

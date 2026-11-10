@@ -57,6 +57,8 @@ jobs:
           path: browser/
           if-no-files-found: error
   native:
+    permissions:
+      contents: write
     needs: [browser, targets]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 360
@@ -198,6 +200,17 @@ jobs:
           name: sysroot-audit-${{ matrix.platform }}
           path: artifacts/sysroot-audit-${{ matrix.platform }}.json
           if-no-files-found: warn
+      - name: Publish immutable third-party native library SDK
+        if: always() && matrix.cross && hashFiles('artifacts/native-sdk/*.tar.xz') != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: native-sdk-v1-${{ matrix.platform }}
+          name: Native library SDK v1 ${{ matrix.platform }}
+          target_commitish: ${{ github.sha }}
+          make_latest: false
+          overwrite_files: false
+          fail_on_unmatched_files: true
+          files: artifacts/native-sdk/*
       - uses: actions/upload-artifact@v4
         with:
           name: native-${{ matrix.platform }}

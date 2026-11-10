@@ -127,6 +127,25 @@ EOF
     fi
 }
 
+# Once an SDK is published, source recipes are only used for an explicit
+# dependency upgrade. The pinned archive includes headers and native outputs.
+sdk_record=$(python3 "$(dirname "$0")/native_sdk.py" location "$kind")
+if [[ -n "$sdk_record" ]]; then
+    read -r sdk_url sdk_sha <<< "$sdk_record"
+    suffix="$kind"
+    [[ "$kind" == loongarch64 ]] && suffix=loong64
+    root="$prefix/sysroot-$suffix"
+    mkdir -p "$root"
+    if [[ ! -f "$root/.sdk-$sdk_sha" ]]; then
+        fetch "$sdk_url" "$sdk_sha" "$prefix/native-sdk.tar.xz"
+        tar -xJf "$prefix/native-sdk.tar.xz" -C "$root"
+        python3 "$(dirname "$0")/native_sdk.py" verify "$kind" "$root"
+        touch "$root/.sdk-$sdk_sha"
+        rm -f "$prefix/native-sdk.tar.xz"
+    fi
+    exit 0
+fi
+
 case "$kind" in
 loongarch64)
     root="$prefix/sysroot-loong64"

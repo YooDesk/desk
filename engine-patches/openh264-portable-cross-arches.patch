@@ -18,3 +18,29 @@
                  "powerpc" => TargetArch::Powerpc,
                  "powerpc64" => TargetArch::Powerpc64,
                  "s390x" => TargetArch::S390x,
+--- a/build.rs
++++ b/build.rs
+@@ -357,6 +357,23 @@ mod source_build {
+     pub fn compile() {
+         let target = Target::from_env();
+ 
++        if let Ok(directory) = std::env::var("OPENH264_LIB_DIR") {
++            assert!(matches!(target.os, TargetOs::Linux), "Published OpenH264 SDK is Linux-only");
++            let directory = Path::new(&directory);
++            assert_eq!(std::fs::read_to_string(directory.join("VERSION")).unwrap().trim(), "0.9.9");
++            println!("cargo:rerun-if-env-changed=OPENH264_LIB_DIR");
++            println!("cargo:rustc-link-search=native={}", directory.display());
++            for name in ["common", "processing", "decoder", "encoder"] {
++                let archive = directory.join(format!("libopenh264_{name}.a"));
++                assert!(archive.is_file(), "Incomplete OpenH264 SDK: {}", archive.display());
++                println!("cargo:rerun-if-changed={}", archive.display());
++                println!("cargo:rustc-link-lib=static=openh264_{name}");
++            }
++            println!("cargo:rustc-link-lib=stdc++");
++            return;
++        }
++        println!("cargo:rerun-if-env-changed=OPENH264_LIB_DIR");
++
+         compile_and_add_openh264_static_lib(&target, "common", "upstream/codec/common", ".", &[]);
+ 
+         compile_and_add_openh264_static_lib(

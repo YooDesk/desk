@@ -316,6 +316,14 @@ if [[ "${YOODESK_SYSROOT_AUDIT_ONLY:-0}" == 1 ]]; then
     cp "/workspace/artifacts/sysroot-audit-$platform.json" /workspace/dist/
     exit 0
 fi
+native_sdk_root="$tools/sysroot-${platform#linux-}"
+if [[ -f "$native_sdk_root/yoodesk-native-sdk.json" ]]; then
+    python3.13 ci/native_sdk.py verify "$platform" "$native_sdk_root"
+    export OPENH264_LIB_DIR="$native_sdk_root/yoodesk-native/openh264"
+    if [[ "$platform" == linux-loong64 ]]; then
+        export YOODESK_PREBUILT_DRMTAP_DIR="$native_sdk_root/yoodesk-native/drmtap"
+    fi
+fi
 python3.13 scripts/prepare_sources.py
 python3.13 scripts/prepare_linux_native.py
 if [[ "$platform" == linux-mips64el ]]; then
@@ -336,6 +344,7 @@ runner_var="CARGO_TARGET_$(echo "$target" | tr 'a-z-' 'A-Z_')_RUNNER"
 export "$runner_var=$QEMU"
 
 cargo build --locked --release "${build_args[@]}" --lib
+python3.13 ci/native_sdk.py package "$platform"
 cargo test --locked "${build_args[@]}" --lib
 python3.13 ci/package.py desk --platform "$platform"
 
