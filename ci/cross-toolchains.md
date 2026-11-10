@@ -78,12 +78,25 @@ hwcodec and scrap run bindgen 0.59 against libclang 10 (Ubuntu 18.04).
 
 ## CI environment requirements for the cross builds
 
-Python 3.13.5 is built from source inside the Ubuntu 18.04 container. It
-needs the same development headers the native flow installs, or its
-stdlib modules silently drop out and `ensurepip` fails:
+The cross jobs download a SHA256-pinned standalone Python 3.13.18 package
+from the sysroot release. Host tools stay separate from the target sysroot.
 
-    zlib1g-dev libffi-dev libssl-dev libbz2-dev liblzma-dev     libreadline-dev libsqlite3-dev
+## Reusable native libraries
 
-Symptom when missing: `zipimport.ZipImportError: can't decompress data;
-zlib not available` and `SSL module is not available` from pip. The
-container's `ubuntu:18.04` image has none of these.
+`ci/native-sdk.lock.json` pins the complete SDK archives by URL and SHA256.
+The build downloads these archives before considering source recipes.
+They include the target sysroot's headers and libraries, OpenH264 archives
+and public headers, mozjpeg archives and headers, and the LoongArch DRM
+runtime. MIPS also includes PIC static AOM 3.14.1 and libyuv.
+
+SDK releases use `native-sdk-v1-linux-loong64` and
+`native-sdk-v1-linux-mips64el`; they do not replace the latest desk plugin
+release. Existing assets are immutable. Public OpenH264 headers are also
+available as a separate archive for SDKs published before header packaging.
+
+For an intentional dependency upgrade, bump the SDK version and dependency
+pins, remove the affected platform's lock entry, run the cross build to
+publish the new SDK, and record its actual URL and SHA256. Ordinary builds
+keep the lock entries and use precompiled OpenH264, mozjpeg, DRM, AOM and
+libyuv. Audits check the pkg-config closure, target headers, executable and
+shared-library links, ELF architecture, and the runtime dependency closure.

@@ -5,6 +5,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
+import tarfile
 
 ROOT = Path(__file__).resolve().parents[1]
 TARGETS = {"linux-loong64": "loongarch64-unknown-linux-gnu",
@@ -17,6 +18,28 @@ DRM_REVISION = "5936a7a88b94aa43516a3dd0eb509d2383f31e2d"
 def digest(path):
     with path.open("rb") as stream:
         return hashlib.file_digest(stream, "sha256").hexdigest()
+
+
+def package_headers(platform):
+    """Keep public OpenH264 headers usable with already published libraries."""
+    source = ROOT / "artifacts/openh264-sys2-patched/upstream"
+    output = ROOT / "artifacts/native-sdk"
+    output.mkdir(parents=True, exist_ok=True)
+    archive = output / ("native-sdk-" + VERSION + "-" + platform + "-openh264-headers.tar.xz")
+    headers = sorted((source / "codec/api/wels").glob("*.h"))
+    if len(headers) != 4:
+        raise ValueError("Pinned OpenH264 public headers are incomplete")
+    with tarfile.open(archive, "w:xz") as bundle:
+        for header in headers:
+            info = bundle.gettarinfo(str(header), "yoodesk-native/openh264/include/wels/" + header.name)
+            info.uid = info.gid = info.mtime = 0
+            info.uname = info.gname = ""
+            info.mode = 0o644
+            with header.open("rb") as stream:
+                bundle.addfile(info, stream)
+    checksum = digest(archive)
+    (output / (archive.name + ".sha256")).write_text(checksum + "  " + archive.name + "\n", encoding="utf-8")
+    print("Packaged public OpenH264 headers:", archive.name, checksum)
 
 
 def verify(root, platform):
@@ -52,6 +75,8 @@ def package(platform):
             raise ValueError("OpenH264 archive is not complete: " + name)
     (h264 / "VERSION").write_text("0.9.9\n", encoding="utf-8")
     shutil.copy2(ROOT / "artifacts/openh264-sys2-patched/upstream/LICENSE", h264 / "LICENSE")
+    shutil.copytree(ROOT / "artifacts/openh264-sys2-patched/upstream/codec/api",
+                    h264 / "include", dirs_exist_ok=True)
     jpeg = extras / "mozjpeg"
     jpeg.mkdir(exist_ok=True)
     outputs = list((ROOT / "desk-engine/target" / target / "release/build").glob("mozjpeg-sys-*/out/libmozjpeg62.a"))
@@ -86,6 +111,7 @@ def package(platform):
     (output / (archive.name + ".sha256")).write_text(checksum + "  " + archive.name + "\n", encoding="utf-8")
     (output / (archive.name + ".json")).write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     print("Packaged reusable native SDK:", archive.name, checksum)
+    package_headers(platform)
 
 
 if __name__ == "__main__":
@@ -100,3 +126,10 @@ if __name__ == "__main__":
         record = lock["platforms"].get(platform)
         if record:
             print(record["url"], record["sha256"])
+    elif action == "headers-location":
+        lock = json.loads((ROOT / "ci/native-sdk.lock.json").read_text(encoding="utf-8"))
+        record = lock["platforms"].get(platform)
+        if record and record.get("headers_url"):
+            print(record["headers_url"], record["headers_sha256"])
+    elif action == "package-headers":
+        package_headers(platform)

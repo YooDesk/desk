@@ -139,6 +139,13 @@ if [[ -n "$sdk_record" ]]; then
     if [[ ! -f "$root/.sdk-$sdk_sha" ]]; then
         fetch "$sdk_url" "$sdk_sha" "$prefix/native-sdk.tar.xz"
         tar -xJf "$prefix/native-sdk.tar.xz" -C "$root"
+        headers_record=$(python3 "$(dirname "$0")/native_sdk.py" headers-location "$kind")
+        if [[ -n "$headers_record" ]]; then
+            read -r headers_url headers_sha <<< "$headers_record"
+            fetch "$headers_url" "$headers_sha" "$prefix/native-sdk-headers.tar.xz"
+            tar -xJf "$prefix/native-sdk-headers.tar.xz" -C "$root"
+            rm -f "$prefix/native-sdk-headers.tar.xz"
+        fi
         python3 "$(dirname "$0")/native_sdk.py" verify "$kind" "$root"
         touch "$root/.sdk-$sdk_sha"
         rm -f "$prefix/native-sdk.tar.xz"
