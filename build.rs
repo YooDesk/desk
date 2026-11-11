@@ -11,9 +11,9 @@ fn main() {
         println!("cargo:rustc-cdylib-link-arg=-Wl,-z,defs");
     }
 
+    // 本仓库只产出 cdylib 插件，没有 bin target；EXE 图标属于宿主程序。
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
-    let logo = brand_build::configure(root);
-    brand_build::configure_executable_icon(root, &logo);
+    let _ = brand_build::configure(root);
     let proto_dir = root.join("protocol/rustdesk");
     let proto = proto_dir.join("message-v1.proto");
     assert!(
