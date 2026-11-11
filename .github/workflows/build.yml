@@ -182,9 +182,8 @@ jobs:
           python3 scripts/build_engine.py
           export YOODESK_DESK_ENGINE_LIB_DIR="$PWD/desk-engine/target/${{ matrix.target }}/release"
           cargo build --locked --release --lib --target '${{ matrix.target }}'
-          if [ '${{ matrix.platform }}' = 'macos-arm64' ]; then
-            cargo test --locked --lib --target '${{ matrix.target }}'
-          fi
+          # 两个架构都在原生 runner 上，测试与打包都能执行。
+          cargo test --locked --lib --target '${{ matrix.target }}'
           python3 ci/package.py desk --platform '${{ matrix.platform }}'
           python3 -m unittest discover -s ci -p 'test_*.py'
       - name: Build Windows native code and run tests
