@@ -5,6 +5,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 static REQUESTS: AtomicUsize = AtomicUsize::new(0);
 static MEDIA_POLLS: AtomicUsize = AtomicUsize::new(0);
+#[cfg(any(test, not(any(target_os = "linux", target_os = "macos"))))]
 static FILE_REQUESTS: AtomicUsize = AtomicUsize::new(0);
 struct RequestSlot(&'static AtomicUsize);
 impl RequestSlot {
@@ -223,6 +224,7 @@ impl crate::desk::Clipboard for RemoteClipboard {
     }
 }
 
+#[cfg(not(any(target_os = "linux", target_os = "macos")))]
 extern "C" {
     fn yd_engine_file_endpoint(
         conn: i32,
@@ -236,22 +238,23 @@ extern "C" {
 
 pub(super) fn close_files(conn: i32) {
     // Linux文件句柄属于普通用户worker，由unsubscribe_conn/worker退出回收。
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
     let _ = conn;
-    #[cfg(not(target_os = "linux"))]
+    #[cfg(not(any(target_os = "linux", target_os = "macos")))]
     let _ = unsafe { yd_engine_file_close(conn) };
 }
 pub(super) fn files(conn: i32, value: &Value) -> Result<Value, ApiError> {
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
     {
         return call("endpoint", json!({"conn":conn,"value":value}))
             .ok_or_else(unavailable)?
             .map(|reply| reply.value);
     }
-    #[cfg(not(target_os = "linux"))]
+    #[cfg(not(any(target_os = "linux", target_os = "macos")))]
     files_operation(conn, || files_native(conn, value), || close_files(conn))
 }
 // 原生文件IO由独立任务锁串行，不可持全局代理锁；慢文件系统不能阻塞切代或媒体。
+#[cfg(any(test, not(any(target_os = "linux", target_os = "macos"))))]
 fn files_operation(
     conn: i32,
     operation: impl FnOnce() -> Result<Value, ApiError>,
@@ -277,6 +280,7 @@ fn files_operation(
     }
     result
 }
+#[cfg(not(any(target_os = "linux", target_os = "macos")))]
 fn files_native(conn: i32, value: &Value) -> Result<Value, ApiError> {
     let input = serde_json::to_vec(value).map_err(|_| unavailable())?;
     if input.len() > 24 << 20 {

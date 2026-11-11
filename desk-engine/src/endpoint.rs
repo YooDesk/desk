@@ -178,7 +178,7 @@ fn clipboard(v: &Value) -> Result<Value, Fault> {
     Ok(Value::Null)
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "macos"))]
 struct StagingDirectory {
     _lease: crate::file_journal::Lease,
 }
@@ -189,12 +189,12 @@ struct StagingDirectory {
     handle: std::fs::File,
 }
 
-#[cfg(not(any(windows, target_os = "linux")))]
+#[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
 struct StagingDirectory;
 
 impl StagingDirectory {
     fn create(_conn: i32, _id: i32, path: &std::path::Path) -> Result<Self, Fault> {
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "macos"))]
         {
             Ok(Self {
                 _lease: crate::file_journal::create(_conn, _id, path).map_err(engine_error)?,
@@ -210,7 +210,7 @@ impl StagingDirectory {
                 handle,
             })
         }
-        #[cfg(not(any(windows, target_os = "linux")))]
+        #[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
         {
             let _ = path;
             Err(fault(501, "safe upload staging unavailable"))
@@ -295,7 +295,9 @@ impl UploadPayload {
     fn create(path: &std::path::Path) -> io::Result<Self> {
         let mut options = std::fs::OpenOptions::new();
         options.write(true).create_new(true);
-        #[cfg(target_os = "linux")]
+        #[cfg(target_os = "macos")]
+        options.read(true);
+        #[cfg(any(target_os = "linux", target_os = "macos"))]
         {
             use std::os::unix::fs::OpenOptionsExt;
             options.mode(0o600);
@@ -375,7 +377,12 @@ impl UploadPayload {
         }
     }
 
-    #[cfg(not(any(windows, target_os = "linux")))]
+    #[cfg(target_os = "macos")]
+    fn publish(&self, destination: &std::path::Path) -> io::Result<()> {
+        crate::macos_files::clone_payload(&self.0, destination)
+    }
+
+    #[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
     fn publish(&self, _: &std::path::Path) -> io::Result<()> {
         Err(io::Error::new(
             io::ErrorKind::Unsupported,
@@ -627,6 +634,10 @@ fn file_error(error: std::io::Error) -> Fault {
 
 // 系统原子“不替换”重命名，不能用 exists + rename（Linux rename 会覆盖竞态中出现的文件）。
 fn rename_new(from: &std::path::Path, to: &std::path::Path) -> Result<(), Fault> {
+    #[cfg(target_os = "macos")]
+    {
+        crate::macos_files::rename_new(from, to).map_err(file_error)
+    }
     #[cfg(windows)]
     {
         use std::os::windows::ffi::OsStrExt;
@@ -659,7 +670,7 @@ fn rename_new(from: &std::path::Path, to: &std::path::Path) -> Result<(), Fault>
         }
         Ok(())
     }
-    #[cfg(not(any(windows, target_os = "linux")))]
+    #[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
     {
         let _ = (from, to);
         Err(fault(501, "atomic rename unavailable"))
@@ -668,11 +679,13 @@ fn rename_new(from: &std::path::Path, to: &std::path::Path) -> Result<(), Fault>
 
 // Resolve each ancestor without following links. Keep the parent pinned
 // until the mutation completes, including recursive removal.
+#[cfg(not(target_os = "macos"))]
 struct MutationParent {
     directory: PathBuf,
     _handles: Vec<std::fs::File>,
 }
 
+#[cfg(not(target_os = "macos"))]
 impl MutationParent {
     fn open(path: &std::path::Path) -> Result<Self, Fault> {
         use std::path::Component;
@@ -761,11 +774,15 @@ fn manage_file(v: &Value, guard: &HashMap<i32, Job>) -> Result<Value, Fault> {
     let parent_path = target
         .parent()
         .ok_or_else(|| fault(400, "parent directory required"))?;
+    #[cfg(not(target_os = "macos"))]
     let parent = MutationParent::open(parent_path)?;
     #[cfg(windows)]
     validate_path_components(&root, &target)?;
     let _ = root;
+    #[cfg(not(target_os = "macos"))]
     let entry = parent.entry(&target)?;
+    #[cfg(target_os = "macos")]
+    let entry = target.clone();
     let action = string(v, "action")?;
     // 活跃传输占用的文件、父目录和临时目录不能在传输途中被改名或删除。
     let busy = |candidate: &std::path::Path| {
@@ -804,13 +821,19 @@ fn manage_file(v: &Value, guard: &HashMap<i32, Job>) -> Result<Value, Fault> {
         if destination.parent() != Some(parent_path) {
             return Err(fault(409, "parent directory changed; refresh directory"));
         }
-        rename_new(&entry, &parent.entry(&destination)?)?;
+        #[cfg(not(target_os = "macos"))]
+        let destination = parent.entry(&destination)?;
+        rename_new(&entry, &destination)?;
     } else {
         let directory = match string(v, "kind")? {
             "file" => false,
             "directory" => true,
             _ => return Err(fault(400, "invalid entry kind")),
         };
+        #[cfg(target_os = "macos")]
+        crate::macos_files::manage(&entry, action == "files.create", directory)
+            .map_err(file_error)?;
+        #[cfg(not(target_os = "macos"))]
         if action == "files.create" {
             if directory {
                 std::fs::create_dir(&entry).map_err(file_error)?;
@@ -1562,7 +1585,7 @@ pub extern "C" fn yd_engine_file_close(conn: c_int) -> c_int {
     0
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "macos"))]
 pub(crate) fn recover_file_jobs() -> std::io::Result<()> {
     crate::file_journal::recover()
 }

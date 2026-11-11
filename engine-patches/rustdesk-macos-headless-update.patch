@@ -1,0 +1,11 @@
+diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -35,6 +35,6 @@ pub mod ui;
+ pub(crate) mod update_metadata;
+ pub(crate) mod update_hash;
+-#[cfg(target_os = "macos")]
++#[cfg(all(target_os = "macos", not(feature = "headless")))]
+ mod manual_update;
+ mod version;
+ pub use version::*;

@@ -25,7 +25,7 @@ use crate::json::{codes, ApiError};
 
 /// 注入器实例；每个会话一个，记录按下的键与按钮用于退出时释放。
 pub struct WinInput {
-    pressed_keys: HashSet<u16>,
+    pressed_keys: HashSet<(u16, bool)>,
     pressed_buttons: HashSet<MouseButton>,
 }
 
@@ -128,9 +128,31 @@ impl WinInput {
             control_key::F10 => VK_F10,
             control_key::F11 => VK_F11,
             control_key::F12 => VK_F12,
+            control_key::NUMPAD_0..=control_key::NUMPAD_9 => {
+                VK_NUMPAD0 + code - control_key::NUMPAD_0
+            }
+            control_key::NUMPAD_DECIMAL => VK_DECIMAL,
+            control_key::NUMPAD_DIVIDE => VK_DIVIDE,
+            control_key::NUMPAD_MULTIPLY => VK_MULTIPLY,
+            control_key::NUMPAD_SUBTRACT => VK_SUBTRACT,
+            control_key::NUMPAD_ADD => VK_ADD,
+            control_key::NUMPAD_ENTER => VK_RETURN,
+            control_key::NUMPAD_EQUAL => 0x92, // VK_OEM_NEC_EQUAL
             _ => return None,
         };
         Some(vk as u16)
+    }
+
+    fn control_key_is_extended(code: i32) -> bool {
+        matches!(
+            code,
+            control_key::NUMPAD_ENTER
+                | control_key::NUMPAD_DIVIDE
+                | control_key::META
+                | control_key::R_WIN
+                | control_key::R_CONTROL
+                | control_key::R_ALT
+        )
     }
 
     /// 按 Unicode 码元注入一个字符（不依赖目标机键盘布局）。
@@ -202,7 +224,7 @@ impl WinInput {
                 MapVirtualKeyW(VK_SHIFT as u32, MAPVK_VK_TO_VSC) as u16
             })?;
         }
-        self.press_check_vk(vk, down)?;
+        self.press_check_vk(vk, false, down)?;
         let flags = if down { 0 } else { KEYEVENTF_KEYUP };
         let result = self.key_event(flags, vk, vk_scan);
         if !down && shift {
@@ -323,9 +345,11 @@ impl InputSink for WinInput {
                 let vk = Self::control_key_to_vk(code).ok_or_else(|| {
                     ApiError::new(400, codes::INVALID_REQUEST, "unsupported control key")
                 })?;
+                let extended = Self::control_key_is_extended(code);
                 let scan = unsafe { MapVirtualKeyW(vk as u32, MAPVK_VK_TO_VSC) } as u16;
-                self.press_check_vk(vk, down)?;
-                let flags = if down { 0 } else { KEYEVENTF_KEYUP };
+                self.press_check_vk(vk, extended, down)?;
+                let flags = (if down { 0 } else { KEYEVENTF_KEYUP })
+                    | if extended { KEYEVENTF_EXTENDEDKEY } else { 0 };
                 self.key_event(flags, vk, scan)
             }
         }
@@ -345,27 +369,29 @@ impl InputSink for WinInput {
         }
         self.pressed_buttons.clear();
         let keys: Vec<_> = self.pressed_keys.iter().copied().collect();
-        for vk in keys {
+        for (vk, extended) in keys {
             let scan = unsafe { MapVirtualKeyW(vk as u32, MAPVK_VK_TO_VSC) } as u16;
-            let _ = self.key_event(KEYEVENTF_KEYUP, vk, scan);
+            let flags = KEYEVENTF_KEYUP | if extended { KEYEVENTF_EXTENDEDKEY } else { 0 };
+            let _ = self.key_event(flags, vk, scan);
         }
         self.pressed_keys.clear();
     }
 }
 
 impl WinInput {
-    fn press_check_vk(&mut self, vk: u16, down: bool) -> Result<(), ApiError> {
+    fn press_check_vk(&mut self, vk: u16, extended: bool, down: bool) -> Result<(), ApiError> {
+        let key = (vk, extended);
         if down {
-            if self.pressed_keys.contains(&vk) {
+            if self.pressed_keys.contains(&key) {
                 return Err(ApiError::new(
                     409,
                     codes::STATE_CONFLICT,
                     "key already pressed",
                 ));
             }
-            self.pressed_keys.insert(vk);
+            self.pressed_keys.insert(key);
         } else {
-            self.pressed_keys.remove(&vk);
+            self.pressed_keys.remove(&key);
         }
         Ok(())
     }
@@ -640,5 +666,20 @@ mod tests {
         );
         assert_eq!(WinInput::control_key_to_vk(control_key::UNKNOWN), None);
         assert_eq!(WinInput::control_key_to_vk(9999), None);
+    }
+
+    #[test]
+    fn keypad_enter_has_a_distinct_scan_flag_and_can_be_held_with_main_enter() {
+        let mut input = WinInput::new();
+        let main = control_key::RETURN;
+        let keypad = control_key::NUMPAD_ENTER;
+        let vk = WinInput::control_key_to_vk(main).unwrap();
+        assert_eq!(WinInput::control_key_to_vk(keypad), Some(vk));
+        assert!(!WinInput::control_key_is_extended(main));
+        assert!(WinInput::control_key_is_extended(keypad));
+        input.press_check_vk(vk, false, true).unwrap();
+        input.press_check_vk(vk, true, true).unwrap();
+        input.press_check_vk(vk, true, false).unwrap();
+        assert!(input.pressed_keys.contains(&(vk, false)));
     }
 }

@@ -37,7 +37,9 @@ def main():
     overlay = ROOT / "engine-patches/rustdesk-mfx-local-cstdint.patch"
     apply = ["git", "-C", str(tree), "apply", "--ignore-space-change"]
     if subprocess.run([*apply, "--reverse", "--check", str(overlay)], capture_output=True).returncode:
-        subprocess.run([*apply, str(overlay)], check=True)
+        # Windows checkouts can carry CRLF; normalize so the patch matches LF sources.
+        patch = overlay.read_bytes().replace(b"\r\n", b"\n")
+        subprocess.run([*apply, "-"], input=patch, check=True)
     # The pinned upstream patch is checked in so vcpkg need not download it.
     patch = (ROOT / "engine-patches/mfx-dispatch-d6241243.patch").read_bytes()
     (tree / "res/vcpkg/mfx-dispatch/fix-missing-cstdint-import.patch").write_bytes(patch)

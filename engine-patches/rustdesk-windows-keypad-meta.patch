@@ -1,0 +1,40 @@
+diff --git a/libs/enigo/src/win/win_impl.rs b/libs/enigo/src/win/win_impl.rs
+--- a/libs/enigo/src/win/win_impl.rs
++++ b/libs/enigo/src/win/win_impl.rs
+@@ -310,7 +310,13 @@
+                 if code == 0 || code == 65535 {
+                     return Err("".into());
+                 }
+-                let res = keybd_event(0, code, 0);
++                let scan = match key {
++                    Key::NumpadEnter => 0xE01C,
++                    Key::Meta => 0xE05B,
++                    Key::RWin => 0xE05C,
++                    _ => 0,
++                };
++                let res = keybd_event(0, code, scan);
+                 if res == 0 {
+                     let err = get_error();
+                     if !err.is_empty() {
+@@ -333,7 +339,13 @@
+                 }
+             }
+             _ => {
+-                keybd_event(KEYEVENTF_KEYUP, self.key_to_keycode(key), 0);
++                let scan = match key {
++                    Key::NumpadEnter => 0xE01C,
++                    Key::Meta => 0xE05B,
++                    Key::RWin => 0xE05C,
++                    _ => 0,
++                };
++                keybd_event(KEYEVENTF_KEYUP, self.key_to_keycode(key), scan);
+             }
+         }
+     }
+@@ -475,5 +487,5 @@
+             Key::Subtract => EVK_SUBTRACT,
+             Key::Divide => EVK_DIVIDE,
+             Key::NumpadEnter => EVK_RETURN,
+-            Key::Equals => '=' as _,
++            Key::Equals => 0x92, // VK_OEM_NEC_EQUAL
+             Key::RightShift => EVK_RSHIFT,

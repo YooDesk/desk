@@ -15,7 +15,7 @@ pub mod json;
 pub mod proto;
 pub mod timefmt;
 pub mod tls_policy;
-#[cfg(all(target_os = "linux", feature = "desk-engine"))]
+#[cfg(all(any(target_os = "linux", target_os = "macos"), feature = "desk-engine"))]
 pub mod unix_worker;
 #[cfg(all(windows, feature = "desk-engine"))]
 pub mod windows_worker;
@@ -30,6 +30,8 @@ mod linux_uinput_access;
 mod linux_worker_host;
 #[cfg(target_os = "linux")]
 mod linux_x11_probe;
+#[cfg(all(target_os = "macos", feature = "desk-engine"))]
+mod macos_worker_host;
 mod plugin_abi;
 mod plugin_runtime;
 mod remote_access;

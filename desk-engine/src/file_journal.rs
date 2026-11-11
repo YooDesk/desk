@@ -46,9 +46,16 @@ fn directory() -> io::Result<Option<PathBuf>> {
             "transfer journal requires a user identity",
         ));
     }
-    let runtime = PathBuf::from(format!("/run/user/{uid}"));
+    #[cfg(target_os = "linux")]
+    let (runtime, unsafe_mode) = (PathBuf::from(format!("/run/user/{uid}")), 0o077);
+    #[cfg(target_os = "macos")]
+    let (runtime, unsafe_mode) = (
+        PathBuf::from(std::env::var_os("HOME").ok_or_else(|| io::Error::other("missing HOME"))?)
+            .join("Library/Caches"),
+        0o022,
+    );
     let metadata = runtime.symlink_metadata()?;
-    if !metadata.is_dir() || metadata.uid() != uid || metadata.mode() & 0o077 != 0 {
+    if !metadata.is_dir() || metadata.uid() != uid || metadata.mode() & unsafe_mode != 0 {
         return Err(io::Error::other("untrusted user runtime"));
     }
     let product = runtime.join(format!(".yoodesk-transfer-{}", env!("PRODUCT_ID")));
@@ -81,6 +88,7 @@ fn remove_temporary(path: &Path, dev: u64, ino: u64) -> io::Result<()> {
         return Err(io::Error::other("upload directory identity changed"));
     }
     // 同父原子移入私有墓碑名后再核 inode；若原路径在核验期间被替换，不能删该替代目录。
+    #[cfg(target_os = "linux")]
     use std::os::unix::ffi::OsStrExt;
     let nonce = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -90,6 +98,9 @@ fn remove_temporary(path: &Path, dev: u64, ino: u64) -> io::Result<()> {
         ".yoodesk-transfer-cleanup-{}-{nonce}",
         std::process::id()
     ));
+    #[cfg(target_os = "macos")]
+    let rename = crate::macos_files::rename_new;
+    #[cfg(target_os = "linux")]
     let rename = |from: &Path, to: &Path| -> io::Result<()> {
         let from = std::ffi::CString::new(from.as_os_str().as_bytes()).map_err(io::Error::other)?;
         let to = std::ffi::CString::new(to.as_os_str().as_bytes()).map_err(io::Error::other)?;
@@ -152,7 +163,7 @@ pub(crate) fn create(conn: i32, id: i32, temporary: &Path) -> io::Result<Lease> 
         .write(true)
         .create_new(true)
         .mode(0o600)
-        .custom_flags(0o400000)
+        .custom_flags(hbb_common::libc::O_NOFOLLOW)
         .open(&record)?;
     lease.record = Some(record);
     let result = file
@@ -177,7 +188,7 @@ pub(crate) fn recover() -> io::Result<()> {
         use std::io::Read;
         let mut file = std::fs::OpenOptions::new()
             .read(true)
-            .custom_flags(0o400000)
+            .custom_flags(hbb_common::libc::O_NOFOLLOW)
             .open(entry.path())?;
         let mut bytes = Vec::new();
         file.by_ref().take(8192).read_to_end(&mut bytes)?;
@@ -198,7 +209,7 @@ pub(crate) fn recover() -> io::Result<()> {
         if value["v"] != 1 || entry.file_name() != format!("job-{pid}-{id}.json").as_str() {
             return Err(io::Error::other("invalid transfer record name"));
         }
-        if Path::new("/proc").join(pid.to_string()).exists() {
+        if i32::try_from(pid).is_ok_and(|pid| unsafe { hbb_common::libc::kill(pid, 0) } == 0) {
             continue;
         }
         let temporary = PathBuf::from(

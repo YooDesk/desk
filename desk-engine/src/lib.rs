@@ -22,10 +22,12 @@ use std::sync::{Arc, Mutex, OnceLock};
 
 use base::message_proto::{message, video_frame, Message};
 mod endpoint;
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "macos"))]
 mod file_journal;
 #[cfg(test)]
 mod lifecycle_tests;
+#[cfg(target_os = "macos")]
+mod macos_files;
 #[cfg(target_os = "linux")]
 mod portal_clipboard;
 #[cfg(windows)]
@@ -111,7 +113,28 @@ pub extern "C" fn yd_engine_init() -> c_int {
         std::thread::spawn(librustdesk::ipc::start_pa);
     }
     // 没有 GPU 的机器上上游探测返回空列表，H.264 会静默回落到 VP9；显式注册软编码。
+    #[cfg(not(target_os = "macos"))]
     librustdesk::video_service::register_software_encoders();
+    #[cfg(target_os = "macos")]
+    {
+        if !librustdesk::platform::is_root() {
+            if let Err(error) = endpoint::recover_file_jobs() {
+                log::error!("file transfer recovery: {error}");
+                return YD_ERR_STATE;
+            }
+        }
+        use scrap::raw_hwcodec::ffmpeg_ram::{CodecInfo, Priority};
+        // macOS 的 FFmpeg 只构建了 VideoToolbox H.264；不能注册不存在的 libx264。
+        let mut encoder = CodecInfo::default();
+        encoder.name = "h264_videotoolbox".into();
+        encoder.priority = Priority::Best as i32;
+        let config = scrap::hwcodec::HwCodecConfig {
+            signature: 0,
+            ram_encode: vec![encoder],
+            ram_decode: Vec::new(),
+        };
+        scrap::hwcodec::HwCodecConfig::set(serde_json::to_string(&config).unwrap());
+    }
     // 本产品只消费 H.264（浏览器 WebCodecs `avc1`），必须显式声明偏好；
     // 引擎的默认协商会选 VP9。
     {
@@ -165,7 +188,108 @@ pub extern "C" fn yd_engine_subscribe(display: i32, conn: i32, fps: u32, bitrate
     if engine().is_none() {
         return YD_ERR_STATE;
     }
+    #[cfg(target_os = "macos")]
+    {
+        if librustdesk::platform::is_root() {
+            macos_request_input();
+        } else if !librustdesk::platform::is_can_screen_recording(false) {
+            // Foreground standalone WebService has no Aqua worker startup hook.
+            if std::env::var_os("YOODESK_MACOS_AQUA_WORKER").is_none() {
+                macos_request_permissions();
+            }
+            return -3;
+        }
+    }
     video_bridge::subscribe(display, conn, fps, bitrate)
+}
+
+#[cfg(target_os = "macos")]
+fn macos_request_input() {
+    static ASK_INPUT: OnceLock<()> = OnceLock::new();
+    ASK_INPUT.get_or_init(|| {
+        if !macos_input_available() {
+            if librustdesk::platform::is_root() {
+                unsafe extern "C" {
+                    fn CGRequestPostEventAccess() -> bool;
+                }
+                unsafe { CGRequestPostEventAccess() };
+            } else {
+                librustdesk::platform::is_process_trusted(true);
+            }
+        }
+    });
+}
+
+#[cfg(target_os = "macos")]
+fn macos_request_permissions() {
+    static ASK_CAPTURE: OnceLock<()> = OnceLock::new();
+    if librustdesk::platform::is_can_screen_recording(false) {
+        macos_request_input();
+        return;
+    }
+    ASK_CAPTURE.get_or_init(|| {
+        unsafe extern "C" {
+            fn CGRequestScreenCaptureAccess() -> bool;
+        }
+        // macOS may decline to show a second permission alert for a background
+        // application. Put Screen Recording first and open its settings when
+        // the request does not grant access to this process.
+        if unsafe { CGRequestScreenCaptureAccess() } {
+            macos_request_input();
+        } else if let Err(error) = std::process::Command::new("/usr/bin/open")
+            .arg("x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture")
+            .status()
+        {
+            log::warn!("could not open macOS Screen Recording settings: {error}");
+        }
+    });
+}
+
+/// Ask only after the Aqua worker authenticates its parent. The system UI
+/// runs on the actual main thread without blocking the IPC worker.
+#[cfg(target_os = "macos")]
+#[no_mangle]
+pub extern "C" fn yd_engine_macos_prompt_on_start() {
+    use std::{ffi::c_void, ptr};
+    if librustdesk::platform::is_root() {
+        return;
+    }
+    unsafe extern "C" {
+        static _dispatch_main_q: u8;
+        fn dispatch_async_f(
+            queue: *const u8,
+            context: *mut c_void,
+            callback: extern "C" fn(*mut c_void),
+        );
+    }
+    extern "C" fn prompt(_: *mut c_void) {
+        macos_request_permissions();
+    }
+    unsafe { dispatch_async_f(&raw const _dispatch_main_q, ptr::null_mut(), prompt) };
+}
+
+#[cfg(target_os = "macos")]
+#[no_mangle]
+pub extern "C" fn yd_engine_macos_screen_available() -> c_int {
+    i32::from(librustdesk::platform::is_can_screen_recording(false))
+}
+
+#[cfg(target_os = "macos")]
+#[no_mangle]
+pub extern "C" fn yd_engine_macos_input_available() -> c_int {
+    i32::from(macos_input_available())
+}
+
+#[cfg(target_os = "macos")]
+fn macos_input_available() -> bool {
+    if !librustdesk::platform::is_root() {
+        return librustdesk::platform::is_process_trusted(false);
+    }
+    unsafe extern "C" {
+        fn CGPreflightPostEventAccess() -> bool;
+    }
+    // root 的登录窗口进程也向系统查询真实事件投递权限。
+    unsafe { CGPreflightPostEventAccess() }
 }
 #[no_mangle]
 pub extern "C" fn yd_engine_unsubscribe() -> c_int {
@@ -275,7 +399,7 @@ mod cursor_tests {
     #[test]
     fn http_key_adapter_matches_frozen_native_enum() {
         use protobuf::Enum;
-        let frozen = include_str!("../../../protocol/rustdesk/message-v1.proto");
+        let frozen = include_str!("../../protocol/rustdesk/message-v1.proto");
         let control = frozen
             .split("enum ControlKey {")
             .nth(1)
@@ -283,7 +407,7 @@ mod cursor_tests {
             .split('}')
             .next()
             .unwrap();
-        for code in 1..=33 {
+        for code in 1..=50 {
             let key = http_control_key(code).unwrap();
             let name = format!("{key:?}");
             let prefix = format!("{name} = ");
@@ -299,7 +423,15 @@ mod cursor_tests {
             assert_eq!(key.value(), expected, "HTTP key {code} maps to {name}");
         }
         assert!(http_control_key(0).is_none());
-        assert!(http_control_key(34).is_none());
+        assert_eq!(
+            http_control_key(34),
+            Some(base::message_proto::ControlKey::Numpad0)
+        );
+        assert_eq!(
+            http_control_key(50),
+            Some(base::message_proto::ControlKey::Equals)
+        );
+        assert!(http_control_key(51).is_none());
         let mut event = base::message_proto::KeyEvent::new();
         add_modifiers(&mut event, 1 | 2 | 16);
         assert_eq!(event.modifiers.len(), 3);
@@ -483,6 +615,23 @@ fn http_control_key(code: i32) -> Option<base::message_proto::ControlKey> {
         31 => K::RShift,
         32 => K::RAlt,
         33 => K::RWin,
+        34 => K::Numpad0,
+        35 => K::Numpad1,
+        36 => K::Numpad2,
+        37 => K::Numpad3,
+        38 => K::Numpad4,
+        39 => K::Numpad5,
+        40 => K::Numpad6,
+        41 => K::Numpad7,
+        42 => K::Numpad8,
+        43 => K::Numpad9,
+        44 => K::Decimal,
+        45 => K::Divide,
+        46 => K::Multiply,
+        47 => K::Subtract,
+        48 => K::Add,
+        49 => K::NumpadEnter,
+        50 => K::Equals,
         _ => return None,
     })
 }
@@ -537,7 +686,21 @@ pub extern "C" fn yd_engine_key_with_modifiers(code: i32, down: c_int, modifiers
         33 => 128,
         _ => 0,
     };
-    add_modifiers(&mut event, modifiers & !own);
+    // macOS 的修饰键按下事件本身也需要携带该标记，AppKit 才会更新 flagsChanged。
+    let event_modifiers = if cfg!(target_os = "macos") && down != 0 {
+        modifiers | own
+    } else {
+        modifiers & !own
+    };
+    add_modifiers(&mut event, event_modifiers);
+    // 导航形态由浏览器发普通导航键；收到小键盘数字时保留数字语义。
+    let keypad_number = (34..=44).contains(&code);
+    let macos_keypad = cfg!(target_os = "macos") && (45..=50).contains(&code);
+    if keypad_number || macos_keypad {
+        event
+            .modifiers
+            .push(base::message_proto::ControlKey::NumLock.into());
+    }
     inject_key(&event);
     YD_OK
 }

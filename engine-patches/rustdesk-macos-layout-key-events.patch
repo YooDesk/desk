@@ -1,0 +1,42 @@
+diff --git a/src/server/input_service.rs b/src/server/input_service.rs
+--- a/src/server/input_service.rs
++++ b/src/server/input_service.rs
+@@ -1875,6 +1875,22 @@
+         }
+     }
+
++    // The embedded viewer sends ASCII Chr as layout-key edges, and uses Seq
++    // for explicit text. Keep the edges so the remote input method sees them.
++    #[cfg(target_os = "macos")]
++    if std::env::var("YOODESK_EMBEDDED_ENGINE").as_deref() == Ok("1")
++        && (32..=126).contains(&chr)
++    {
++        let key = char_value_to_key(chr);
++        if down {
++            if let Err(error) = en.key_down(key) {
++                log::warn!("Could not send embedded macOS layout key: {error}");
++            }
++        } else {
++            en.key_up(key);
++        }
++        return;
++    }
+     #[cfg(any(target_os = "macos", target_os = "windows"))]
+     if !_hotkey {
+         if down {
+diff --git a/libs/enigo/src/macos/macos_impl.rs b/libs/enigo/src/macos/macos_impl.rs
+--- a/libs/enigo/src/macos/macos_impl.rs
++++ b/libs/enigo/src/macos/macos_impl.rs
+@@ -133,8 +133,8 @@
+         let flag = match key {
+             &Key::CapsLock => CGEventFlags::CGEventFlagAlphaShift,
+-            &Key::Shift => CGEventFlags::CGEventFlagShift,
+-            &Key::Control => CGEventFlags::CGEventFlagControl,
+-            &Key::Alt => CGEventFlags::CGEventFlagAlternate,
+-            &Key::Meta => CGEventFlags::CGEventFlagCommand,
++            &Key::Shift | &Key::RightShift => CGEventFlags::CGEventFlagShift,
++            &Key::Control | &Key::RightControl => CGEventFlags::CGEventFlagControl,
++            &Key::Alt | &Key::RightAlt => CGEventFlags::CGEventFlagAlternate,
++            &Key::Meta | &Key::RWin => CGEventFlags::CGEventFlagCommand,
+             &Key::NumLock => CGEventFlags::CGEventFlagNumericPad,
+             _ => CGEventFlags::CGEventFlagNull,

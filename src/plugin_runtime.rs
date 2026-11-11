@@ -119,6 +119,8 @@ unsafe extern "C" fn start(
                     let worker = if start.service { Some(tokio::spawn(crate::windows_worker_host::supervise(business.clone(), shutdown.clone(), events))) } else { None };
                     #[cfg(all(target_os="linux", feature="desk-engine"))]
                     let worker = if start.service { Some(tokio::spawn(crate::linux_worker_host::supervise(business.clone(), shutdown.clone(), events))) } else { None };
+                    #[cfg(all(target_os="macos", feature="desk-engine"))]
+                    let worker = if start.service { Some(tokio::spawn(crate::macos_worker_host::supervise(business.clone(), shutdown.clone()))) } else { None };
                     #[cfg(not(feature="desk-engine"))]
                     let _ = events;
                     let server = axum::serve(listener, app).with_graceful_shutdown(wait_stop(shutdown.clone())).into_future();
@@ -279,6 +281,21 @@ unsafe extern "C" fn worker(input: *const u8, len: usize, output: *mut Buffer) -
                     }
                     _ => {}
                 }
+                // 独立探测进程只查询录屏权限；宿主用退出码选择是否重开 worker。
+                #[cfg(target_os = "macos")]
+                if mode == "--macos-check-screen-access" {
+                    return Ok(json!(i32::from(
+                        crate::unix_worker::macos_screen_available()
+                    )));
+                }
+                // LoginWindow LaunchAgent 由系统直接启动，不带 --pipe/--parent-pid；
+                // 它自行等待 root 服务写入交接文件。
+                #[cfg(target_os = "macos")]
+                if mode == "--macos-loginwindow-agent" {
+                    return crate::macos_worker_host::run_loginwindow_agent()
+                        .map(|()| json!(0))
+                        .map_err(|_| error("desk worker failed"));
+                }
                 let flag = |name: &str| {
                     args.windows(2)
                         .find(|pair| pair[0] == name)
@@ -291,6 +308,8 @@ unsafe extern "C" fn worker(input: *const u8, len: usize, output: *mut Buffer) -
                     .map_err(|_| error("invalid worker parent"))?;
                 #[cfg(windows)]
                 let result = crate::windows_worker::run_worker(pipe, parent);
+                #[cfg(target_os = "macos")]
+                let result = crate::macos_worker_host::run_worker(pipe, parent);
                 #[cfg(target_os = "linux")]
                 let result = if mode == "--privileged-worker" {
                     crate::unix_worker::run_privileged_worker(pipe, parent)

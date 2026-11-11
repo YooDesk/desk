@@ -9,7 +9,7 @@ on:
         description: Build one platform for diagnosis, or all platforms for release
         type: choice
         default: all
-        options: [all, windows-x64, windows-arm64, linux-x64, linux-arm64, linux-loong64, linux-mips64el]
+        options: [all, windows-x64, windows-arm64, linux-x64, linux-arm64, linux-loong64, linux-mips64el, macos-arm64, macos-x64]
       audit_only:
         description: Audit the selected cross sysroot without compiling the engine
         type: boolean
@@ -49,6 +49,10 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci --prefix frontend --ignore-scripts
 
+      - name: Run the Desk page unit tests
+        working-directory: frontend
+        run: npm test
+
       - name: Build browser assets once for all native targets
         run: node ci/browser.mjs desk
       - uses: actions/upload-artifact@v4
@@ -67,6 +71,19 @@ jobs:
       matrix: ${{ fromJSON(needs.targets.outputs.matrix) }}
     steps:
       - uses: actions/checkout@v4
+      # Windows 的 build.rs 用这里的 Node 依赖生成可执行文件图标。
+      - uses: actions/setup-node@v4
+        if: runner.os == 'Windows'
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install the native icon generator
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          npm ci --prefix frontend --ignore-scripts
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - uses: actions/download-artifact@v4
         with:
           name: browser
@@ -140,6 +157,36 @@ jobs:
           & "$env:VCPKG_ROOT/vcpkg.exe" install --triplet '${{ matrix.triplet }}' --host-triplet '${{ matrix.triplet }}' --x-install-root="$env:VCPKG_ROOT/installed"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      - name: Build macOS native code and run tests
+        if: matrix.macos
+        shell: bash
+        env:
+          CARGO_BUILD_TARGET: ${{ matrix.target }}
+          CARGO_NET_GIT_FETCH_WITH_CLI: 'true'
+          MACOSX_DEPLOYMENT_TARGET: '11.0'
+        run: |
+          rustup target add '${{ matrix.target }}'
+          # Connector 与 WebService 的宿主包由各自的流水线构建；本仓库只产出 Desk 插件。
+          python3 scripts/prepare_sources.py
+          export VCPKG_ROOT="$PWD/.ci-cache/vcpkg"
+          git -C "$VCPKG_ROOT" rev-parse --verify HEAD >/dev/null 2>&1 || {
+            mkdir -p "$VCPKG_ROOT" && git clone --depth 1 https://github.com/microsoft/vcpkg.git "$VCPKG_ROOT"
+          }
+          git -C "$VCPKG_ROOT" fetch --depth 1 https://github.com/microsoft/vcpkg.git '${{ env.VCPKG_COMMIT_ID }}'
+          git -C "$VCPKG_ROOT" checkout --detach FETCH_HEAD
+          [ -x "$VCPKG_ROOT/vcpkg" ] || "$VCPKG_ROOT/bootstrap-vcpkg.sh" -disableMetrics
+          export VCPKG_INSTALLED_ROOT="$VCPKG_ROOT/installed"
+          export VCPKGRS_TRIPLET='${{ matrix.triplet }}'
+          "$VCPKG_ROOT/vcpkg" install --triplet '${{ matrix.triplet }}' --host-triplet '${{ matrix.triplet }}' \
+            --x-manifest-root=artifacts/rustdesk-engine-src --x-install-root="$VCPKG_INSTALLED_ROOT"
+          python3 scripts/build_engine.py
+          export YOODESK_DESK_ENGINE_LIB_DIR="$PWD/desk-engine/target/${{ matrix.target }}/release"
+          cargo build --locked --release --lib --target '${{ matrix.target }}'
+          if [ '${{ matrix.platform }}' = 'macos-arm64' ]; then
+            cargo test --locked --lib --target '${{ matrix.target }}'
+          fi
+          python3 ci/package.py desk --platform '${{ matrix.platform }}'
+          python3 -m unittest discover -s ci -p 'test_*.py'
       - name: Build Windows native code and run tests
         if: runner.os == 'Windows'
         shell: pwsh
@@ -262,7 +309,7 @@ jobs:
           merge-multiple: true
       - name: Require all four platform archives before publishing
         run: |
-          for platform in windows-x64 windows-arm64 linux-x64 linux-arm64 linux-loong64 linux-mips64el; do
+          for platform in windows-x64 windows-arm64 linux-x64 linux-arm64 linux-loong64 linux-mips64el macos-arm64 macos-x64; do
             test -s "dist/yoodesk-desk-$platform.zip"
             (cd dist && sha256sum -c "yoodesk-desk-$platform.zip.sha256")
           done

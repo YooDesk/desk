@@ -13,6 +13,9 @@ npm test
 `../gateway/internal/viewerui/transport.js`；`build:viewers` 生成 WebService
 的成熟协议组件。远程 viewer 按需加载同源网关 SDK，LAN 不依赖网关。
 
+`npm test` 直接读取 `../browser_static/app.js` 验证 Desk 页面脚本（传输恢复、
+键盘映射与小键盘键位）；该文件与上游 `APP_JS` 内容一致，修改页面逻辑时两处一起更新。
+
 真实页面联调需明确指定已授权的 Connector 管理地址：
 
 ```powershell

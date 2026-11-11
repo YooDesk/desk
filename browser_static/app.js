@@ -11,10 +11,24 @@
   var base = '/' + productId + '/webclient';
   var api = base + '/desk/api/v2';
   var connectorAccess = new URLSearchParams(window.__yoodeskViewer?.query ?? location.search).get('gateway') === '1';
+  var viewerEntryFetch = window.fetch.bind(window);
+  var viewerRecoveryTransport = null;
+  // 只保留本页已验证的访问密码；不写入浏览器存储、URL 或诊断。
+  var viewerRecoveryCredential = '';
   var transportReady = connectorAccess ? import('/' + productId + '/transport/viewer.js').then(function (module) {
-    return module.attachViewer(productId);
+    return module.attachViewer(productId).then(function (state) {
+      return Promise.resolve(window.__yoodeskTransportReady).then(function (transport) {
+        if (typeof transport?.reconnect === 'function') { viewerRecoveryTransport = transport; }
+        return state;
+      });
+    });
   }) : Promise.resolve();
-  transportReady.catch(function () {});
+  transportReady.catch(function (error) {
+    // SDK 初次协商失败后，这个 Promise 不会恢复；同页重试只能再次得到原错误。
+    if (connectorAccess && !/rejected \((401|403)\)$/.test(error.message)) {
+      recoverViewerTransport();
+    }
+  });
   // 所有业务读取都等待 SDK；信令与授权由 SDK 保存的原生 fetch 执行。
   function fetch(url, options) {
     var ready = transportReady;
@@ -260,16 +274,20 @@
       });
   }
 
-  function login(credential) {
+  function login(credential, recovering, signal) {
     return (connectorAccess ? Promise.resolve() : bootstrap()).then(function () {
-      return request('POST', access + '/login/', { credential: credential, access_mode: 'cookie' });
+      return request('POST', access + '/login/', { credential: credential, access_mode: 'cookie' }, signal);
     }).then(function (info) {
+      if (signal) { signal.throwIfAborted(); }
       state.csrf = info.csrf_token;
       window.__yoodeskDesk = window.__yoodeskDesk || {};
       window.__yoodeskDesk.csrf = info.csrf_token;
+      if (connectorAccess) { viewerRecoveryCredential = credential; }
       el('credential').value = '';
+      if (recovering) { stopViewerTransportRecovery(); }
       return afterLogin(info);
     }).catch(function (error) {
+      if (recovering && transportRecoveryPending) { throw error; }
       el('login-error').textContent = error.message;
       showLogin(true);
       throw error;
@@ -337,6 +355,98 @@
   var streamOpenedAt = null;
   var cleanupTail = Promise.resolve();
   var lastPong = 0;
+  var transportRecoveryTimer;
+  var transportRecoveryPending = false;
+  var transportRecoveryNavigating = false;
+  var transportRecoveryController;
+  var transportRecoveryAttempts = 0;
+  var transportRecoveryDelays = [1000, 2000, 5000, 10000, 15000];
+  var transportRecoveryLimit = 10;
+  var transportRecoveryCleared = false;
+  var transportRetryFailures = 0;
+  var transportRecoveryKey = 'yoodesk-desk-reconnect:' + location.pathname;
+
+  function recoverViewerTransport() {
+    if (!connectorAccess || transportRecoveryPending) { return; }
+    var attempts;
+    try {
+      attempts = Number(sessionStorage.getItem(transportRecoveryKey) || '0');
+      // 跨页面保留预算；权限失效或持续故障不能造成无限刷新。
+      if (!Number.isInteger(attempts) || attempts < 0) { return; }
+      if (attempts >= transportRecoveryLimit) {
+        connectionWanted = false;
+        setStatus('重连失败', 'failed');
+        return;
+      }
+    } catch (_) { return; }
+    transportRecoveryAttempts = attempts;
+    transportRecoveryPending = true;
+    clearTimeout(reconnectTimer);
+    setStatus('等待重连', 'connecting');
+    resumeViewerTransportRecovery(transportRecoveryDelays[Math.min(attempts, transportRecoveryDelays.length - 1)]);
+  }
+
+  function resumeViewerTransportRecovery(delay) {
+    clearTimeout(transportRecoveryTimer);
+    if (!transportRecoveryPending || transportRecoveryNavigating || !navigator.onLine) { return; }
+    transportRecoveryTimer = setTimeout(async function () {
+      if (!transportRecoveryPending || transportRecoveryNavigating || !navigator.onLine) { return; }
+      try { sessionStorage.setItem(transportRecoveryKey, String(transportRecoveryAttempts + 1)); }
+      catch (_) { stopViewerTransportRecovery(); return; }
+      transportRecoveryNavigating = true;
+      try {
+        if (viewerRecoveryTransport) {
+          var controller = transportRecoveryController = new AbortController();
+          var credential = viewerRecoveryCredential;
+          // 已排队的旧输入/关闭请求不能跨到新的授权。
+          connectionGeneration += 1;
+          if (connectionController) { connectionController.abort(); }
+          await disconnect();
+          if (!transportRecoveryPending || controller.signal.aborted) { return; }
+          var replacement = viewerRecoveryTransport.reconnect(controller.signal);
+          transportReady = replacement.then(function (next) { return next.state; });
+          transportReady.catch(function () {});
+          viewerRecoveryTransport = await replacement;
+          if (!transportRecoveryPending || controller.signal.aborted) { return; }
+          if (credential) {
+            await login(credential, true, controller.signal);
+          } else {
+            stopViewerTransportRecovery();
+            connectionWanted = false;
+            showLogin(true);
+          }
+          return;
+        }
+        // 只探测当前页面入口，业务请求仍只能走 SDK。已失效的入口不能把页面刷成错误页。
+        var response = await viewerEntryFetch(location.href, {
+          credentials: 'same-origin', cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout(5000)
+        });
+        if (!transportRecoveryPending) { return; }
+        if (response.ok && (response.headers.get('content-type') || '').includes('text/html')) {
+          if (window.__yoodeskViewer?.reload) { window.__yoodeskViewer.reload(); }
+          else { location.reload(); }
+          return;
+        }
+        if ([401, 403].includes(response.status)) {
+          stopViewerTransportRecovery();
+          connectionWanted = false;
+          setStatus('访问已失效', 'failed');
+          return;
+        }
+      } catch (_) {
+        if (!transportRecoveryPending) { return; }
+      }
+      stopViewerTransportRecovery();
+      recoverViewerTransport();
+    }, delay);
+  }
+
+  function stopViewerTransportRecovery() {
+    transportRecoveryPending = false;
+    transportRecoveryNavigating = false;
+    clearTimeout(transportRecoveryTimer);
+    if (transportRecoveryController) { transportRecoveryController.abort(); transportRecoveryController = null; }
+  }
 
   function ensureGeneration(generation) {
     if (!connectionWanted || generation !== connectionGeneration) {
@@ -349,16 +459,20 @@
     var timer = setTimeout(function () { controller.abort(); }, 5000);
     return request('DELETE', api + '/sessions/' + id + '/', undefined, controller.signal)
       .catch(function (error) {
-        if (error.status !== 404) { say('关闭会话失败：' + error.message, true); }
+        if (error.status !== 404 && !transportRecoveryPending) { say('关闭会话失败：' + error.message, true); }
       }).finally(function () { clearTimeout(timer); });
   }
   function scheduleConnection(delay) {
     clearTimeout(reconnectTimer);
-    if (!connectionWanted || connectionAttempt || !navigator.onLine) { return; }
+    if (!connectionWanted || connectionAttempt || !navigator.onLine || transportRecoveryPending) { return; }
     reconnectTimer = setTimeout(runConnection, delay);
   }
   function restartConnection(unexpected, reason) {
     if (!connectionWanted) { return; }
+    if (connectorAccess && document.documentElement.dataset.transportState === 'closed') {
+      recoverViewerTransport();
+      if (transportRecoveryPending || !connectionWanted) { return; }
+    }
     var now = performance.now();
     var diagnostic = window.__yoodeskDesk = window.__yoodeskDesk || {};
     diagnostic.lastReconnectReason = reason || 'other';
@@ -377,7 +491,7 @@
     scheduleConnection(delay);
   }
   async function runConnection() {
-    if (!connectionWanted || connectionAttempt || !navigator.onLine) { return; }
+    if (!connectionWanted || connectionAttempt || !navigator.onLine || transportRecoveryPending) { return; }
     var generation = connectionGeneration;
     var controller = connectionController = new AbortController();
     // 等待关闭旧会话后才创建新会话，避免遗留按键和隐私屏跨越模式。
@@ -395,13 +509,22 @@
     try {
       await connectionAttempt;
       ensureGeneration(generation);
+      transportRetryFailures = 0;
       message.textContent = '';
     } catch (error) {
       if (generation === connectionGeneration && connectionWanted) {
         if (error.status === 403) {
           connectionWanted = false;
           setStatus('访问被拒绝', 'failed');
-        } else { setStatus('等待重连', 'connecting'); }
+        } else {
+          setStatus('等待重连', 'connecting');
+          // 信令还活着时，业务通道也可能已经不可用。给原页重连机会，再重开入口。
+          if (connectorAccess && navigator.onLine &&
+              (!error.status || [429, 502, 503, 504].includes(error.status)) &&
+              ++transportRetryFailures >= 3) {
+            recoverViewerTransport();
+          }
+        }
         say(error.name === 'AbortError' ? '连接超时' : error.message, true);
         disconnect();
       }
@@ -894,6 +1017,7 @@
           __obs.decodeMs = submitted === undefined ? null : performance.now() - submitted;
           state.stats.frames += 1;
           ctx.drawImage(frame, 0, 0, canvas.width, canvas.height);
+          if (!state.hasVideoFrame) { focusDeskKeyboard(); }
           state.hasVideoFrame = true;
           el('screenshot').disabled = false;
           if (state.videoRecovering) { state.videoRecovering = false; say('画面已恢复'); }
@@ -1012,6 +1136,11 @@
     }
     if (state.stream && state.stream.readyState === WebSocket.OPEN) {
       if (now - lastPong > 8000) { restartConnection(true, 'pong_timeout'); return; }
+      if (connectorAccess && !transportRecoveryCleared && streamOpenedAt !== null &&
+          now - streamOpenedAt >= 30000 && state.hasVideoFrame) {
+        transportRecoveryCleared = true;
+        try { sessionStorage.removeItem(transportRecoveryKey); } catch (_) {}
+      }
       state.stats.ping = {id: Date.now(), at: now};
       if (state.events && state.events.readyState === WebSocket.OPEN) {
         state.events.send(JSON.stringify({type: 'ping', id: state.stats.ping.id}));
@@ -1028,6 +1157,7 @@
     state.hasVideoFrame = false;
     el('screenshot').disabled = true;
     pressedKeyboard.clear();
+    resetControlCopy();
     chat.stop();
     clipboard.stop();
     resetDecoder();
@@ -1055,6 +1185,8 @@
   function stopConnection() {
     chat.clear();
     connectionWanted = false;
+    viewerRecoveryCredential = '';
+    stopViewerTransportRecovery();
     connectionGeneration += 1;
     clearTimeout(reconnectTimer);
     if (connectionController) { connectionController.abort(); }
@@ -1078,13 +1210,28 @@
       showLogin(true);
     });
   }
-  window.addEventListener('offline', restartConnection);
-  window.addEventListener('online', restartConnection);
+  window.addEventListener('offline', function () {
+    if (transportRecoveryPending) { clearTimeout(transportRecoveryTimer); }
+    else { restartConnection(true, 'offline'); }
+  });
+  window.addEventListener('online', function () {
+    if (transportRecoveryPending) { resumeViewerTransportRecovery(0); }
+    else { restartConnection(false, 'online'); }
+  });
+  if (connectorAccess) {
+    new MutationObserver(function () {
+      if (connectionWanted && document.documentElement.dataset.transportState === 'closed') {
+        recoverViewerTransport();
+      }
+    }).observe(document.documentElement, {attributes: true, attributeFilter: ['data-transport-state']});
+  }
   function closeOnPageHide() {
     var id = state.sessionId;
     // 卸载期间必须同步发出keepalive请求，不能排队等锁/前置GET。
     if (id) { rawRequest('DELETE', api + '/sessions/' + id + '/').catch(function () {}); }
     connectionWanted = false;
+    viewerRecoveryCredential = '';
+    stopViewerTransportRecovery();
     connectionGeneration += 1;
     clearTimeout(reconnectTimer);
     if (connectionController) { connectionController.abort(); }
@@ -1156,7 +1303,8 @@
   var inputBatchLimit = 32;
   var inputQueueLimit = 128;
   function sendInputs(payloads) {
-    if (!payloads.length || !state.sessionId || state.readonly || state.modePending || !state.inputController) { return Promise.resolve(); }
+    if (!payloads.length || !state.sessionId || state.readonly || state.modePending ||
+        !state.inputController || transportRecoveryPending) { return Promise.resolve(); }
     var session = state.sessionId;
     var signal = state.inputController.signal;
     var version = state.inputVersion;
@@ -1225,6 +1373,8 @@
   });
   canvas.addEventListener('mousedown', function (event) {
     if (state.readonly || state.modePending) { return; }
+    resetControlCopy();
+    flushDeferredMeta();
     canvas.focus({preventScroll: true});
     var names = { 0: 'left', 1: 'middle', 2: 'right', 3: 'back', 4: 'forward' };
     var point = canvasPoint(event);
@@ -1248,7 +1398,7 @@
 
   // HTTP 沿用兼容编号（Home=16、Insert=29）；原生桥按名称转换到 RustDesk 枚举。
   var CONTROL_KEYS = {
-    Backspace: 2, CapsLock: 3, Delete: 5, ArrowDown: 6, End: 7, Escape: 8,
+    Backspace: 2, Delete: 5, ArrowDown: 6, End: 7, Escape: 8,
     Home: 16, ArrowLeft: 17, PageDown: 20, PageUp: 21, Enter: 22, ArrowRight: 23,
     Shift: 25, ' ': 26, Tab: 27, ArrowUp: 28, Insert: 29, Control: 4, Alt: 1, Meta: 18,
     F1: 9, F2: 13, F3: 14, F4: 15, F10: 10, F11: 11, F12: 12
@@ -1256,40 +1406,141 @@
 
   // 用物理键标识保留按下时的字符，Shift先抬起时仍释放同一个键；断开后丢弃旧状态。
   var pressedKeyboard = new Map();
+  var controlCopyAt = null;
+  var copyKeyDown = false;
+  var rawCopyDown = false;
+  function resetControlCopy() {
+    controlCopyAt = null;
+    copyKeyDown = false;
+    rawCopyDown = false;
+  }
+  function isMacViewerKeyboard() {
+    return /^mac/i.test(navigator.userAgentData?.platform || navigator.platform || '');
+  }
+  function focusDeskKeyboard() {
+    // 登录表单隐藏或会话重连后，焦点可能落到 body；不抢聊天、菜单等控件的焦点。
+    if (state.readonly || state.modePending || !state.sessionId || !state.capabilities?.keyboard) { return; }
+    var active = document.activeElement;
+    if (!active || active === document.body || active === document.documentElement ||
+        el('login').contains(active)) {
+      canvas.focus({preventScroll: true});
+    }
+  }
+  // 画布只接受物理按键。拒绝浏览器能取消的文本合成，不影响其他控件。
+  ['beforeinput', 'compositionstart', 'compositionupdate', 'compositionend'].forEach(function (type) {
+    canvas.addEventListener(type, function (event) {
+      if (event.cancelable) { event.preventDefault(); }
+    });
+  });
+  function baseLayoutKey(code) {
+    if (/^Key[A-Z]$/.test(code)) { return code.slice(-1).toLowerCase(); }
+    if (/^Digit[0-9]$/.test(code)) { return code.slice(-1); }
+    return {
+      Backquote: '`', Minus: '-', Equal: '=', BracketLeft: '[', BracketRight: ']',
+      Backslash: '\\', Semicolon: ';', Quote: "'", Comma: ',', Period: '.', Slash: '/'
+    }[code];
+  }
+  // RustDesk 按原生键位区分数字区，不能把小键盘回车合并为主键盘回车。
+  function keypadControl(event) {
+    var code = event.code;
+    if (/^Numpad[0-9]$/.test(code) && /^[0-9]$/.test(event.key)) {
+      return 34 + Number(code.slice(-1));
+    }
+    if (code === 'NumpadDecimal' && event.key === 'Delete') { return undefined; }
+    return {
+      NumpadDecimal: 44, NumpadDivide: 45, NumpadMultiply: 46, NumpadSubtract: 47,
+      NumpadAdd: 48, NumpadEnter: 49, NumpadEqual: 50, NumLock: 19
+    }[code];
+  }
+  function flushDeferredMeta() {
+    pressedKeyboard.forEach(function (key) {
+      if (!key.deferred) { return; }
+      key.deferred = false;
+      sendKey({control: key.control, down: true});
+    });
+  }
   canvas.addEventListener('keydown', function (event) {
-    if (state.readonly || state.modePending || event.isComposing) { return; }
-    if (handleShortcut(event)) { return; }
-    var code = CONTROL_KEYS[event.key];
+    if (state.readonly || state.modePending) { return; }
+    // Caps Lock 由浏览器反映在字母大小写中，不再让远端锁键独立切换一次。
+    if (event.code === 'CapsLock' || event.key === 'CapsLock') {
+      resetControlCopy();
+      event.preventDefault();
+      return;
+    }
+    if (!event.isComposing && event.key !== 'Process' && handleShortcut(event)) { return; }
+    var capsLock = event.getModifierState?.('CapsLock');
+    var letterOnly = /^[a-z]$/i.test(event.key) && !event.ctrlKey && !event.metaKey && !event.altKey;
+    if (letterOnly && !pressedKeyboard.has(event.code || event.key) &&
+        (capsLock || (!event.shiftKey && /^[A-Z]$/.test(event.key)))) {
+      var upper = /^[A-Z]$/.test(event.key);
+      // macOS 布局入口需要未移位键码；大小写通过 Shift 发送。
+      var layout = state.platform.os === 'macos' ? event.key.toLowerCase() : event.key;
+      var shift = state.platform.os === 'macos' ? upper : (capsLock && event.shiftKey && !upper ? false : undefined);
+      sendInputs(remapShortcutKeys({layout: layout}, [], [], shift));
+      event.preventDefault();
+      return;
+    }
+    // 本机输入法可能把 key 改成 Process；用 code 识别键，交给远端输入法处理。
+    var controlKey = event.isComposing || event.key === 'Process' ? event.code : event.key;
+    var modifiers = { ControlRight: 30, ShiftRight: 31, AltRight: 32, MetaRight: 33, OSRight: 33, MetaLeft: 18, OSLeft: 18 };
     var identity = event.code || event.key;
+    var previous = pressedKeyboard.get(identity);
+    var code = previous?.control ?? keypadControl(event) ?? modifiers[event.code] ??
+      CONTROL_KEYS[controlKey === 'Space' ? ' ' : controlKey];
+    if (code === undefined && /^(Shift|Control|Alt|Meta)(Left|Right)$/.test(controlKey)) {
+      code = CONTROL_KEYS[controlKey.replace(/Left$|Right$/, '')];
+    }
+    if ((code === 18 || code === 33) && state.platform.os === 'windows' && isMacViewerKeyboard()) {
+      // 等到下一键再发送 Win；Command+C/V 映射到 Ctrl 时不应误触发开始菜单。
+      if (!previous) { pressedKeyboard.set(identity, {control: code, deferred: true}); }
+      event.preventDefault();
+      return;
+    }
+    if (![1, 4, 25, 30, 31, 32].includes(code)) { flushDeferredMeta(); }
     if (code !== undefined) {
       pressedKeyboard.set(identity, {control: code});
       sendInput({ type: 'key', control: code, down: true });
       event.preventDefault();
-    } else if (event.key.length === 1 && event.key >= ' ' && event.key <= '~' &&
-        (state.platform.os === 'windows' || event.ctrlKey || event.metaKey)) {
-      // Windows普通ASCII也要发送按键，让远端IME收到拼音；其它平台保留原来的文本路径。
-      var key = pressedKeyboard.get(identity) || {layout: event.ctrlKey || event.metaKey ? event.key.toLowerCase() : event.key};
+    } else {
+      var base = baseLayoutKey(event.code);
+      var ascii = event.key.length === 1 && event.key >= ' ' && event.key <= '~';
+      var layout = ascii ? event.key : base;
+      if (base && (event.isComposing || event.ctrlKey || event.metaKey ||
+          (state.platform.os === 'macos' && (event.shiftKey || event.altKey)))) { layout = base; }
+      var key = pressedKeyboard.get(identity) || (layout && {layout: layout});
+      if (!key) { return; }
       pressedKeyboard.set(identity, key);
       sendKey({layout: key.layout, down: true});
-      event.preventDefault();
-    } else if (event.key.length === 1 && !event.altKey && !event.metaKey) {
-      sendInput({ type: 'key', text: event.key });
       event.preventDefault();
     }
   });
   canvas.addEventListener('keyup', function (event) {
+    if (event.code === 'KeyC' || (!event.code && event.key.toLowerCase() === 'c')) {
+      copyKeyDown = false;
+      rawCopyDown = false;
+    }
     if (state.readonly || state.modePending) { return; }
     var identity = event.code || event.key;
     var key = pressedKeyboard.get(identity);
     if (key) {
       pressedKeyboard.delete(identity);
-      sendKey(Object.assign({down: false}, key));
+      if (key.deferred) {
+        if (!key.usedForEdit) {
+          sendInputs([{type: 'key', control: key.control, down: true}, {type: 'key', control: key.control, down: false}]);
+        }
+      } else if (key.control !== undefined) { sendKey({control: key.control, down: false}); }
+      else { sendKey({layout: key.layout, down: false}); }
       event.preventDefault();
     }
   });
   function releasePressedKeyboard() {
+    resetControlCopy();
     // 工具栏/聊天取得焦点时立即释放，不能把修饰键留在远端。
-    var releases = Array.from(pressedKeyboard.values(), function (key) { return Object.assign({type: 'key', down: false}, key); });
+    var releases = Array.from(pressedKeyboard.values()).filter(function (key) { return !key.deferred; })
+      .map(function (key) {
+        return key.control === undefined ? {type: 'key', layout: key.layout, down: false}
+          : {type: 'key', control: key.control, down: false};
+      });
     pressedKeyboard.clear();
     if (releases.length) { sendInputs(releases); }
   }
@@ -1350,16 +1601,89 @@
   // Ctrl+C/X 正常发给远端应用；Ctrl+V 在自动同步完成后发完整粘贴组合键。
   function handleShortcut(event) {
     var caps = state.capabilities || {};
-    if (!(event.ctrlKey || event.metaKey)) { return false; }
-    if (event.key.toLowerCase() === 'v' && caps.clipboard_write && !state.readonly) {
+    var key = /^Key[A-Z]$/.test(event.code) ? event.code.slice(-1).toLowerCase() : event.key.toLowerCase();
+    var targetMac = state.platform.os === 'macos';
+    var viewerMac = isMacViewerKeyboard();
+    var plainControlCopy = targetMac && key === 'c' && event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey;
+    if (key === 'c') {
+      if (!copyKeyDown && !event.repeat) {
+        copyKeyDown = true;
+        var now = performance.now();
+        rawCopyDown = plainControlCopy && controlCopyAt !== null && now - controlCopyAt <= 1000;
+        controlCopyAt = plainControlCopy ? now : null;
+      }
+      if (rawCopyDown) {
+        if (event.repeat) { event.preventDefault(); return true; }
+        return false;
+      }
+    } else if (!/^(Control|Meta|OS)(Left|Right)$/.test(event.code) &&
+               !['control', 'meta', 'os'].includes(key)) {
+      controlCopyAt = null;
+    }
+    if (viewerMac && state.platform.os === 'windows' && !event.ctrlKey &&
+        event.metaKey !== event.altKey) {
+      var navigation = event.metaKey ? {arrowleft: 16, arrowright: 7}
+        : {arrowleft: 17, arrowright: 23, backspace: 2};
+      var destination = navigation[key];
+      if (Object.hasOwn(navigation, key)) {
+        event.preventDefault();
+        if (event.metaKey) { markDeferredMetaUsed(); }
+        sendInputs(remapShortcutKeys({control: destination}, event.metaKey ? [18, 33] : [1, 32],
+          event.altKey ? [4, 30] : []));
+        return true;
+      }
+    }
+    if (event.ctrlKey === event.metaKey || event.altKey || (event.metaKey && !viewerMac && !targetMac)) { return false; }
+    var clipboardKey = ['c', 'x', 'v'].includes(key);
+    var crossPlatform = targetMac !== viewerMac;
+    var commonEdit = clipboardKey || key === 'a' || (crossPlatform && ['z', 's', 'f'].includes(key));
+    var redoMac = crossPlatform && targetMac && event.ctrlKey && key === 'y' && !event.shiftKey;
+    var redoWin = crossPlatform && !targetMac && event.metaKey && key === 'z' && event.shiftKey;
+    if (!commonEdit && !redoMac && !redoWin) { return false; }
+    if (event.metaKey && state.platform.os === 'windows' && viewerMac) {
+      markDeferredMetaUsed();
+    }
+    if (key === 'v' && !event.shiftKey && caps.clipboard_write && !state.readonly) {
       event.preventDefault();
-      clipboard.paste();
+      if (!event.repeat) { clipboard.paste(function () { return editShortcutKeys('v'); }); }
       return true;
     }
-    if ((event.key.toLowerCase() === 'c' || event.key.toLowerCase() === 'x') && caps.clipboard_read) {
+    if ((key === 'c' || key === 'x') && !event.shiftKey && caps.clipboard_read && !event.repeat) {
       clipboard.copiedRemote();
     }
+    var needsMapping = targetMac ? event.ctrlKey : event.metaKey;
+    if (needsMapping) {
+      event.preventDefault();
+      if (!event.repeat) { sendInputs(editShortcutKeys(redoMac ? 'z' : redoWin ? 'y' : key, redoMac ? true : redoWin ? false : undefined)); }
+      return true;
+    }
     return false;
+  }
+
+  function editShortcutKeys(letter, shift) {
+    var mac = state.platform.os === 'macos';
+    return remapShortcutKeys({layout: letter}, mac ? [4, 30] : [18, 33],
+      mac ? [18, 33] : [4, 30], shift);
+  }
+  function markDeferredMetaUsed() {
+    pressedKeyboard.forEach(function (held) { if (held.deferred) { held.usedForEdit = true; } });
+  }
+  function remapShortcutKeys(key, source, target, shift) {
+    var held = Array.from(pressedKeyboard.values()).filter(function (key) { return !key.deferred; })
+      .map(function (key) { return key.control; });
+    var wrong = source.filter(function (key) { return held.includes(key); });
+    var temporary = target.length && !target.some(function (key) { return held.includes(key); });
+    var heldShift = [25, 31].filter(function (key) { return held.includes(key); });
+    if (shift === false) { wrong = wrong.concat(heldShift); }
+    var temporaryShift = shift === true && !heldShift.length;
+    function control(key, down) { return {type: 'key', control: key, down: down}; }
+    var events = wrong.map(function (key) { return control(key, false); });
+    if (temporary) { events.push(control(target[0], true)); }
+    if (temporaryShift) { events.push(control(25, true)); }
+    events.push(Object.assign({type: 'key', down: true}, key), Object.assign({type: 'key', down: false}, key));
+    if (temporary) { events.push(control(target[0], false)); }
+    if (temporaryShift) { events.push(control(25, false)); }
+    return events.concat(wrong.map(function (key) { return control(key, true); }));
   }
 
   // 键盘事件走与鼠标相同的 input 端点，但字段名不同：服务端按 `control`/`layout`/`text` 区分。
@@ -1440,5 +1764,9 @@
   } else { loadSession().then(function (info) {
     if (!info) { showLogin(true); return; }
     return afterLogin(info);
-  }).catch(function (error) { el('login-error').textContent = error.message; showLogin(true); }); }
+  }).catch(function (error) {
+    if (transportRecoveryPending) { return; }
+    el('login-error').textContent = error.message;
+    showLogin(true);
+  }); }
 }());

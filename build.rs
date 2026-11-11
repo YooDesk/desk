@@ -12,7 +12,8 @@ fn main() {
     }
 
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
-    brand_build::configure(root);
+    let logo = brand_build::configure(root);
+    brand_build::configure_executable_icon(root, &logo);
     let proto_dir = root.join("protocol/rustdesk");
     let proto = proto_dir.join("message-v1.proto");
     assert!(
@@ -63,6 +64,24 @@ fn link_engine() {
     println!("cargo:rustc-link-search=native={}", lib_dir.display());
     println!("cargo:rustc-link-lib=static=yoodesk_desk_engine");
     println!("cargo:rerun-if-changed={}", library.display());
+    if target_os == "macos" {
+        let dependencies = lib_dir.join("native-static-libs.txt");
+        println!("cargo:rerun-if-changed={}", dependencies.display());
+        let flags = std::fs::read_to_string(&dependencies)
+            .expect("先运行 build_engine.py 生成 macOS Desk 链接依赖");
+        let mut flags = flags.split_whitespace();
+        while let Some(flag) = flags.next() {
+            if flag == "-framework" {
+                let name = flags.next().expect("缺少 framework 名称");
+                println!("cargo:rustc-link-lib=framework={name}");
+            } else if let Some(name) = flag.strip_prefix("-l") {
+                println!("cargo:rustc-link-lib={name}");
+            } else {
+                panic!("未知 macOS Desk 链接参数：{flag}");
+            }
+        }
+        return;
+    }
     if target_os == "linux" {
         const CODECS: &[&str] = &["yuv", "aom", "vpx", "opus", "sodium"];
         const FFMPEG: &[&str] = &[

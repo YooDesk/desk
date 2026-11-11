@@ -1387,6 +1387,7 @@ fn run_engine_loop(
                 );
                 if first_frame {
                     first_frame = false;
+                    tracing::info!(session = %session.id, bytes = data.len(), key, "Desk 收到首个 H.264 帧");
                     session.publish_state(SessionStateKind::TransportReady, true);
                     session.publish_state(SessionStateKind::Active, true);
                 }

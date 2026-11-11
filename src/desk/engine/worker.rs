@@ -48,6 +48,15 @@ pub(crate) fn read_frame<S: Read + Write>(file: &mut S) -> io::Result<(Value, Ve
 }
 
 pub(crate) fn serve<S: Read + Write>(file: &mut S) -> io::Result<()> {
+    serve_with_policy(file, false)
+}
+
+#[cfg(target_os = "macos")]
+pub(crate) fn serve_login_window<S: Read + Write>(file: &mut S) -> io::Result<()> {
+    serve_with_policy(file, true)
+}
+
+fn serve_with_policy<S: Read + Write>(file: &mut S, login_window: bool) -> io::Result<()> {
     let engine = EngineBackend::new();
     let mut inputs: HashMap<u64, Box<dyn InputSink>> = HashMap::new();
     let mut next_input = 1u64;
@@ -62,13 +71,54 @@ pub(crate) fn serve<S: Read + Write>(file: &mut S) -> io::Result<()> {
         }
         previous = id;
         let args: Value = serde_json::from_slice(&bytes).map_err(|_| invalid("IPC args"))?;
-        let response = dispatch(
-            &engine,
-            request["op"].as_str().unwrap_or(""),
-            args,
-            &mut inputs,
-            &mut next_input,
-        );
+        let op = request["op"].as_str().unwrap_or("");
+        // 登录窗口 worker 属于 root；只允许画面和登录输入，不开放系统用户数据。
+        let response = if login_window && op == "capabilities" {
+            let mut caps = engine.capabilities();
+            caps.clipboard_read = false;
+            caps.clipboard_write = false;
+            caps.privacy_screen = false;
+            caps.audio = false;
+            caps.file_transfer = false;
+            Ok(Reply {
+                value: serde_json::to_value(caps).expect("DeskCapabilities is serializable"),
+                bytes: Vec::new(),
+            })
+        } else if login_window && op == "poll_audio" {
+            // 登录窗口明确没有音频，返回空队列，避免媒体轮询持续报错。
+            Ok(Reply {
+                value: Value::Null,
+                bytes: Vec::new(),
+            })
+        } else if login_window
+            && !matches!(
+                op,
+                "displays"
+                    | "subscribe"
+                    | "unsubscribe"
+                    | "unsubscribe_conn"
+                    | "replay_keyframe"
+                    | "replay_cursor"
+                    | "ack_video"
+                    | "refresh_video"
+                    | "poll"
+                    | "poll_cursor"
+                    | "input.create"
+                    | "input.mouse"
+                    | "input.key"
+                    | "input.release"
+                    | "input.drop"
+            )
+            && !(op == "endpoint" && args["value"]["action"] == "capabilities")
+        {
+            Err(ApiError::new(
+                403,
+                codes::FORBIDDEN,
+                "unavailable at the login window",
+            ))
+        } else {
+            dispatch(&engine, op, args, &mut inputs, &mut next_input)
+        };
         match response {
             Ok(reply) if reply.bytes.is_empty() => write_frame(
                 file,
@@ -183,7 +233,8 @@ fn dispatch(
             if action != "capabilities"
                 && !action.starts_with("clipboard.")
                 && !action.starts_with("privacy.")
-                && !(cfg!(target_os = "linux") && action.starts_with("files."))
+                && !(cfg!(any(target_os = "linux", target_os = "macos"))
+                    && action.starts_with("files."))
             {
                 return Err(ApiError::new(
                     403,

@@ -262,6 +262,24 @@ pub mod control_key {
     pub const R_ALT: i32 = 32;
     /// 右 Win。
     pub const R_WIN: i32 = 33;
+    /// 小键盘数字 0–9 对应连续编号 34–43。
+    pub const NUMPAD_0: i32 = 34;
+    /// 小键盘数字 9。
+    pub const NUMPAD_9: i32 = 43;
+    /// 小键盘小数点。
+    pub const NUMPAD_DECIMAL: i32 = 44;
+    /// 小键盘除号。
+    pub const NUMPAD_DIVIDE: i32 = 45;
+    /// 小键盘乘号。
+    pub const NUMPAD_MULTIPLY: i32 = 46;
+    /// 小键盘减号。
+    pub const NUMPAD_SUBTRACT: i32 = 47;
+    /// 小键盘加号。
+    pub const NUMPAD_ADD: i32 = 48;
+    /// 小键盘回车。
+    pub const NUMPAD_ENTER: i32 = 49;
+    /// 小键盘等号。
+    pub const NUMPAD_EQUAL: i32 = 50;
 }
 
 /// 控制键的稳定名称，用于错误信息与日志（不含平台虚拟键码）。
@@ -303,6 +321,17 @@ pub fn control_key_name(code: i32) -> Option<&'static str> {
         control_key::R_SHIFT => "RShift",
         control_key::R_ALT => "RAlt",
         control_key::R_WIN => "RWin",
+        control_key::NUMPAD_0..=control_key::NUMPAD_9 => [
+            "Numpad0", "Numpad1", "Numpad2", "Numpad3", "Numpad4", "Numpad5", "Numpad6", "Numpad7",
+            "Numpad8", "Numpad9",
+        ][(code - control_key::NUMPAD_0) as usize],
+        control_key::NUMPAD_DECIMAL => "Decimal",
+        control_key::NUMPAD_DIVIDE => "Divide",
+        control_key::NUMPAD_MULTIPLY => "Multiply",
+        control_key::NUMPAD_SUBTRACT => "Subtract",
+        control_key::NUMPAD_ADD => "Add",
+        control_key::NUMPAD_ENTER => "NumpadEnter",
+        control_key::NUMPAD_EQUAL => "Equals",
         _ => return None,
     };
     Some(name)
@@ -409,7 +438,10 @@ mod tests {
             assert_eq!(control_key_name(*code), Some(*name), "code {code}");
         }
         assert_eq!(control_key_name(0), None);
-        assert_eq!(control_key_name(34), None);
+        assert_eq!(control_key_name(34), Some("Numpad0"));
+        assert_eq!(control_key_name(43), Some("Numpad9"));
+        assert_eq!(control_key_name(49), Some("NumpadEnter"));
+        assert_eq!(control_key_name(51), None);
         assert_eq!(control_key_name(9999), None);
     }
 

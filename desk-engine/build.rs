@@ -4,5 +4,5 @@ fn main() {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .unwrap();
-    brand_build::configure(root);
+    let _ = brand_build::configure(root);
 }

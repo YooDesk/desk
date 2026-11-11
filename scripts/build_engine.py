@@ -56,8 +56,15 @@ def main() -> int:
             print("patch failed (already partially applied?)", file=sys.stderr)
             return 1
 
-    for name in ("rustdesk-headless-trusted-devices.patch", "rustdesk-x265-pixel-format.patch",
-                 "rustdesk-build-version-host.patch", "rustdesk-scrap-va-vdpau-optional.patch"):
+    overlays = ["rustdesk-headless-trusted-devices.patch", "rustdesk-x265-pixel-format.patch",
+                "rustdesk-build-version-host.patch", "rustdesk-scrap-va-vdpau-optional.patch"]
+    if sys.platform == "darwin":
+        overlays.append("rustdesk-macos-headless-update.patch")
+        overlays.append("rustdesk-macos-loginwindow-input.patch")
+        overlays.append("rustdesk-macos-layout-key-events.patch")
+    elif os.name == "nt":
+        overlays.append("rustdesk-windows-keypad-meta.patch")
+    for name in overlays:
         overlay = PATCH.parent / name
         if subprocess.run(["git", "-C", str(tree), "apply", "--reverse", "--check", "--ignore-space-change", str(overlay)], capture_output=True).returncode:
             subprocess.run(["git", "-C", str(tree), "apply", "--ignore-space-change", str(overlay)], check=True)
@@ -133,7 +140,7 @@ def main() -> int:
     subprocess.run([sys.executable, str(ROOT / "scripts" / "prepare_ring.py")], env=env, check=True)
     subprocess.run([sys.executable, str(ROOT / "scripts" / "prepare_mozjpeg.py")], env=env, check=True)
     fetch = ["cargo", "fetch", "--locked"]
-    if os.name == "nt":
+    if os.name == "nt" or sys.platform == "darwin":
         target = env.get("CARGO_BUILD_TARGET")
         if not target:
             info = subprocess.check_output(["rustc", "-vV"], env=env, text=True)
@@ -143,16 +150,40 @@ def main() -> int:
 
     # Cross ports may need extra flags (e.g. -Z build-std when the Rust
     # distribution has no prebuilt std for the target).
-    command = ["cargo", "build", "--release", "--locked"]
+    target = env.get("CARGO_BUILD_TARGET")
+    if sys.platform == "darwin":
+        # rustc reports the frameworks and dylibs that a staticlib consumer must link.
+        # A separate rustc invocation also reports them when the dependencies are cached.
+        command = ["cargo", "rustc", "--release", "--locked", "--lib"]
+        # x64 is cross-compiled on the arm64 runner; the host target needs no flag.
+        if target:
+            command += ["--target", target]
+        command += ["--", "--print", "native-static-libs"]
+    else:
+        command = ["cargo", "build", "--release", "--locked"]
     command.extend(shlex.split(os.environ.get("YOODESK_ENGINE_CARGO_ARGS", "")))
     print("running:", " ".join(command))
-    result = subprocess.run(command, cwd=ROOT / "desk-engine", env=env)
-    if result.returncode != 0:
-        return result.returncode
+    flags = []
+    if sys.platform == "darwin":
+        with subprocess.Popen(command, cwd=ROOT / "desk-engine", env=env,
+                              stderr=subprocess.PIPE, text=True) as build:
+            for line in build.stderr:
+                sys.stderr.write(line)
+                if line.startswith("note: native-static-libs: "):
+                    flags.append(line.removeprefix("note: native-static-libs: ").strip())
+            returncode = build.wait()
+    else:
+        returncode = subprocess.run(command, cwd=ROOT / "desk-engine", env=env).returncode
+    if returncode != 0:
+        return returncode
     output = ROOT / "desk-engine" / "target"
     if target := env.get("CARGO_BUILD_TARGET"):
         output /= target
     library = output / "release" / ("yoodesk_desk_engine.lib" if os.name == "nt" else "libyoodesk_desk_engine.a")
+    if sys.platform == "darwin":
+        if len(flags) != 1:
+            raise RuntimeError("rustc did not report the macOS Desk static library link flags")
+        library.with_name("native-static-libs.txt").write_text(flags[0] + "\n", encoding="utf-8")
     print(f"built {library} ({library.stat().st_size} bytes)")
     return 0
 

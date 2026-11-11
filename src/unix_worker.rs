@@ -34,12 +34,18 @@ unsafe extern "C" {
         length: *mut u32,
     ) -> i32;
 }
+#[cfg(target_os = "macos")]
+unsafe extern "C" {
+    fn getpeereid(fd: i32, uid: *mut u32, gid: *mut u32) -> i32;
+}
+#[cfg(target_os = "linux")]
 #[repr(C)]
 struct Credentials {
     pid: i32,
     uid: u32,
     gid: u32,
 }
+#[cfg(target_os = "linux")]
 fn verify(stream: &UnixStream, pid: u32, uid: u32) -> io::Result<()> {
     let mut credentials = Credentials {
         pid: 0,
@@ -70,6 +76,43 @@ fn verify(stream: &UnixStream, pid: u32, uid: u32) -> io::Result<()> {
     }
     Ok(())
 }
+#[cfg(target_os = "macos")]
+fn verify(stream: &UnixStream, pid: u32, uid: u32) -> io::Result<()> {
+    // Darwin 分别提供本地套接字的有效 UID 和连接进程 PID。
+    const SOL_LOCAL: i32 = 0;
+    const LOCAL_PEERPID: i32 = 2;
+    let fd = stream.as_raw_fd();
+    let (mut peer_uid, mut peer_gid, mut peer_pid) = (0u32, 0u32, 0i32);
+    let mut size = std::mem::size_of_val(&peer_pid) as u32;
+    if unsafe { getpeereid(fd, &mut peer_uid, &mut peer_gid) } != 0
+        || unsafe {
+            getsockopt(
+                fd,
+                SOL_LOCAL,
+                LOCAL_PEERPID,
+                (&mut peer_pid as *mut i32).cast(),
+                &mut size,
+            )
+        } != 0
+    {
+        return Err(io::Error::last_os_error());
+    }
+    if size as usize != std::mem::size_of_val(&peer_pid)
+        || peer_uid != uid
+        || peer_pid as u32 != pid
+    {
+        return Err(io::Error::new(
+            io::ErrorKind::PermissionDenied,
+            "desktop IPC peer identity mismatch",
+        ));
+    }
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+const RUN_DIR: &str = "/private/var/run";
+#[cfg(target_os = "linux")]
+const RUN_DIR: &str = "/run";
 fn invalid() -> io::Error {
     io::Error::new(io::ErrorKind::InvalidData, "desktop IPC protocol")
 }
@@ -131,7 +174,8 @@ impl UnixEndpoint {
             ));
         }
         let directory = PathBuf::from(format!(
-            "/run/yoodesk-desktop-{}-{}",
+            "{RUN_DIR}/{}-desktop-{}-{}",
+            env!("PRODUCT_ID"),
             std::process::id(),
             uuid::Uuid::new_v4()
         ));
@@ -202,6 +246,9 @@ impl UnixEndpoint {
             }
             std::thread::sleep(Duration::from_millis(10));
         };
+        // Darwin 的 accept 可以继承监听套接字的非阻塞状态。握手和 RPC 需要
+        // 阻塞连接，由 DeadlineIo 为每次读写设置剩余期限。
+        stream.set_nonblocking(false)?;
         let nonce: [u8; 32] = rand::random();
         let mut handshake = DeadlineIo::new(&mut stream, Duration::from_secs(10));
         write_frame(&mut handshake, &json!({"v":1,"op":"hello"}), &nonce)?;
@@ -231,7 +278,25 @@ struct UnixTransport {
 }
 impl Transport for UnixTransport {
     fn healthy(&self) -> bool {
-        !self.failed.load(Ordering::SeqCst)
+        if self.failed.load(Ordering::SeqCst) {
+            return false;
+        }
+        #[cfg(target_os = "macos")]
+        {
+            // macOS can terminate the idle worker when the user clicks
+            // Quit & Reopen after granting recording. Detect EOF without
+            // waiting for the next remote RPC or consuming any IPC bytes.
+            unsafe extern "C" {
+                fn recv(fd: i32, buffer: *mut u8, size: usize, flags: i32) -> isize;
+            }
+            const PEEK_NONBLOCKING: i32 = 0x02 | 0x80; // MSG_PEEK | MSG_DONTWAIT on Darwin
+            let mut byte = 0;
+            if unsafe { recv(self.cancel.as_raw_fd(), &mut byte, 1, PEEK_NONBLOCKING) } == 0 {
+                self.failed.store(true, Ordering::SeqCst);
+                return false;
+            }
+        }
+        true
     }
     fn close(&self) {
         self.failed.store(true, Ordering::SeqCst);
@@ -292,21 +357,21 @@ impl Transport for UnixTransport {
 pub fn run_worker(path: &str, parent_pid: u32) -> io::Result<()> {
     let uid = unsafe { geteuid() };
     let gid = unsafe { getegid() };
-    if uid == 0 {
+    if cfg!(target_os = "linux") && uid == 0 {
         return Err(io::Error::new(
             io::ErrorKind::PermissionDenied,
             "desktop worker requires the selected graphical user",
         ));
     }
     let socket = PathBuf::from(path);
-    if !socket.starts_with("/run") {
+    if !socket.starts_with(RUN_DIR) {
         return Err(invalid());
     }
     let directory = socket.parent().ok_or_else(invalid)?;
     let parent = fs::symlink_metadata(directory)?;
     let metadata = fs::symlink_metadata(&socket)?;
     if parent.uid() != 0
-        || parent.mode() & 0o777 != 0o710
+        || parent.mode() & 0o777 != if uid == 0 { 0o700 } else { 0o710 }
         || parent.gid() != gid
         || !parent.is_dir()
         || metadata.uid() != uid
@@ -328,10 +393,64 @@ pub fn run_worker(path: &str, parent_pid: u32) -> io::Result<()> {
     stream.set_read_timeout(None)?;
     stream.set_write_timeout(None)?;
     // 父退出会关闭socket，EOF沿共享serve路径释放输入、订阅和隐私状态。
+    #[cfg(target_os = "macos")]
+    if uid == 0 {
+        return crate::desk::engine::worker::serve_login_window(&mut stream);
+    }
+    #[cfg(target_os = "macos")]
+    {
+        unsafe extern "C" {
+            fn yd_engine_macos_prompt_on_start();
+        }
+        unsafe { yd_engine_macos_prompt_on_start() };
+        if !macos_screen_available() {
+            watch_macos_screen_grant();
+        }
+    }
     crate::desk::engine::worker::serve(&mut stream)
 }
 
+#[cfg(target_os = "macos")]
+/// Check screen recording permission for this process without asking macOS to prompt.
+pub fn macos_screen_available() -> bool {
+    unsafe extern "C" {
+        fn yd_engine_macos_screen_available() -> i32;
+    }
+    unsafe { yd_engine_macos_screen_available() != 0 }
+}
+
+#[cfg(target_os = "macos")]
+fn watch_macos_screen_grant() {
+    let Ok(executable) = std::env::current_exe() else {
+        return;
+    };
+    let _ = std::thread::Builder::new()
+        .name("screen-grant".into())
+        .spawn(move || {
+            // WindowServer may cache denial in the current process even after
+            // System Settings grants access. Only a fresh process can verify it.
+            // Limit the checks to the interactive startup authorization window.
+            for _ in 0..60 {
+                std::thread::sleep(Duration::from_secs(2));
+                if macos_screen_available() {
+                    break;
+                }
+                let Ok(status) = std::process::Command::new(&executable)
+                    .arg("--macos-check-screen-access")
+                    .status()
+                else {
+                    break;
+                };
+                if status.success() {
+                    // The service detects the socket closing even with no viewer.
+                    std::process::exit(0);
+                }
+            }
+        });
+}
+
 /// root特权helper仅探测/运行DRM并等待父控制连接关闭，不运行输入/桌面/音频/HTTP。
+#[cfg(target_os = "linux")]
 pub fn run_privileged_worker(path: &str, parent_pid: u32) -> io::Result<()> {
     if unsafe { geteuid() } != 0 {
         return Err(io::Error::new(
@@ -383,7 +502,7 @@ pub fn run_privileged_worker(path: &str, parent_pid: u32) -> io::Result<()> {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, target_os = "linux"))]
 mod tests {
     use super::*;
     #[test]

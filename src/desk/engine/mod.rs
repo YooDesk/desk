@@ -158,6 +158,13 @@ impl Capturer for EngineCapturer {
 
 // 用户 Wayland 缺设备授权时仍保留画面，不能宣称已经具备输入或静默丢弃事件。
 fn local_input_available() -> bool {
+    #[cfg(target_os = "macos")]
+    {
+        extern "C" {
+            fn yd_engine_macos_input_available() -> i32;
+        }
+        return unsafe { yd_engine_macos_input_available() } != 0;
+    }
     #[cfg(target_os = "linux")]
     if std::env::var_os("YOODESK_ENGINE_NAMESPACE").is_some()
         && std::env::var("XDG_SESSION_TYPE").as_deref() == Ok("wayland")
@@ -169,6 +176,7 @@ fn local_input_available() -> bool {
         return std::env::var("YOODESK_ENGINE_USER_UINPUT").as_deref() == Ok("1")
             || flags & 12 == 12;
     }
+    #[cfg(not(target_os = "macos"))]
     true
 }
 impl Backend for EngineBackend {
@@ -287,17 +295,17 @@ impl Backend for EngineBackend {
             return rpc::input();
         }
         if !local_input_available() {
-            return Err(ApiError::new(
-                503,
-                codes::DESK_ENGINE,
-                "Wayland input unavailable: uinput access was not granted",
-            ));
+            #[cfg(target_os = "macos")]
+            let message = "请在 Mac 系统设置的辅助功能中允许 YooDesk 控制键鼠。";
+            #[cfg(not(target_os = "macos"))]
+            let message = "Wayland input unavailable: uinput access was not granted";
+            return Err(ApiError::new(503, codes::DESK_ENGINE, message));
         }
         Ok(Box::new(EngineInput::new()))
     }
 
     fn supports_input(&self) -> bool {
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "macos"))]
         if rpc::enabled() {
             let capabilities = self.capabilities();
             return capabilities.pointer || capabilities.keyboard;
@@ -441,6 +449,14 @@ impl EngineBackend {
                 settings.bitrate_bps,
             )
         };
+        #[cfg(target_os = "macos")]
+        if rc == -3 {
+            return Err(ApiError::new(
+                403,
+                codes::FORBIDDEN,
+                "请在 Mac 系统设置中允许 YooDesk 录屏，重启 YooDesk 服务后再连接。",
+            ));
+        }
         tracing::info!(
             "引擎订阅结果 display={} conn={} rc={}",
             display_index,
