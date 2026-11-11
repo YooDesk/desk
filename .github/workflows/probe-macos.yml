@@ -1,0 +1,14 @@
+name: probe-macos
+on: workflow_dispatch
+jobs:
+  probe:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-13, macos-14, macos-15, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - run: |
+          echo "requested: ${{ matrix.os }}"
+          sw_vers
+          uname -m
