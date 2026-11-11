@@ -166,6 +166,9 @@ jobs:
           MACOSX_DEPLOYMENT_TARGET: '11.0'
         run: |
           rustup target add '${{ matrix.target }}'
+          # vcpkg 的 aom/libvpx 端口需要 nasm；macOS runner 默认没有。
+          brew install nasm
+          nasm -v
           # Connector 与 WebService 的宿主包由各自的流水线构建；本仓库只产出 Desk 插件。
           python3 scripts/prepare_sources.py
           export VCPKG_ROOT="$PWD/.ci-cache/vcpkg"
