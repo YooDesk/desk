@@ -26,7 +26,7 @@ pub(crate) fn run_worker(path: &str, parent_pid: u32) -> io::Result<()> {
     std::thread::Builder::new()
         .name("desk-ipc".into())
         .spawn(move || {
-            let status = match crate::unix_worker::run_worker(path, parent_pid) {
+            let status = match crate::unix_worker::run_worker(&path, parent_pid) {
                 Ok(()) => 0,
                 Err(error) if error.kind() == io::ErrorKind::UnexpectedEof => 0,
                 Err(error) => {
