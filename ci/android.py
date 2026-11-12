@@ -75,7 +75,8 @@ def main():
         from prepare_sources import checkout
         tree = target.parent / "rustdesk-src"
         checkout("rustdesk", tree)
-        baseline = json.loads((tree / "vcpkg.json").read_text())["builtin-baseline"]
+        configuration = json.loads((tree / "vcpkg.json").read_text())
+        baseline = configuration.get("builtin-baseline") or configuration["vcpkg-configuration"]["default-registry"]["baseline"]
         vcpkg = target.parent / "vcpkg"
         if not (vcpkg / ".git").exists():
             run("git", "init", vcpkg)
