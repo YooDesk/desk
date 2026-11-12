@@ -124,6 +124,13 @@ jobs:
         if: runner.os == 'Windows'
         with:
           arch: ${{ matrix.msvc }}
+      # macOS 和 Linux 都固定同一个 rustc 版本；runner 预装版本会漂移，
+      # 新版本会把 vendored nix 的 macOS 专用代码判为 dead_code。
+      - uses: dtolnay/rust-toolchain@stable
+        if: runner.os == 'macOS'
+        with:
+          toolchain: '1.99.0'
+          targets: ${{ matrix.target }}
       # Copied from E:/NetJobs/rustdesk/.github/workflows/flutter-build.yml:
       # LLVM 15.0.6, vcpkg 9e593..., static target triplets and MSVC preparation.
       - name: Install LLVM and Clang
