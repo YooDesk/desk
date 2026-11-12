@@ -10,6 +10,7 @@ from __future__ import annotations
 import os
 import json
 import pathlib
+import re
 import shlex
 import subprocess
 import sys
@@ -19,6 +20,12 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'scripts'))
 PATCH = ROOT / "engine-patches" / "rustdesk-1.5.1-engine.patch"
 
+
+def native_link_flags(line: str) -> str | None:
+    """Read rustc's link note even when a runner forces ANSI-colored output."""
+    plain = re.sub(r"\x1b\[[0-9;]*m", "", line).strip()
+    prefix = "note: native-static-libs: "
+    return plain.removeprefix(prefix) if plain.startswith(prefix) else None
 
 
 def rustdesk_dir() -> pathlib.Path:
@@ -155,7 +162,7 @@ def main() -> int:
         # rustc reports the frameworks and dylibs that a staticlib consumer must link.
         # A separate rustc invocation also reports them when the dependencies are cached.
         command = ["cargo", "rustc", "--release", "--locked", "--lib"]
-        # x64 is cross-compiled on the arm64 runner; the host target needs no flag.
+        # Both architectures have native runners; keep their target explicit.
         if target:
             command += ["--target", target]
         command += ["--", "--print", "native-static-libs"]
@@ -165,12 +172,14 @@ def main() -> int:
     print("running:", " ".join(command))
     flags = []
     if sys.platform == "darwin":
+        env["CARGO_TERM_COLOR"] = "never"
         with subprocess.Popen(command, cwd=ROOT / "desk-engine", env=env,
                               stderr=subprocess.PIPE, text=True) as build:
             for line in build.stderr:
                 sys.stderr.write(line)
-                if line.startswith("note: native-static-libs: "):
-                    flags.append(line.removeprefix("note: native-static-libs: ").strip())
+                parsed = native_link_flags(line)
+                if parsed is not None:
+                    flags.append(parsed)
             returncode = build.wait()
     else:
         returncode = subprocess.run(command, cwd=ROOT / "desk-engine", env=env).returncode
