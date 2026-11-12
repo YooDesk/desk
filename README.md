@@ -56,5 +56,7 @@ The workflow runs component unit tests, cross-compiles with NDK 26.1.10909125 / 
 checks ARM64, shared Bionic dependencies and 16 KiB load alignment, and publishes
 `yoodesk-desk-android-arm64.zip` plus SHA256 in `android-v0.1.0-ci.<run>`.
 These releases do not replace the latest desktop release. Build order is Connector,
-Desk, WebService, then `yoodeskclient`'s Android workflow; the installer pins all three
+Desk, SSH, RDP, VNC, WebService, then `yoodeskclient`'s Android workflow; the installer pins all six
 complete Android releases and their commit IDs before packaging.
+
+The Android APK loads Desk, SSH, RDP and VNC plugins. Gateway retains its existing server builds and has no Android workflow.
