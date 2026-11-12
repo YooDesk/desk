@@ -11,3 +11,9 @@ Existing Linux toolchain and published SDK reuse scripts and locks are unchanged
 The LoongArch job in that run restored both tool/native compilation caches and
 completed successfully. Other platforms and the repaired macOS flow still need
 the subsequent complete workflow result; no desktop runtime claim is made here.
+
+## Android/device migration validation (2026-11-12)
+
+Upstream c0975f2 migrated with standalone repository adapters. Local validation and actual GitHub run/release results are tracked in `E:/YooDeskGroup/.ci-tmp/android-build-state.json` and the final acceptance report.
+
+Local Windows no-default-features Cargo library suite: 100 passed, including actual Android frame delivery, H.264 decode, input queue and consent lifecycle. Desk browser connection lifecycle suite: 11 passed.

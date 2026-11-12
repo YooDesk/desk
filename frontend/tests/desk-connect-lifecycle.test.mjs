@@ -176,3 +176,21 @@ test('connector restart installs a fresh transport and restores access in the sa
   assert.equal(f.reloads(),0);
   assert.equal(f.context.viewerRecoveryTransport,next);
 });
+
+
+test('Android capture consent extends connection setup without changing desktop timeouts', async()=>{
+  const f=fixture();
+  f.context.loadCapabilities=async()=>{f.state.platform={backend:'rustdesk-android'};};
+  const connection=f.context.runConnection();
+  await f.posted;
+  assert(f.timers.includes(45000));
+  f.release();
+  await connection;
+  const desktop=fixture();
+  const pending=desktop.context.runConnection();
+  await desktop.posted;
+  assert(!desktop.timers.includes(45000));
+  assert(desktop.timers.includes(15000));
+  desktop.release();
+  await pending;
+});

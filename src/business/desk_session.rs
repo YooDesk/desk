@@ -33,6 +33,7 @@ pub type AudioSubscription = (broadcast::Receiver<Arc<Vec<u8>>>, Option<Arc<Vec<
 
 /// 采集轮询超时；超时表示画面无变化，不产生帧。
 const CAPTURE_TIMEOUT: Duration = Duration::from_millis(120);
+const STREAM_ATTACH_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// 默认会话上限：本机单用户场景，限制并发采集占用。
 pub const DEFAULT_MAX_SESSIONS: usize = 4;
@@ -796,14 +797,13 @@ impl DeskSessionManager {
                 "desk target must be \"local\"",
             ));
         }
-        let displays = self.backend.displays()?;
         let display = match &options.display_id {
             None => 0u32,
             Some(value) => value
                 .parse::<u32>()
                 .map_err(|_| ApiError::new(400, codes::INVALID_REQUEST, "invalid display_id"))?,
         };
-        if !displays.iter().any(|d| d.index == display) {
+        if !self.backend.accepts_display(display)? {
             return Err(ApiError::new(404, codes::NOT_FOUND, "display not found"));
         }
         {
@@ -979,8 +979,21 @@ impl DeskSessionManager {
                 "desk 采集开始"
             );
             // A lost create response must not reserve capture until the login expires.
-            let mut attach_deadline = Some(std::time::Instant::now() + Duration::from_secs(30));
+            let started = std::time::Instant::now();
+            let first_frame_deadline = capturer
+                .first_frame_timeout()
+                .map(|timeout| started + timeout);
+            let mut attach_deadline = first_frame_deadline
+                .is_none()
+                .then(|| started + STREAM_ATTACH_TIMEOUT);
             while !stop.load(Ordering::SeqCst) {
+                if first_frame
+                    && first_frame_deadline
+                        .is_some_and(|deadline| std::time::Instant::now() >= deadline)
+                {
+                    session.fail("first_frame_timeout");
+                    break;
+                }
                 session.expire_unattached_stream(&mut attach_deadline);
                 if stop.load(Ordering::SeqCst) {
                     break;
@@ -1043,14 +1056,19 @@ impl DeskSessionManager {
                     Ok(frame) => {
                         match encoder.encode(frame.width, frame.height, &frame.data) {
                             Ok(encoded) => {
-                                if first_frame {
-                                    first_frame = false;
-                                    session.publish_state(SessionStateKind::TransportReady, true);
-                                    session.publish_state(SessionStateKind::Active, true);
-                                }
                                 if let Some(message) =
                                     to_message(&encoded, frame.width, frame.height)
                                 {
+                                    if first_frame {
+                                        first_frame = false;
+                                        if first_frame_deadline.is_some() {
+                                            attach_deadline = Some(
+                                                std::time::Instant::now() + STREAM_ATTACH_TIMEOUT,
+                                            );
+                                        }
+                                        session.publish_state(SessionStateKind::TransportReady, true);
+                                        session.publish_state(SessionStateKind::Active, true);
+                                    }
                                     // 无订阅者时 `send` 失败是正常的；丢弃而不是报错。
                                     let _ = session.frames.send(Arc::new(message));
                                 }
@@ -1302,7 +1320,7 @@ fn run_engine_loop(
 
     let mut first_frame = true;
     tracing::info!(session = %session.id, display = session.display, "引擎采集开始");
-    let mut attach_deadline = Some(std::time::Instant::now() + Duration::from_secs(30));
+    let mut attach_deadline = Some(std::time::Instant::now() + STREAM_ATTACH_TIMEOUT);
     while !stop.load(Ordering::SeqCst) {
         session.expire_unattached_stream(&mut attach_deadline);
         if stop.load(Ordering::SeqCst) {

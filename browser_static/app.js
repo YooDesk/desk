@@ -501,6 +501,10 @@
       setStatus('连接中', 'connecting');
       await loadCapabilities(controller.signal);
       ensureGeneration(generation);
+      if (state.platform?.backend === 'rustdesk-android') {
+        clearTimeout(timeout);
+        timeout = setTimeout(function () { controller.abort(); }, 45000);
+      }
       await loadDisplays(controller.signal);
       ensureGeneration(generation);
       await createSession(generation, controller.signal);
@@ -572,14 +576,16 @@
   }
   async function waitForStream(generation, signal) {
     var id = state.sessionId;
-    for (var attempts = 0; attempts < 100; attempts += 1) {
+    var android = state.platform?.backend === 'rustdesk-android';
+    var androidDeadline = performance.now() + 38000;
+    for (var attempts = 0; android ? performance.now() < androidDeadline : attempts < 100; attempts += 1) {
       ensureGeneration(generation);
       var info = await request('GET', api + '/sessions/' + id + '/', undefined, signal);
       ensureGeneration(generation);
       if (info.stream_available) { return openStream(info.stream_url, generation, signal); }
       if (info.state === 'failed' || info.state === 'closed') { throw new Error('会话已结束：' + info.state); }
       await new Promise(function (resolve, reject) {
-        var timer = setTimeout(done, 100);
+        var timer = setTimeout(done, android ? 250 : 100);
         function done() { signal.removeEventListener('abort', cancelled); resolve(); }
         function cancelled() { clearTimeout(timer); signal.removeEventListener('abort', cancelled); reject(new DOMException('连接已取消', 'AbortError')); }
         signal.addEventListener('abort', cancelled, {once: true});

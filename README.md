@@ -48,3 +48,13 @@ python3 ci/package.py desk --platform macos-arm64
 
 Intel 切片用 `x86_64-apple-darwin` 和 `macos-x64`。`ci/package.py` 拒绝链接
 Homebrew 等非系统动态库、带构建 rpath 或架构不符的镜像。
+
+## Android ARM64
+
+Manually dispatch `.github/workflows/build-android.yml` after committing source changes.
+The workflow runs component unit tests, cross-compiles with NDK 26.1.10909125 / API 24,
+checks ARM64, shared Bionic dependencies and 16 KiB load alignment, and publishes
+`yoodesk-desk-android-arm64.zip` plus SHA256 in `android-v0.1.0-ci.<run>`.
+These releases do not replace the latest desktop release. Build order is Connector,
+Desk, WebService, then `yoodeskclient`'s Android workflow; the installer pins all three
+complete Android releases and their commit IDs before packaging.

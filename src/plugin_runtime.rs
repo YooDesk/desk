@@ -96,10 +96,10 @@ unsafe extern "C" fn start(
                 runtime.block_on(async move {
                     #[cfg(feature="desk-engine")]
                     if start.service { crate::desk::engine::rpc::set_transport(None); }
-                    #[cfg(feature="desk-engine")]
+                    #[cfg(any(feature="desk-engine", target_os="android"))]
                     let business = Arc::new(BusinessHub::with_config(crate::desk::default_backend(), &start.config));
-                    #[cfg(not(feature="desk-engine"))]
-                    let business = Arc::new(BusinessHub::new());
+                    #[cfg(not(any(feature="desk-engine", target_os="android")))]
+                    let business = Arc::new(BusinessHub::new(crate::desk::default_backend()));
                     let state = Arc::new(AppState { config:start.config, access, business:business.clone(), limiter:LoginLimiter::new(10.0,10.0/60.0) });
                     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.map_err(|_| error("plugin listener unavailable"))?;
                     let address = listener.local_addr().map_err(|_| error("plugin listener address unavailable"))?;
@@ -129,12 +129,12 @@ unsafe extern "C" fn start(
                         result=&mut server => result.map_err(|_|error("plugin HTTP server failed")),
                         _=wait_stop(shutdown.clone()) => {
                             business.remote.close_all();
-                            #[cfg(feature="desk-engine")] business.desk.close_all("server_shutdown");
+                            #[cfg(any(feature="desk-engine", target_os="android"))] business.desk.close_all("server_shutdown");
                             let _ = tokio::time::timeout(Duration::from_secs(15), &mut server).await;
                             Ok(())
                         }
                     };
-                    #[cfg(feature="desk-engine")]
+                    #[cfg(all(feature="desk-engine", any(windows,target_os="linux",target_os="macos")))]
                     if let Some(worker) = worker { let _ = tokio::time::timeout(Duration::from_secs(5),worker).await; }
                     result
                 })
@@ -190,16 +190,16 @@ unsafe extern "C" fn command(
             match request["op"].as_str() {
                 Some("close.owner") => {
                     instance.business.remote.close_owner(id);
-                    #[cfg(feature = "desk-engine")]
+                    #[cfg(any(feature = "desk-engine", target_os = "android"))]
                     instance.business.desk.close_all_for(id, reason);
                 }
                 Some("close.all") => {
                     instance.business.remote.close_all();
-                    #[cfg(feature = "desk-engine")]
+                    #[cfg(any(feature = "desk-engine", target_os = "android"))]
                     instance.business.desk.close_all("server_shutdown");
                 }
                 Some("access.renew") => {
-                    #[cfg(feature = "desk-engine")]
+                    #[cfg(any(feature = "desk-engine", target_os = "android"))]
                     {
                         let expires: SystemTime =
                             serde_json::from_value(request["expires"].clone())
@@ -217,11 +217,11 @@ unsafe extern "C" fn command(
                     );
                 }
                 Some("ready") => {
-                    #[cfg(feature = "desk-engine")]
+                    #[cfg(any(feature = "desk-engine", target_os = "android"))]
                     return Ok(json!(
-                        instance.business.desk.backend().capabilities().capture
+                        instance.business.desk.backend().accepts_capture_request()
                     ));
-                    #[cfg(not(feature = "desk-engine"))]
+                    #[cfg(not(any(feature = "desk-engine", target_os = "android")))]
                     return Ok(json!(true));
                 }
                 #[cfg(feature = "desk-engine")]

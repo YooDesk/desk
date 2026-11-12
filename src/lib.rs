@@ -26,7 +26,7 @@ mod backend_context;
 
 #[cfg(target_os = "linux")]
 mod linux_uinput_access;
-#[cfg(target_os = "linux")]
+#[cfg(all(target_os = "linux", feature = "desk-engine"))]
 mod linux_worker_host;
 #[cfg(target_os = "linux")]
 mod linux_x11_probe;
@@ -35,5 +35,5 @@ mod macos_worker_host;
 mod plugin_abi;
 mod plugin_runtime;
 mod remote_access;
-#[cfg(windows)]
+#[cfg(all(windows, feature = "desk-engine"))]
 mod windows_worker_host;

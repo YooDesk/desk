@@ -24,6 +24,8 @@ use std::time::SystemTime;
 
 use crate::json::{codes, ApiError};
 
+#[cfg(any(target_os = "android", test))]
+mod android;
 pub mod encode;
 #[cfg(feature = "desk-engine")]
 pub mod engine;
@@ -129,6 +131,12 @@ pub enum ClipboardContent {
 
 /// 采集器接口：一个会话一个实例，独占对应显示器。
 pub trait Capturer: Send {
+    /// Separate startup budget for platforms that require local consent before capture.
+    /// When set, the stream attachment deadline starts after the first frame is ready.
+    fn first_frame_timeout(&self) -> Option<std::time::Duration> {
+        None
+    }
+
     /// 显示器几何。
     fn geometry(&self) -> &DisplayGeometry;
 
@@ -316,6 +324,16 @@ pub struct PlatformInfo {
 
 /// 被控端后端：平台能力集合。
 pub trait Backend: Send + Sync + 'static {
+    /// 设备能接收新的采集请求；需系统授权的平台可先接受请求，再等待首帧。
+    fn accepts_capture_request(&self) -> bool {
+        self.capabilities().capture
+    }
+
+    /// 检查会话目标；系统尚未提供几何时，平台可以接受自己的默认显示器。
+    fn accepts_display(&self, display: u32) -> Result<bool, ApiError> {
+        Ok(self.displays()?.iter().any(|item| item.index == display))
+    }
+
     /// 后端名称，用于能力响应和日志。
     fn name(&self) -> &'static str;
 
@@ -454,7 +472,11 @@ pub fn default_backend() -> Arc<dyn Backend> {
     {
         Arc::new(windows::WindowsBackend::new())
     }
-    #[cfg(all(not(windows), not(feature = "desk-engine")))]
+    #[cfg(all(target_os = "android", not(feature = "desk-engine")))]
+    {
+        Arc::new(android::AndroidBackend)
+    }
+    #[cfg(all(not(any(windows, target_os = "android")), not(feature = "desk-engine")))]
     {
         Arc::new(UnsupportedBackend {
             platform: std::env::consts::OS,
