@@ -71,6 +71,22 @@ def patch(source: Path, destination: Path, version: str) -> None:
             continue
         if not target.is_file() or original.read_bytes() != target.read_bytes():
             shutil.copy2(original, target)
+    # nix 0.26 在 lib.rs 顶层 #![deny(unused)]；较新 rustc 会在非 Linux 平台
+    # 把仅 BSD/macOS 使用的辅助结构判为 dead_code，直接编译失败。
+    # 只放宽 vendored 副本的该 lint，不改依赖语义。
+    original_lib = source / "src" / "lib.rs"
+    lib = destination / "src" / "lib.rs"
+    if original_lib.is_file():
+        text = original_lib.read_text(encoding="utf-8")
+        if "#![deny(unused)]" in text and "// YooDesk: dead_code" not in text:
+            text = text.replace(
+                "#![deny(unused)]",
+                "// YooDesk: dead_code in macOS/BSD-only helpers is not an error\n"
+                "#![deny(unused)]\n#![allow(dead_code)]",
+                1,
+            )
+        if not lib.is_file() or lib.read_text(encoding="utf-8") != text:
+            lib.write_text(text, encoding="utf-8")
     original_ioctl = source / "src" / "sys" / "ioctl" / "linux.rs"
     ioctl = destination / "src" / "sys" / "ioctl" / "linux.rs"
     text = original_ioctl.read_text(encoding="utf-8")
