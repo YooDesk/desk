@@ -101,7 +101,24 @@ def main():
     if component == "connector":
         admin = ROOT / "src/bin/webadmin"
         shutil.copytree(admin, stage / "webadmin", dirs_exist_ok=True)
-    shutil.copy2(ROOT / "LICENSE", stage / "LICENSE")
+    copied = 0
+    for notice in ROOT.glob("LICENSE*"):
+        if notice.is_file():
+            shutil.copy2(notice, stage / notice.name)
+            copied += 1
+    if not copied:
+        raise ValueError("Component license is missing")
+    for vendor in (ROOT / "vendor").glob("*"):
+        if vendor.is_dir():
+            for notice in vendor.glob("LICENSE*"):
+                destination = stage / "licenses" / vendor.name
+                destination.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(notice, destination / notice.name)
+            for name in ("SOURCE.json", "PATCHES.md"):
+                if (vendor / name).is_file():
+                    destination = stage / "licenses" / vendor.name
+                    destination.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(vendor / name, destination / name)
     for name in ("SOURCE.json", "dependencies.lock.json"):
         if (ROOT / name).is_file():
             shutil.copy2(ROOT / name, stage / name)

@@ -34,16 +34,18 @@ jobs:
           sdkmanager 'ndk;26.1.10909125'
           sudo apt-get update
           sudo apt-get install -y clang libclang-dev ninja-build nasm autoconf automake libtool pkg-config
-      - uses: actions/cache@v4
+      - uses: actions/cache/restore@v4
+        id: android-cache
         with:
           path: |
             ~/.cargo/registry/
             ~/.cargo/git/
+            target/
             artifacts/android/target/
             artifacts/android/vcpkg-installed/
             artifacts/android/vcpkg-build/
             ~/.cache/vcpkg/archives/
-          key: android-desk-rust199-ndk26-v1-${{ hashFiles('Cargo.lock', 'dependencies.lock.json', 'engine-patches/android-frame-sink.rs') }}
+          key: android-desk-rust199-ndk26-v1-${{ hashFiles('Cargo.lock', 'dependencies.lock.json', 'engine-patches/android-frame-sink.rs', 'ci/android.py', 'scripts/android_capture.py') }}-${{ github.sha }}
           restore-keys: android-desk-rust199-ndk26-v1-
       - name: Build browser assets
         run: |
@@ -56,6 +58,19 @@ jobs:
           cargo test --locked --no-default-features --lib
       - name: Cross compile and validate Android ARM64 release
         run: python ci/android.py desk
+      - name: Preserve completed native compilation even after a failed build
+        if: always() && steps.android-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.cargo/registry/
+            ~/.cargo/git/
+            target/
+            artifacts/android/target/
+            artifacts/android/vcpkg-installed/
+            artifacts/android/vcpkg-build/
+            ~/.cache/vcpkg/archives/
+          key: ${{ steps.android-cache.outputs.cache-primary-key }}
       - uses: actions/upload-artifact@v4
         with:
           name: android-desk
