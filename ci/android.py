@@ -20,14 +20,14 @@ def run(*args, **kwargs):
 
 def environment():
     sdk = Path(os.environ.get("ANDROID_HOME") or os.environ["ANDROID_SDK_ROOT"])
-    ndk = Path(os.environ.get("ANDROID_NDK_HOME", sdk / "ndk" / NDK))
+    ndk = sdk / "ndk" / NDK
     tools = ndk / "toolchains/llvm/prebuilt/linux-x86_64/bin"
     clang = tools / "clang"
     link = ROOT / "artifacts/android/cxx-link"
     link.mkdir(parents=True, exist_ok=True)
     for name in ("libc++_static.a", "libc++abi.a"):
         shutil.copy2(tools.parent / "sysroot/usr/lib" / TARGET / name, link / name)
-    env = dict(os.environ, ANDROID_NDK_HOME=str(ndk), CARGO_NET_GIT_FETCH_WITH_CLI="true")
+    env = dict(os.environ, ANDROID_NDK_HOME=str(ndk), ANDROID_NDK_ROOT=str(ndk), ANDROID_NDK=str(ndk), CARGO_NET_GIT_FETCH_WITH_CLI="true")
     flags = env.get("CARGO_ENCODED_RUSTFLAGS", "").split("\x1f") if env.get("CARGO_ENCODED_RUSTFLAGS") else []
     flags += ["-C", f"link-arg=--target={TARGET}{API}", "-C", "link-arg=-Wl,-z,max-page-size=16384", "-L", f"native={link}"]
     env.update(CC_aarch64_linux_android=str(clang), CXX_aarch64_linux_android=str(tools / "clang++"),
@@ -127,6 +127,7 @@ def main():
         if path.name == binary or path.suffix == ".so":
             verify(path, tools)
     manifest = {"schema_version": 1, "component": component, "platform": "android-arm64",
+                "ndk_version": NDK, "android_api": API, "page_alignment": 16384,
                 "commit": os.environ.get("GITHUB_SHA") or subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
                 "files": {str(path.relative_to(stage)).replace("\\", "/"): hashlib.sha256(path.read_bytes()).hexdigest()
                           for path in stage.rglob("*") if path.is_file() and path.name != "android-component.json"}}

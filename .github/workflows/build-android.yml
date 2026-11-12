@@ -33,7 +33,7 @@ jobs:
         run: |
           sdkmanager 'ndk;26.1.10909125'
           sudo apt-get update
-          sudo apt-get install -y clang libclang-dev ninja-build nasm autoconf automake libtool pkg-config
+          sudo apt-get install -y clang libclang-dev ninja-build nasm autoconf autoconf-archive automake libtool pkg-config
       - uses: actions/cache/restore@v4
         id: android-cache
         with:
