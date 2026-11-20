@@ -14,9 +14,18 @@ on:
         description: Audit the selected cross sysroot without compiling the engine
         type: boolean
         default: false
+      source_ref:
+        description: Exact source commit when reusing completed platforms after a build-only fix
+        type: string
+        default: ''
+      reuse_run_id:
+        description: Completed run at source_ref whose successful native artifacts can be reused
+        type: string
+        default: ''
 
 permissions:
   contents: read
+  actions: read
 concurrency:
   group: build-${{ github.ref }}-${{ inputs.platform || 'all' }}
   cancel-in-progress: true
@@ -31,17 +40,24 @@ jobs:
     runs-on: ubuntu-24.04-arm
     outputs:
       matrix: ${{ steps.select.outputs.matrix }}
+      source_sha: ${{ steps.select.outputs.source_sha }}
     steps:
       - uses: actions/checkout@v4
       - id: select
         env:
           PLATFORM: ${{ inputs.platform || 'all' }}
+          SOURCE_REF: ${{ inputs.source_ref }}
+          REUSE_RUN_ID: ${{ inputs.reuse_run_id }}
+          GH_TOKEN: ${{ github.token }}
         run: python ci/build_matrix.py >> "$GITHUB_OUTPUT"
 
   browser:
+    needs: targets
     runs-on: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.targets.outputs.source_sha }}
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -61,6 +77,8 @@ jobs:
           path: browser/
           if-no-files-found: error
   native:
+    env:
+      YOODESK_SOURCE_SHA: ${{ needs.targets.outputs.source_sha }}
     permissions:
       contents: write
     needs: [browser, targets]
@@ -71,6 +89,17 @@ jobs:
       matrix: ${{ fromJSON(needs.targets.outputs.matrix) }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.targets.outputs.source_sha }}
+      - name: Apply the reviewed build-only adapters to the pinned source checkout
+        if: inputs.source_ref != ''
+        shell: bash
+        env:
+          BUILD_TOOLS_SHA: ${{ github.sha }}
+        run: |
+          git fetch --depth 1 origin "$BUILD_TOOLS_SHA"
+          git show "$BUILD_TOOLS_SHA:scripts/prepare_vcpkg_downloads.py" > scripts/prepare_vcpkg_downloads.py
+          git show "$BUILD_TOOLS_SHA:scripts/prepare_vcpkg_tool.py" > scripts/prepare_vcpkg_tool.py
       # Windows 的 build.rs 用这里的 Node 依赖生成可执行文件图标。
       - uses: actions/setup-node@v4
         if: runner.os == 'Windows'
@@ -158,6 +187,8 @@ jobs:
         working-directory: artifacts/rustdesk-engine-src
         shell: pwsh
         run: |
+          python "$env:GITHUB_WORKSPACE/scripts/prepare_vcpkg_downloads.py" "$env:VCPKG_ROOT"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $binaryCache="$env:GITHUB_WORKSPACE/.ci-cache/vcpkg"
           New-Item -ItemType Directory -Force -Path $binaryCache | Out-Null
           $env:VCPKG_BINARY_SOURCES="clear;x-gha,readwrite;files,$binaryCache,readwrite"
@@ -172,6 +203,7 @@ jobs:
           CARGO_NET_GIT_FETCH_WITH_CLI: 'true'
           MACOSX_DEPLOYMENT_TARGET: '11.0'
         run: |
+          export GITHUB_SHA="$YOODESK_SOURCE_SHA"
           rustup target add '${{ matrix.target }}'
           # vcpkg 的 aom/libvpx 端口需要 nasm；macOS runner 默认没有。
           brew install nasm
@@ -185,6 +217,7 @@ jobs:
           git -C "$VCPKG_ROOT" fetch --depth 1 https://github.com/microsoft/vcpkg.git '${{ env.VCPKG_COMMIT_ID }}'
           git -C "$VCPKG_ROOT" checkout --detach FETCH_HEAD
           [ -x "$VCPKG_ROOT/vcpkg" ] || "$VCPKG_ROOT/bootstrap-vcpkg.sh" -disableMetrics
+          python3 scripts/prepare_vcpkg_downloads.py "$VCPKG_ROOT"
           export VCPKG_INSTALLED_ROOT="$VCPKG_ROOT/installed"
           export VCPKGRS_TRIPLET='${{ matrix.triplet }}'
           "$VCPKG_ROOT/vcpkg" install --triplet '${{ matrix.triplet }}' --host-triplet '${{ matrix.triplet }}' \
@@ -205,6 +238,7 @@ jobs:
           _CL_: '/MT'
           LIBCLANG_PATH: ${{ github.workspace }}/artifacts/llvm-x64/bin
         run: |
+          $env:GITHUB_SHA=$env:YOODESK_SOURCE_SHA
           $env:VCPKG_INSTALLED_ROOT="$env:VCPKG_ROOT/installed"
           $env:VCPKG_DEFAULT_TRIPLET='${{ matrix.triplet }}'
           $env:VCPKG_DEFAULT_HOST_TRIPLET='${{ matrix.triplet }}'
@@ -228,6 +262,7 @@ jobs:
         if: runner.os == 'Linux' && !matrix.cross
         shell: bash
         run: |
+          export GITHUB_SHA="$YOODESK_SOURCE_SHA"
           # Same disposable runner cleanup as the RustDesk Linux workflow.
           sudo rm -rf /opt/ghc /usr/local/lib/android /usr/share/dotnet
           mkdir -p .ci-cache/tools .ci-cache/vcpkg
@@ -242,6 +277,7 @@ jobs:
         env:
           YOODESK_SYSROOT_AUDIT_ONLY: ${{ inputs.audit_only && '1' || '0' }}
         run: |
+          export GITHUB_SHA="$YOODESK_SOURCE_SHA"
           # Same disposable runner cleanup as the RustDesk Linux workflow.
           sudo rm -rf /opt/ghc /usr/local/lib/android /usr/share/dotnet
           mkdir -p .ci-cache/tools
@@ -306,11 +342,20 @@ jobs:
           key: ${{ steps.linux-tools.outputs.cache-primary-key }}
   release:
     if: github.event_name != 'pull_request' && !inputs.audit_only && (github.event_name != 'workflow_dispatch' || inputs.platform == 'all')
-    needs: native
+    needs: [native, targets]
     runs-on: ubuntu-24.04-arm
     permissions:
       contents: write
+      actions: read
     steps:
+      - uses: actions/download-artifact@v4
+        if: inputs.reuse_run_id != ''
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.reuse_run_id }}
+          pattern: native-*
+          path: dist/
+          merge-multiple: true
       - uses: actions/download-artifact@v4
         with:
           pattern: native-*
@@ -322,11 +367,27 @@ jobs:
             test -s "dist/yoodesk-desk-$platform.zip"
             (cd dist && sha256sum -c "yoodesk-desk-$platform.zip.sha256")
           done
+      - name: Verify every archive identifies the exact pinned source
+        env:
+          SOURCE_SHA: ${{ needs.targets.outputs.source_sha }}
+        run: |
+          python3 - <<'PY'
+          import glob, hashlib, json, os, zipfile
+          archives = glob.glob('dist/*.zip')
+          assert len(archives) == 8
+          for archive in archives:
+              with zipfile.ZipFile(archive) as bundle:
+                  metadata = json.loads(bundle.read('plugin.json'))
+                  assert archive == 'dist/yoodesk-desk-'+metadata['platform']+'.zip', archive
+                  assert metadata['id'] == 'desk' and metadata['abi_version'] == 1, archive
+                  assert metadata['source_commit'] == os.environ['SOURCE_SHA'], archive
+                  assert hashlib.sha256(bundle.read(metadata['library'])).hexdigest() == metadata['sha256'], archive
+          PY
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('v0.1.0-ci.{0}', github.run_number) }}
-          name: 'desk ${{ github.sha }}'
-          target_commitish: ${{ github.sha }}
+          name: 'desk ${{ needs.targets.outputs.source_sha }}'
+          target_commitish: ${{ needs.targets.outputs.source_sha }}
           make_latest: true
           fail_on_unmatched_files: true
           files: dist/*

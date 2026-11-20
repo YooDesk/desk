@@ -1,7 +1,10 @@
 """Build the pinned vcpkg tool against Ubuntu 18 glibc and its system libcurl."""
 from pathlib import Path
+import subprocess
+import sys
 
 root=Path(__file__).resolve().parents[1]
+subprocess.run([sys.executable, str(root/'scripts/prepare_vcpkg_downloads.py'), str(root/'artifacts/vcpkg')], check=True)
 script=root/'artifacts/vcpkg/scripts/bootstrap.sh'
 text=script.read_text(encoding='utf-8')
 original='-DVCPKG_DEVELOPMENT_WARNINGS=OFF"'
