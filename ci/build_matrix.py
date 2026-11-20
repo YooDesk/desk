@@ -30,7 +30,7 @@ if reuse:
         raise ValueError('Reuse requires the complete release matrix and a numeric run ID')
     subprocess.run(['git','fetch','--depth','1','origin',source],check=True)
     changes = subprocess.check_output(['git','diff','--name-only',source,'HEAD'],text=True).splitlines()
-    allowed = {'.github/workflows/build.yml','ci/build_matrix.py','scripts/prepare_vcpkg_tool.py','scripts/prepare_vcpkg_downloads.py','PROGRESS.md','MIGRATION.md'}
+    allowed = {'.github/workflows/build.yml','ci/build_matrix.py','ci/linux-build.sh','scripts/prepare_vcpkg_tool.py','scripts/prepare_vcpkg_downloads.py','PROGRESS.md','MIGRATION.md'}
     if any(name not in allowed and not name.startswith('docs/') for name in changes):
         raise ValueError('Artifact reuse is restricted to build-tool/documentation changes')
     base = 'https://api.github.com/repos/'+os.environ['GITHUB_REPOSITORY']

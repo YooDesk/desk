@@ -20,3 +20,9 @@ platform names, archive checksums and DLL/library hashes.
 Native builds check out `source_ref`; only the build/download adapters come from the reviewed
 workflow commit. Every package records the actual pinned source SHA, and the release tag
 targets that same SHA. Runtime code is never substituted by the artifact reuse path.
+
+The original Linux x64 run also encountered HTTP 504/connection timeouts from the
+existing Canonical Azure Bionic mirror during the later desktop dependency install.
+All APT phases now use three bounded acquisition retries and 30-second HTTP/HTTPS
+timeouts. The Ubuntu 18.04 environment, package versions and mirror remain unchanged;
+an exhausted download still fails the build.

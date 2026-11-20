@@ -5,6 +5,8 @@ platform="$2"
 target="$3"
 triplet="$4"
 export DEBIAN_FRONTEND=noninteractive
+# Bound acquisition retries in every dependency-install phase, including desktop packages.
+printf '%s\n' 'Acquire::Retries "3";' 'Acquire::http::Timeout "30";' 'Acquire::https::Timeout "30";' > /etc/apt/apt.conf.d/80-yoodesk-retries
 # archive.ubuntu.com is unreliable from CI runners (connection refused or
 # timeout). Canonical's Azure mirror serves the same bionic archive.
 if [[ -f /etc/apt/sources.list ]]; then
