@@ -26,3 +26,7 @@ existing Canonical Azure Bionic mirror during the later desktop dependency insta
 All APT phases now use three bounded acquisition retries and 30-second HTTP/HTTPS
 timeouts. The Ubuntu 18.04 environment, package versions and mirror remain unchanged;
 an exhausted download still fails the build.
+
+## Release-only recovery
+
+All eight native archives passed validation. The release integration token rejected creating/updating a release with an older target_commitish (403). The tag was explicitly created at the exact runtime source. publish-recovery.yml downloads the two completed runs, checks the tag, all eight platforms, archive SHA256 and embedded source/library hashes, then uploads to that existing tag without changing target_commitish. No platform is recompiled.

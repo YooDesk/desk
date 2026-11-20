@@ -1,0 +1,56 @@
+name: Publish verified existing artifacts
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  release:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: '44767568435'
+          pattern: native-*
+          path: dist/
+          merge-multiple: true
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: '44776093182'
+          pattern: native-*
+          path: dist/
+          merge-multiple: true
+      - name: Verify source, platform set and checksums before upload
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          import glob, hashlib, json, os, urllib.request, zipfile
+          source = 'fa3b03c20e32012d92792c4a0a022b120776acfd'
+          request = urllib.request.Request('https://api.github.com/repos/${{ github.repository }}/git/ref/tags/v0.1.0-ci.139', headers={'Authorization': 'Bearer '+os.environ['GH_TOKEN']})
+          with urllib.request.urlopen(request, timeout=45) as response:
+              assert json.load(response)['object']['sha'] == source
+          platforms = {'windows-x64','windows-arm64','linux-x64','linux-arm64','linux-loong64','linux-mips64el','macos-arm64','macos-x64'}
+          archives = glob.glob('dist/*.zip')
+          assert len(archives) == len(platforms)
+          for archive in archives:
+              checksum, name = open(archive+'.sha256').read().split()
+              assert name == os.path.basename(archive)
+              assert hashlib.sha256(open(archive,'rb').read()).hexdigest() == checksum
+              with zipfile.ZipFile(archive) as bundle:
+                  metadata = json.loads(bundle.read('plugin.json'))
+                  platforms.remove(metadata['platform'])
+                  assert archive == 'dist/yoodesk-desk-'+metadata['platform']+'.zip'
+                  assert metadata['source_commit'] == source
+                  assert metadata['id'] == 'desk' and metadata['abi_version'] == 1
+                  assert hashlib.sha256(bundle.read(metadata['library'])).hexdigest() == metadata['sha256']
+          assert not platforms
+          PY
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v0.1.0-ci.139
+          make_latest: true
+          fail_on_unmatched_files: true
+          files: dist/*
