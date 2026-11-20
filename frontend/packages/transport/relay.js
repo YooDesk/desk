@@ -12,6 +12,7 @@ export async function connectRelay({
   context,
   grant,
   getGrant,
+  acceptCarrier,
   timeoutMs = 15000,
   signal,
 }) {
@@ -60,7 +61,25 @@ export async function connectRelay({
     ws.addEventListener(
       'open',
       () => {
-        ws.send(JSON.stringify(deviceBind));
+        try {
+          ws.send(JSON.stringify(deviceBind));
+        } catch (error) {
+          fail(error);
+          return;
+        }
+        if (acceptCarrier) {
+          const selectedPair = async () => ({ local: 'websocket', remote: 'websocket' });
+          void Promise.resolve().then(() => {
+            if (!completed) return acceptCarrier(ws, selectedPair);
+          }).then(() => {
+            if (completed) return;
+            completed = true;
+            clearTimeout(timer);
+            signal?.removeEventListener('abort', abort);
+            resolve({ selectedPair, close: () => ws.close(1000, 'done') });
+          }).catch(fail);
+          return;
+        }
         const sample = () => {
           sampler = undefined;
           if (ws.readyState !== WebSocket.OPEN) return;

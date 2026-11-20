@@ -6,7 +6,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use axum::body::Bytes;
+use axum::body::{to_bytes, Body, Bytes};
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::extract::{Path, State};
 use axum::http::{header, HeaderMap, StatusCode};
@@ -517,7 +517,7 @@ pub async fn endpoint(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Path(session_id): Path<String>,
-    body: Bytes,
+    body: Body,
 ) -> Response {
     let request_id = match require_request_id(headers.get("x-request-id")) {
         Ok(v) => v,
@@ -537,6 +537,39 @@ pub async fn endpoint(
     let session = match state.business.desk.find(&context, id) {
         Ok(v) => v,
         Err(e) => return failure(&e, &request_id).into_response(),
+    };
+    if headers.get(header::CONTENT_TYPE).and_then(|value| value.to_str().ok())
+        == Some("application/octet-stream")
+    {
+        if let Err(error) = context.require_scope("files.write") {
+            return failure(&error, &request_id).into_response();
+        }
+        let Some(transfer_id) = headers
+            .get("x-desk-transfer-id")
+            .and_then(|value| value.to_str().ok())
+            .and_then(|value| value.parse::<i32>().ok())
+            .filter(|id| *id > 0)
+        else {
+            return failure(
+                &ApiError::new(400, codes::INVALID_REQUEST, "invalid file transfer ID"),
+                &request_id,
+            )
+            .into_response();
+        };
+        return match write_file_stream(session, transfer_id, body).await {
+            Ok(offset) => success(json!({"offset": offset}), &request_id).into_response(),
+            Err(error) => {
+                tracing::warn!(%request_id, transfer_id, status = error.status, code = error.code, "desktop upload stream failed");
+                failure(&error, &request_id).into_response()
+            }
+        };
+    }
+    let body = match to_bytes(body, 2 * 1024 * 1024).await {
+        Ok(body) => body,
+        Err(_) => return failure(
+            &ApiError::new(413, codes::PAYLOAD_TOO_LARGE, "endpoint request too large or incomplete"),
+            &request_id,
+        ).into_response(),
     };
     let value = match crate::json::parse_json_strict(&body) {
         Ok(v) => v,
@@ -603,6 +636,69 @@ pub async fn endpoint(
             return failure(&err, &request_id).into_response();
         }
     }
+    if value["action"] == "files.read"
+        && headers.get(header::ACCEPT).and_then(|value| value.to_str().ok())
+            == Some("application/octet-stream")
+    {
+        let (Some(transfer_id), Some(offset)) =
+            (
+                value["transfer_id"].as_i64().and_then(|id| i32::try_from(id).ok()),
+                value["offset"].as_u64(),
+            )
+        else {
+            return failure(
+                &ApiError::new(400, codes::INVALID_REQUEST, "invalid file read cursor"),
+                &request_id,
+            )
+            .into_response();
+        };
+        let stream = futures_util::stream::unfold(
+            Some((session, offset)),
+            move |cursor| async move {
+                let (session, offset) = cursor?;
+                let worker = session.clone();
+                #[cfg(all(windows, feature = "desk-engine"))]
+                let block = desktop_file(move || worker.read_file_block(transfer_id, offset))
+                    .await
+                    .map(|(bytes, done)| (Bytes::from(bytes), done));
+                #[cfg(not(all(windows, feature = "desk-engine")))]
+                let result = desktop_file(move || {
+                    worker.endpoint(&json!({
+                        "action": "files.read", "transfer_id": transfer_id, "offset": offset
+                    }))
+                })
+                .await;
+                #[cfg(not(all(windows, feature = "desk-engine")))]
+                let block = result.and_then(|block| {
+                    let invalid = || ApiError::new(500, codes::DESK_ENGINE, "invalid file block");
+                    let bytes = base64_decode(block["data"].as_str().ok_or_else(invalid)?)?;
+                    let next = block["offset"].as_u64().ok_or_else(invalid)?;
+                    let done = block["done"].as_bool().ok_or_else(invalid)?;
+                    if offset.checked_add(bytes.len() as u64) != Some(next)
+                        || (bytes.is_empty() && !done)
+                    {
+                        return Err(invalid());
+                    }
+                    Ok((Bytes::from(bytes), done))
+                });
+                Some(match block {
+                    Ok((bytes, done)) => {
+                        let next = offset + bytes.len() as u64;
+                        (Ok(bytes), (!done).then_some((session, next)))
+                    }
+                    Err(_) => (Err(std::io::Error::other("desktop file read failed")), None),
+                })
+            },
+        );
+        return (
+            [
+                (header::CONTENT_TYPE, "application/octet-stream"),
+                (header::CACHE_CONTROL, "no-store"),
+            ],
+            Body::from_stream(stream),
+        )
+            .into_response();
+    }
     let result = if value["action"] == "input.release" {
         desktop_cleanup(move || session.endpoint(&value)).await
     } else if value["action"]
@@ -616,6 +712,55 @@ pub async fn endpoint(
     match result {
         Ok(v) => success(v, &request_id).into_response(),
         Err(e) => failure(&e, &request_id).into_response(),
+    }
+}
+
+async fn write_file_stream(
+    session: Arc<crate::business::desk_session::DeskSession>,
+    transfer_id: i32,
+    body: Body,
+) -> Result<u64, ApiError> {
+    use futures_util::StreamExt;
+
+    const BLOCK: usize = 128 * 1024;
+    let mut stream = body.into_data_stream();
+    let mut pending = Vec::with_capacity(BLOCK);
+    let mut offset = 0_u64;
+    loop {
+        let frame = stream.next().await.transpose().map_err(|_| {
+            ApiError::new(400, codes::INVALID_REQUEST, "file upload stream interrupted")
+        })?;
+        let done = frame.is_none();
+        let mut bytes = frame.as_deref().unwrap_or_default();
+        while !bytes.is_empty() || (done && !pending.is_empty()) {
+            let count = bytes.len().min(BLOCK - pending.len());
+            pending.extend_from_slice(&bytes[..count]);
+            bytes = &bytes[count..];
+            if pending.len() == BLOCK || done {
+                let length = pending.len() as u64;
+                let worker = session.clone();
+                pending = desktop_file(move || {
+                    #[cfg(all(windows, feature = "desk-engine"))]
+                    worker.write_file_block(transfer_id, offset, &pending)?;
+                    #[cfg(not(all(windows, feature = "desk-engine")))]
+                    {
+                        let reply = worker.endpoint(&json!({
+                            "action": "files.write", "transfer_id": transfer_id,
+                            "offset": offset, "data": base64_encode(&pending),
+                        }))?;
+                        if reply["offset"].as_u64() != Some(offset + length) {
+                            return Err(ApiError::new(500, codes::DESK_ENGINE, "invalid upload cursor"));
+                        }
+                    }
+                    pending.clear();
+                    Ok(pending)
+                }).await?;
+                offset += length;
+            }
+        }
+        if done {
+            return Ok(offset);
+        }
     }
 }
 

@@ -7,5 +7,6 @@
     "products"
   ],
   "migration": "native-plugin-abi-v1",
-  "android_and_devices_upstream_commit": "c0975f27b05dc33dd303742cea519f390552fb4c"
+  "android_and_devices_upstream_commit": "c0975f27b05dc33dd303742cea519f390552fb4c",
+  "viewer_resume_and_binary_files_upstream_commit": "bdd69273495ec7cfe9b6b2750416959c7777ec39"
 }

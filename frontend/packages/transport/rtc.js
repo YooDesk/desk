@@ -12,6 +12,7 @@ export async function connectRTC({
   context,
   grant,
   getGrant,
+  acceptCarrier,
   timeoutMs = 15000,
   signal,
 }) {
@@ -19,9 +20,10 @@ export async function connectRTC({
   if (!configuration || !signaling || typeof signaling.onClose !== 'function' || timeoutMs <= 0)
     throw new TypeError('explicit RTC configuration and signaling required');
   const pc = new RTCPeerConnection(configuration);
-  const channel = pc.createDataChannel('raccess.data.v2', {
+  const label = acceptCarrier ? 'raccess.resume.v1' : 'raccess.data.v2';
+  const channel = pc.createDataChannel(label, {
     ordered: true,
-    protocol: 'raccess.data.v2',
+    protocol: label,
   });
   let resolve;
   let reject;
@@ -41,6 +43,26 @@ export async function connectRTC({
     unsubscribeClosed();
     unsubscribeLocal();
     signal?.removeEventListener('abort', abort);
+  };
+  const closePeer = () => {
+    cleanup();
+    pc.close();
+  };
+  const selectedPair = async () => {
+    const stats = await pc.getStats();
+    const transport = [...stats.values()].find(
+      (entry) => entry.type === 'transport' && entry.selectedCandidatePairId,
+    );
+    const pair = transport && stats.get(transport.selectedCandidatePairId);
+    const local = pair && stats.get(pair.localCandidateId);
+    const remote = pair && stats.get(pair.remoteCandidateId);
+    if (!pair || !local || !remote) throw new Error('selected ICE candidate pair unavailable');
+    return {
+      local: local.candidateType,
+      remote: remote.candidateType,
+      bytesSent: pair.bytesSent,
+      bytesReceived: pair.bytesReceived,
+    };
   };
   const fail = (error) => {
     if (done) {
@@ -99,6 +121,18 @@ export async function connectRTC({
     () => {
       void (async () => {
         if (done) return;
+        if (acceptCarrier) {
+          channel.addEventListener('close', closePeer, { once: true });
+          await acceptCarrier(channel, selectedPair);
+          if (done) return;
+          done = true;
+          unsubscribe();
+          unsubscribeLocal();
+          clearTimeout(timer);
+          signal?.removeEventListener('abort', abort);
+          resolve({ selectedPair, close: closePeer });
+          return;
+        }
         mux = dataChannelMux(channel, () => {
           cleanup();
           pc.close();
@@ -124,23 +158,7 @@ export async function connectRTC({
             mux._close();
             pc.close();
           },
-          async selectedPair() {
-            const stats = await pc.getStats();
-            const transport = [...stats.values()].find(
-              (s) => s.type === 'transport' && s.selectedCandidatePairId,
-            );
-            const pair = transport && stats.get(transport.selectedCandidatePairId);
-            const local = pair && stats.get(pair.localCandidateId);
-            const remote = pair && stats.get(pair.remoteCandidateId);
-            if (!pair || !local || !remote)
-              throw new Error('selected ICE candidate pair unavailable');
-            return {
-              local: local.candidateType,
-              remote: remote.candidateType,
-              bytesSent: pair.bytesSent,
-              bytesReceived: pair.bytesReceived,
-            };
-          },
+          selectedPair,
         });
       })().catch(fail);
     },

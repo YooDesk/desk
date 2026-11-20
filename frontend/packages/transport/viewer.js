@@ -4,6 +4,9 @@ import { releaseSession } from './release.js';
 import { maintainSessionLease } from './lease.js';
 import { signalSubprotocols } from './protocols.js';
 import { installShim } from './shim.js';
+import { SignalControl } from './signaling.js';
+import { connectResumableSession } from './resume-session.js';
+import { ConnectivityError } from './rtc.js';
 
 export async function attachViewer(productID) {
   let owner = window;
@@ -98,8 +101,8 @@ export async function connectViewer(productID, recovery) {
   const origin = location.origin;
   const requestedTransport = new URLSearchParams(location.search).get('transport');
   const requestedPath =
-    requestedTransport === 'wss' ? 'websocket' : requestedTransport || undefined;
-  if (requestedPath !== undefined && !['stun', 'turn', 'websocket'].includes(requestedPath))
+    requestedTransport === 'wss' ? 'websocket' : requestedTransport || 'resume';
+  if (!['stun', 'turn', 'websocket', 'resume'].includes(requestedPath))
     throw new TypeError('invalid viewer transport');
   const nativeFetch = recovery?.nativeFetch ?? globalThis.fetch.bind(globalThis);
   const NativeWebSocket = recovery?.NativeWebSocket ?? globalThis.WebSocket;
@@ -232,7 +235,7 @@ export async function connectViewer(productID, recovery) {
       targetID: authorized.target_id,
     };
     common = { origin, productID, csrfToken, fetchImpl: nativeFetch };
-    link = await connectPreferredControl({
+    const selection = {
       requestedPath,
       context,
       policy: created.policy,
@@ -300,7 +303,79 @@ export async function connectViewer(productID, recovery) {
           if (budget.signal.aborted) fail();
         });
       },
-    });
+    };
+    if (requestedPath === 'resume') {
+      if (created.policy.allowWSS !== true) throw new Error('viewer WSS policy denied');
+      const budget = {
+        signal: selection.signal,
+        remaining: () => Math.max(1, Math.ceil(selectionDeadline - performance.now())),
+      };
+      const approved = await selection.prepare('resume', budget);
+      let control;
+      let socket;
+      try {
+        socket = await selection.openSignal(approved, budget);
+        control = new SignalControl(socket, {
+          connectionGeneration: approved.connectionGeneration,
+          sessionID: approved.context.sessionID,
+          negotiationGeneration: approved.context.generation,
+        });
+        maintain(control, approved.session);
+        const options = { signal: budget.signal, timeoutMs: budget.remaining() };
+        await control.requestRelay(options);
+        const resumed = await connectResumableSession({
+          context: approved.context,
+          grant: authorized.grant,
+          signal: abort.signal,
+          policy: created.policy,
+          async prepareCarrier(path, { signal }) {
+            if (path === 'websocket') return {
+              url: approved.url,
+              deviceBind: { ...approved.deviceBind, token: authorized.grant },
+            };
+            const ice = await control.requestCarrierICE(path, { signal, timeoutMs: 23000 });
+            if (!ice) throw new ConnectivityError('candidate ICE unavailable');
+            const turn = path === 'turn';
+            if (ice.ice_transport_policy !== (turn ? 'relay' : 'all') || ice.ice_servers.some((server) => {
+              const relay = server.urls.every((url) => /^turns?:/.test(url));
+              const direct = server.urls.every((url) => /^stuns?:/.test(url));
+              return !server.urls.length || (relay ? path === 'stun' || !server.username || !server.credential
+                : turn || !direct || server.username || server.credential);
+            }))
+              throw new Error('unauthorized candidate ICE configuration');
+            const turnExpiries = ice.ice_servers.filter((server) => server.username)
+              .map((server) => Date.parse(server.credential_expires_at));
+            return {
+              turnCredentialExpiresAt: Math.min(...turnExpiries),
+              configuration: { iceTransportPolicy: ice.ice_transport_policy,
+                iceServers: ice.ice_servers.map(({ urls, username, credential }) => ({ urls, ...(username ? { username, credential } : {}) })) },
+              signaling: {
+                onClose: (listener) => control.onClose(listener),
+                onCandidate: (listener) => control.onCandidate(listener),
+                sendCandidate: (candidate) => control.sendCandidate(candidate),
+                exchangeOffer: (offer) => control.exchangeOffer(offer, { signal }),
+              },
+            };
+          },
+        });
+        link = {
+          ...resumed,
+          get path() { return resumed.path; },
+          signalControl: control,
+          async close() {
+            resumed.close();
+            try { await approved.dispose(); } finally { control.close(); }
+          },
+        };
+        control.onClose(() => { void failed(); });
+      } catch (error) {
+        socket?.close();
+        await approved.dispose().catch(() => {});
+        throw error;
+      }
+    } else {
+      link = await connectPreferredControl(selection);
+    }
     if (closed) {
       await link.close();
       throw abort.signal.reason;
@@ -316,6 +391,7 @@ export async function connectViewer(productID, recovery) {
       productID,
       origin,
       state,
+      ...(requestedPath === 'resume' ? { switchTransport: link.switchTo } : {}),
       // Only the top-level Desk owns this grant. Re-enter the normal device
       // launch route after a connector restart; never reuse the old grant.
       async reconnect(signal) {

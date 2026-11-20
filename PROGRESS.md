@@ -25,3 +25,7 @@ Migrated upstream `c0975f27b05dc33dd303742cea519f390552fb4c` with the standalone
 - build.yml: success; release `v0.1.0-ci.134`; run https://github.com/YooDesk/desk/actions/runs/43190276794; tested commit `66e429c7160867ad35fe338f028d5a9bb98e0296`.
 Android builds use ARM64, API 24 and NDK 26.1.10909125 with 16 KiB ELF load alignment. Actual Android-device acceptance remains pending.
 Original repository visibility and workflow activation were restored after the build. Documentation-only acceptance commits do not change the tested executable source.
+
+## 2026-11-20 local migration validation
+
+Independent release builds and the real five-route concurrent Windows Desk pressure test passed. Each route completed 500 MiB in each direction and 100 small-file round trips with zero decode/chunk errors. The four Gateway routes covered every directed WSS/STUN/TURN switch and in-flight RTC recovery. Native Host media reconnect restored decoding in 1,241 ms. Details: `E:/YooDeskGroup/gateway/docs/acceptance-20261120.md`.

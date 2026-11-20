@@ -240,6 +240,22 @@ export class SignalControl {
     );
   }
 
+  async requestCarrierICE(path, options) {
+    if (!['stun', 'turn', 'mixed'].includes(path)) throw new TypeError('invalid candidate path');
+    this.#candidates.length = 0;
+    this.#candidateCount = 0;
+    const reply = await this.#request('relay_request', {
+      negotiation_generation: this.#binding.negotiationGeneration,
+      candidate_path: path,
+    }, 'relay_ready', options);
+    if (reply.candidate_path !== path || typeof reply.available !== 'boolean')
+      throw new TypeError('invalid candidate response');
+    if (!reply.available) return null;
+    if (!reply.ice_config || Date.parse(reply.ice_config.expires_at) <= Date.now())
+      throw new StaleControlError('expired or missing candidate ICE snapshot');
+    return reply.ice_config;
+  }
+
   onCandidate(listener) {
     if (this.#closed) throw this.#closed;
     if (typeof listener !== 'function' || this.#listeners.size >= 8)

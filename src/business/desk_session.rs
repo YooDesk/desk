@@ -36,7 +36,7 @@ const CAPTURE_TIMEOUT: Duration = Duration::from_millis(120);
 const STREAM_ATTACH_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// 默认会话上限：本机单用户场景，限制并发采集占用。
-pub const DEFAULT_MAX_SESSIONS: usize = 4;
+pub const DEFAULT_MAX_SESSIONS: usize = 5;
 
 /// 会话所有权：只允许创建它的本地访问会话访问。
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -368,6 +368,25 @@ impl DeskSession {
                 "endpoint extensions require desk-engine",
             ))
         }
+    }
+
+    #[cfg(all(windows, feature = "desk-engine"))]
+    pub(crate) fn write_file_block(&self, id: i32, offset: u64, bytes: &[u8]) -> Result<(), ApiError> {
+        self.require_active_endpoint()?;
+        let _guard = self.endpoint_lock.lock().unwrap_or_else(|error| error.into_inner());
+        self.require_active_endpoint()?;
+        if self.read_only {
+            return Err(ApiError::new(403, codes::FORBIDDEN, "session is read-only"));
+        }
+        crate::desk::engine::rpc::write_file_block(self.engine_conn, id, offset, bytes)
+    }
+
+    #[cfg(all(windows, feature = "desk-engine"))]
+    pub(crate) fn read_file_block(&self, id: i32, offset: u64) -> Result<(Vec<u8>, bool), ApiError> {
+        self.require_active_endpoint()?;
+        let _guard = self.endpoint_lock.lock().unwrap_or_else(|error| error.into_inner());
+        self.require_active_endpoint()?;
+        crate::desk::engine::rpc::read_file_block(self.engine_conn, id, offset)
     }
 
     /// 流控绑定本会话，和关闭串行；只读观众也必须能够确认视频。

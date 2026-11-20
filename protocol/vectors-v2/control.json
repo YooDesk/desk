@@ -1,5 +1,29 @@
 [
   {
+    "name": "resume_second_round_mixed_allowed",
+    "valid": true,
+    "message": {
+      "v": 2,
+      "type": "relay_request",
+      "request_id": "carrier-mixed",
+      "connection_generation": "3",
+      "session_id": "remote-1",
+      "payload": { "negotiation_generation": "2", "candidate_path": "mixed" }
+    }
+  },
+  {
+    "name": "resume_unknown_candidate_path_rejected",
+    "valid": false,
+    "message": {
+      "v": 2,
+      "type": "relay_request",
+      "request_id": "carrier-invalid",
+      "connection_generation": "3",
+      "session_id": "remote-1",
+      "payload": { "negotiation_generation": "2", "candidate_path": "any" }
+    }
+  },
+  {
     "name": "renew_has_new_grant",
     "valid": true,
     "message": {

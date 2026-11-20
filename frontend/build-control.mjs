@@ -85,7 +85,6 @@ const source = await format(
 );
 const outputs = [
   [new URL('packages/transport/control-schema.js', import.meta.url), source],
-  [new URL('gateway/internal/control/schema.json', root), input],
 ];
 for (const [path, expected] of outputs) {
   if (process.argv.includes('--write')) await writeFile(path, expected, 'utf8');

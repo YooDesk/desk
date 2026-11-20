@@ -234,6 +234,49 @@ extern "C" {
         cap: usize,
     ) -> i32;
     fn yd_engine_file_close(conn: i32) -> i32;
+    #[cfg(windows)]
+    fn yd_engine_file_write(conn: i32, id: i32, offset: u64, data: *const u8, len: usize) -> i32;
+    #[cfg(windows)]
+    fn yd_engine_file_read(conn: i32, id: i32, offset: u64, out: *mut u8, cap: usize, done: *mut u8) -> i32;
+}
+
+#[cfg(windows)]
+pub(crate) fn write_file_block(conn: i32, id: i32, offset: u64, bytes: &[u8]) -> Result<(), ApiError> {
+    native_file_operation(conn, || {
+        let status = unsafe { yd_engine_file_write(conn, id, offset, bytes.as_ptr(), bytes.len()) };
+        match status {
+            0 => Ok(()),
+            -400 => Err(ApiError::new(400, codes::INVALID_REQUEST, "invalid upload block")),
+            -404 => Err(ApiError::new(404, codes::NOT_FOUND, "transfer not found")),
+            -409 => Err(ApiError::new(409, codes::STATE_CONFLICT, "upload offset mismatch")),
+            _ => Err(unavailable()),
+        }
+    })
+}
+
+#[cfg(windows)]
+pub(crate) fn read_file_block(conn: i32, id: i32, offset: u64) -> Result<(Vec<u8>, bool), ApiError> {
+    native_file_operation(conn, || {
+        let mut bytes = vec![0; 128 * 1024];
+        let mut done = 0;
+        let count = unsafe {
+            yd_engine_file_read(conn, id, offset, bytes.as_mut_ptr(), bytes.len(), &mut done)
+        };
+        if count < 0 || count as usize > bytes.len() {
+            return Err(unavailable());
+        }
+        bytes.truncate(count as usize);
+        Ok((bytes, done != 0))
+    })
+}
+
+#[cfg(windows)]
+fn native_file_operation<T>(conn: i32, operation: impl FnOnce() -> Result<T, ApiError>) -> Result<T, ApiError> {
+    if enabled() {
+        files_operation(conn, operation, || close_files(conn))
+    } else {
+        operation()
+    }
 }
 
 pub(super) fn close_files(conn: i32) {
@@ -255,11 +298,11 @@ pub(super) fn files(conn: i32, value: &Value) -> Result<Value, ApiError> {
 }
 // 原生文件IO由独立任务锁串行，不可持全局代理锁；慢文件系统不能阻塞切代或媒体。
 #[cfg(any(test, not(any(target_os = "linux", target_os = "macos"))))]
-fn files_operation(
+fn files_operation<T>(
     conn: i32,
-    operation: impl FnOnce() -> Result<Value, ApiError>,
+    operation: impl FnOnce() -> Result<T, ApiError>,
     cleanup: impl FnOnce(),
-) -> Result<Value, ApiError> {
+) -> Result<T, ApiError> {
     let guard = state().lock().unwrap_or_else(|e| e.into_inner());
     if !guard.enabled || guard.connections.get(&conn) != Some(&guard.generation) {
         return Err(unavailable());

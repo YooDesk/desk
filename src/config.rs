@@ -68,7 +68,7 @@ fn default_bitrate() -> u32 {
 }
 
 fn default_max_sessions() -> usize {
-    4
+    crate::business::desk_session::DEFAULT_MAX_SESSIONS
 }
 
 /// 配置错误：启动阶段直接失败，不做默认值兜底。
@@ -265,6 +265,17 @@ pub(crate) mod tests {
     #[test]
     fn valid_config_passes() {
         assert!(test_config().validate().is_ok());
+    }
+
+    #[test]
+    fn desk_sessions_default_to_five_and_keep_explicit_limits() {
+        let mut value = serde_json::to_value(test_config()).unwrap();
+        assert_eq!(
+            serde_json::from_value::<Config>(value.clone()).unwrap().max_sessions,
+            4
+        );
+        value.as_object_mut().unwrap().remove("max_sessions");
+        assert_eq!(serde_json::from_value::<Config>(value).unwrap().max_sessions, 5);
     }
 
     #[test]

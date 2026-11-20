@@ -1037,6 +1037,11 @@ fn files_with_context(
         return Ok(json!({"transfer_id":id,"size":size,"name":name}));
     }
     let id = i32::try_from(number(v, "transfer_id")?).map_err(invalid)?;
+    if action == "files.read" {
+        let offset = number(v, "offset")?;
+        let (bytes, done) = read_file_block(conn, id, offset, guard, rt)?;
+        return Ok(json!({"data":STANDARD.encode(&bytes),"offset":offset + bytes.len() as u64,"done":done}));
+    }
     let job = guard
         .get_mut(&id)
         .filter(|j| j.conn == conn)
@@ -1104,59 +1109,66 @@ fn files_with_context(
         return Err(fault(409, "transfer offset mismatch"));
     }
     if action == "files.write" {
-        if job.destination.is_none() {
-            return Err(fault(400, "upload required"));
-        }
         let bytes = STANDARD.decode(string(v, "data")?).map_err(invalid)?;
-        if bytes.is_empty() || bytes.len() > CHUNK || job.offset + bytes.len() as u64 > job.size {
-            return Err(fault(400, "invalid upload block"));
-        }
-        let length = bytes.len() as u64;
-        let payload = job
-            .upload
-            .as_mut()
-            .ok_or_else(|| fault(409, "upload finalized"))?;
-        payload
-            .0
-            .seek(SeekFrom::Start(job.offset))
-            .map_err(engine_error)?;
-        payload.0.write_all(&bytes).map_err(engine_error)?;
-        job.offset += length;
+        write_file_block(job, &bytes)?;
         return Ok(json!({"offset":job.offset}));
     }
-    if action == "files.read" {
-        if job.destination.is_some() {
-            return Err(fault(400, "download required"));
-        }
-        let transfer = job
-            .transfer
-            .as_mut()
-            .ok_or_else(|| fault(409, "transfer finalized"))?;
-        rt.block_on(transfer.init_data_stream_for_cm())
-            .map_err(engine_error)?;
-        let block = rt.block_on(transfer.read()).map_err(engine_error)?;
-        let bytes = match block {
-            Some(b) => {
-                if b.compressed {
-                    hbb_common::compress::decompress(&b.data)
-                } else {
-                    b.data.to_vec()
-                }
-            }
-            None => Vec::new(),
-        };
-        job.offset += bytes.len() as u64;
-        if job.offset > job.size || (bytes.is_empty() && job.offset != job.size) {
-            return Err(fault(409, "file changed during download"));
-        }
-        let done = job.offset == job.size;
-        let result = json!({"data":STANDARD.encode(&bytes),"offset":job.offset,"done":done});
-        if done {
-            guard.remove(&id);
-        }
-        return Ok(result);
-    }
     Err(fault(400, "unknown file action"))
+}
+
+fn write_file_block(job: &mut Job, bytes: &[u8]) -> Result<(), Fault> {
+    if job.destination.is_none() {
+        return Err(fault(400, "upload required"));
+    }
+    if bytes.is_empty() || bytes.len() > CHUNK || job.offset + bytes.len() as u64 > job.size {
+        return Err(fault(400, "invalid upload block"));
+    }
+    let payload = job
+        .upload
+        .as_mut()
+        .ok_or_else(|| fault(409, "upload finalized"))?;
+    payload.0.seek(SeekFrom::Start(job.offset)).map_err(engine_error)?;
+    payload.0.write_all(bytes).map_err(engine_error)?;
+    job.offset += bytes.len() as u64;
+    Ok(())
+}
+
+fn read_file_block(
+    conn: i32,
+    id: i32,
+    offset: u64,
+    guard: &mut HashMap<i32, Job>,
+    rt: &tokio::runtime::Runtime,
+) -> Result<(Vec<u8>, bool), Fault> {
+    let job = guard
+        .get_mut(&id)
+        .filter(|job| job.conn == conn)
+        .ok_or_else(|| fault(404, "transfer not found"))?;
+    if offset != job.offset {
+        return Err(fault(409, "transfer offset mismatch"));
+    }
+    if job.destination.is_some() {
+        return Err(fault(400, "download required"));
+    }
+    let transfer = job
+        .transfer
+        .as_mut()
+        .ok_or_else(|| fault(409, "transfer finalized"))?;
+    rt.block_on(transfer.init_data_stream_for_cm()).map_err(engine_error)?;
+    let bytes = match rt.block_on(transfer.read()).map_err(engine_error)? {
+        Some(block) if block.compressed => hbb_common::compress::decompress(&block.data),
+        Some(block) => block.data.to_vec(),
+        None => Vec::new(),
+    };
+    job.offset += bytes.len() as u64;
+    if job.offset > job.size || (bytes.is_empty() && job.offset != job.size) {
+        return Err(fault(409, "file changed during download"));
+    }
+    let done = job.offset == job.size;
+    if done {
+        guard.remove(&id);
+    }
+    Ok((bytes, done))
 }
 
 fn privacy_supported() -> bool {
@@ -1583,6 +1595,61 @@ pub extern "C" fn yd_engine_file_endpoint(
 pub extern "C" fn yd_engine_file_close(conn: c_int) -> c_int {
     jobs().lock().unwrap().retain(|_, job| job.conn != conn);
     0
+}
+
+#[cfg(windows)]
+#[no_mangle]
+pub extern "C" fn yd_engine_file_write(
+    conn: c_int,
+    id: c_int,
+    offset: u64,
+    data: *const u8,
+    len: usize,
+) -> c_int {
+    if data.is_null() || len == 0 || len > CHUNK {
+        return -400;
+    }
+    let mut guard = jobs().lock().unwrap();
+    let Some(job) = guard.get_mut(&id).filter(|job| job.conn == conn) else {
+        return -404;
+    };
+    if job.offset != offset {
+        return -409;
+    }
+    let bytes = unsafe { std::slice::from_raw_parts(data, len) };
+    match write_file_block(job, bytes) {
+        Ok(()) => 0,
+        Err(error) => -c_int::from(error.status),
+    }
+}
+
+#[cfg(windows)]
+#[no_mangle]
+pub extern "C" fn yd_engine_file_read(
+    conn: c_int,
+    id: c_int,
+    offset: u64,
+    out: *mut u8,
+    cap: usize,
+    done: *mut u8,
+) -> c_int {
+    if out.is_null() || done.is_null() || cap < CHUNK {
+        return -400;
+    }
+    let result = runtime().and_then(|rt| {
+        read_file_block(conn, id, offset, &mut jobs().lock().unwrap(), rt)
+    });
+    match result {
+        Ok((bytes, finished)) if bytes.len() <= cap => {
+            unsafe {
+                std::ptr::copy_nonoverlapping(bytes.as_ptr(), out, bytes.len());
+                done.write(u8::from(finished));
+            }
+            bytes.len() as c_int
+        }
+        Ok(_) => -500,
+        Err(error) => -c_int::from(error.status),
+    }
 }
 
 #[cfg(any(target_os = "linux", target_os = "macos"))]

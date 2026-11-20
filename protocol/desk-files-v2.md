@@ -37,6 +37,18 @@ Windows 先显示“我的电脑”，再选择 `C:\`、`D:\` 等磁盘。此次
 | `{action:"files.commit",transfer_id}` | `{committed:true,name}`，name可能在提交冲突时再次改变 |
 | `{action:"files.download",path,root_id?}` | `{transfer_id,size}`，后续 read 不再携带位置 |
 
+下载可在现有 `files.read` 请求中指定 `Accept: application/octet-stream`。
+请求仍携带 `transfer_id` 和起始 `offset`，并沿用原会话、权限及 CSRF 校验。
+成功响应以原始字节从该偏移流式传到文件末尾，HTTP 分块不代表文件块边界；客户端必须核对总长度。
+流中读取失败时响应流中止，不追加 JSON 错误作为文件内容。未指定该 Accept 时仍返回旧的 JSON 单块响应。
+远程 Viewer 继续使用同一 yamux 会话，载体切换不需要重发 HTTP 请求。
+
+上传在 `files.upload` 创建任务后，可向同一端点 POST 原始请求体，指定
+`Content-Type: application/octet-stream` 和 `X-Desk-Transfer-ID`（十进制任务 ID）。
+请求从偏移零开始；服务器逐段按已声明大小校验并写入，不自动提交。成功响应仍为 JSON envelope，
+`data.offset` 必须等于声明大小才能提交。出错或取消时沿用 `files.cancel` 回收暂存文件，
+不能自动重发未确认的上传请求。旧 `files.write` JSON 请求继续受支持。
+
 `root_id` 只能为 `default`、`system`、`drive-A` 至 `drive-Z`，并且必须实际由当前平台枚举。
 省略或使用 `default` 时，仍使用原 `YOODESK_DESK_FILE_ROOT`/默认 Downloads/YooDesk 目录。
 `system` 只用于 Unix；Windows 使用对应磁盘 ID。“我的电脑”是前端的虚拟列表，不是可写路径。

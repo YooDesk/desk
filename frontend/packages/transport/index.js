@@ -10,4 +10,5 @@ export { maintainSessionLease } from './lease.js';
 export { releaseSession } from './release.js';
 export { signalSubprotocols, relaySubprotocols } from './protocols.js';
 export { connectPreferred } from './preferred.js';
+export { connectResumableSession } from './resume-session.js';
 export { connectPreferredControl } from './preferred-control.js';

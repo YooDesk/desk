@@ -1,5 +1,5 @@
 // 文件导航与有界传输队列。每项绑定选中文件时的目录、会话和输入代次。
-window.createDeskFiles = function ({ request, api, state }) {
+window.createDeskFiles = function ({ request, api, state, fileStreams }) {
   const el = (id) => document.getElementById(id);
   const diagnostic = () => (window.__yoodeskDesk ||= {});
   const MAX_PENDING = 32;
@@ -546,6 +546,7 @@ window.createDeskFiles = function ({ request, api, state }) {
     if (!pending(task) || ["committing", "saving"].includes(task.status))
       return;
     task.cancelled = true;
+    task.streamController?.abort();
     task.status = "cancelled";
     task.error = reason;
     renderTasks();
@@ -602,6 +603,22 @@ window.createDeskFiles = function ({ request, api, state }) {
     task.status = task.direction === "upload" ? "uploading" : "downloading";
     renderTasks();
     if (task.direction === "upload") {
+      if (fileStreams && task.size > 0) {
+        const controller = new AbortController();
+        task.streamController = controller;
+        try {
+          const response = await request(
+            "POST", `${api}/sessions/${task.session}/endpoint/`,
+            task.file, controller.signal, false, task.id,
+          );
+          ensureCurrent(task);
+          if (response.offset !== task.size) throw new Error("Incomplete file upload stream");
+          task.offset = response.offset;
+          reportProgress(task);
+        } finally {
+          task.streamController = undefined;
+        }
+      }
       while (task.offset < task.size) {
         ensureCurrent(task);
         const bytes = new Uint8Array(
@@ -637,6 +654,34 @@ window.createDeskFiles = function ({ request, api, state }) {
     } else {
       const blocks = [];
       let done = false;
+      if (fileStreams) {
+        const controller = new AbortController();
+        task.streamController = controller;
+        let reader;
+        try {
+          const stream = await request(
+            'POST', `${api}/sessions/${task.session}/endpoint/`,
+            { action: 'files.read', transfer_id: task.id, offset: task.offset },
+            controller.signal,
+            true,
+          );
+          reader = stream.getReader();
+          while (true) {
+            const block = await reader.read();
+            ensureCurrent(task);
+            if (block.done) break;
+            task.offset += block.value.byteLength;
+            if (task.offset > task.size) throw new Error('File stream exceeds expected size');
+            blocks.push(block.value);
+            reportProgress(task);
+          }
+          done = true;
+        } finally {
+          if (!done) controller.abort();
+          reader?.releaseLock();
+          task.streamController = undefined;
+        }
+      }
       while (!done) {
         ensureCurrent(task);
         const response = await endpoint(
@@ -802,6 +847,7 @@ window.createDeskFiles = function ({ request, api, state }) {
       for (const task of tasks) {
         if (pending(task)) {
           task.cancelled = true;
+          task.streamController?.abort();
           task.status = "cancelled";
           task.error = "连接已断开，请重新选择文件";
         }

@@ -12,9 +12,9 @@ var __commonJS = (cb, mod) =>
     }
   };
 
-// frontend/node_modules/ajv/dist/runtime/ucs2length.js
+// node_modules/ajv/dist/runtime/ucs2length.js
 var require_ucs2length = __commonJS({
-  'frontend/node_modules/ajv/dist/runtime/ucs2length.js'(exports) {
+  'node_modules/ajv/dist/runtime/ucs2length.js'(exports) {
     'use strict';
     Object.defineProperty(exports, '__esModule', { value: true });
     function ucs2length(str) {
@@ -37,9 +37,9 @@ var require_ucs2length = __commonJS({
   },
 });
 
-// frontend/node_modules/ajv-formats/dist/formats.js
+// node_modules/ajv-formats/dist/formats.js
 var require_formats = __commonJS({
-  'frontend/node_modules/ajv-formats/dist/formats.js'(exports) {
+  'node_modules/ajv-formats/dist/formats.js'(exports) {
     'use strict';
     Object.defineProperty(exports, '__esModule', { value: true });
     exports.formatNames = exports.fastFormats = exports.fullFormats = void 0;
@@ -245,9 +245,9 @@ var require_formats = __commonJS({
   },
 });
 
-// frontend/control-schema.cjs
+// control-schema.cjs
 var require_control_schema = __commonJS({
-  'frontend/control-schema.cjs'(exports, module) {
+  'control-schema.cjs'(exports, module) {
     module.exports = validate20;
     module.exports.default = validate20;
     var schema31 = {
@@ -456,6 +456,7 @@ var require_control_schema = __commonJS({
         payload_session_open: {
           type: 'object',
           properties: {
+            resume: { type: 'boolean' },
             grant: { type: 'string', minLength: 1, maxLength: 16384 },
             ice_config: { $ref: '#/$defs/ice_config' },
             capability: { type: 'string', minLength: 1, maxLength: 128 },
@@ -529,13 +530,21 @@ var require_control_schema = __commonJS({
         },
         payload_relay_request: {
           type: 'object',
-          properties: { negotiation_generation: { type: 'string', pattern: '^[1-9][0-9]{0,19}$' } },
+          properties: {
+            candidate_path: { enum: ['stun', 'turn', 'mixed'] },
+            negotiation_generation: { type: 'string', pattern: '^[1-9][0-9]{0,19}$' },
+          },
           required: ['negotiation_generation'],
           additionalProperties: false,
         },
         payload_relay_ready: {
           type: 'object',
-          properties: { negotiation_generation: { type: 'string', pattern: '^[1-9][0-9]{0,19}$' } },
+          properties: {
+            candidate_path: { enum: ['stun', 'turn', 'mixed'] },
+            available: { type: 'boolean' },
+            ice_config: { $ref: '#/$defs/ice_config' },
+            negotiation_generation: { type: 'string', pattern: '^[1-9][0-9]{0,19}$' },
+          },
           required: ['negotiation_generation'],
           additionalProperties: false,
         },
@@ -849,6 +858,15 @@ var require_control_schema = __commonJS({
         negotiation_generation: { type: 'string', pattern: '^[1-9][0-9]{0,19}$' },
       },
       required: ['candidate', 'negotiation_generation'],
+      additionalProperties: false,
+    };
+    var schema48 = {
+      type: 'object',
+      properties: {
+        candidate_path: { enum: ['stun', 'turn', 'mixed'] },
+        negotiation_generation: { type: 'string', pattern: '^[1-9][0-9]{0,19}$' },
+      },
+      required: ['negotiation_generation'],
       additionalProperties: false,
     };
     var func1 = require_ucs2length().default;
@@ -2734,6 +2752,7 @@ var require_control_schema = __commonJS({
             const _errs1 = errors;
             for (const key0 in data) {
               if (!(
+                key0 === 'resume' ||
                 key0 === 'grant' ||
                 key0 === 'ice_config' ||
                 key0 === 'capability' ||
@@ -2753,167 +2772,136 @@ var require_control_schema = __commonJS({
               }
             }
             if (_errs1 === errors) {
-              if (data.grant !== void 0) {
-                let data0 = data.grant;
+              if (data.resume !== void 0) {
                 const _errs2 = errors;
-                if (errors === _errs2) {
-                  if (typeof data0 === 'string') {
-                    if (func1(data0) > 16384) {
-                      validate27.errors = [
-                        {
-                          instancePath: instancePath + '/grant',
-                          schemaPath: '#/properties/grant/maxLength',
-                          keyword: 'maxLength',
-                          params: { limit: 16384 },
-                          message: 'must NOT have more than 16384 characters',
-                        },
-                      ];
-                      return false;
-                    } else {
-                      if (func1(data0) < 1) {
-                        validate27.errors = [
-                          {
-                            instancePath: instancePath + '/grant',
-                            schemaPath: '#/properties/grant/minLength',
-                            keyword: 'minLength',
-                            params: { limit: 1 },
-                            message: 'must NOT have fewer than 1 characters',
-                          },
-                        ];
-                        return false;
-                      }
-                    }
-                  } else {
-                    validate27.errors = [
-                      {
-                        instancePath: instancePath + '/grant',
-                        schemaPath: '#/properties/grant/type',
-                        keyword: 'type',
-                        params: { type: 'string' },
-                        message: 'must be string',
-                      },
-                    ];
-                    return false;
-                  }
+                if (typeof data.resume !== 'boolean') {
+                  validate27.errors = [
+                    {
+                      instancePath: instancePath + '/resume',
+                      schemaPath: '#/properties/resume/type',
+                      keyword: 'type',
+                      params: { type: 'boolean' },
+                      message: 'must be boolean',
+                    },
+                  ];
+                  return false;
                 }
                 var valid0 = _errs2 === errors;
               } else {
                 var valid0 = true;
               }
               if (valid0) {
-                if (data.ice_config !== void 0) {
-                  let data1 = data.ice_config;
+                if (data.grant !== void 0) {
+                  let data1 = data.grant;
                   const _errs4 = errors;
-                  const _errs5 = errors;
-                  if (errors === _errs5) {
-                    if (data1 && typeof data1 == 'object' && !Array.isArray(data1)) {
-                      let missing1;
-                      if (
-                        (data1.revision === void 0 && (missing1 = 'revision')) ||
-                        (data1.policy_revision === void 0 && (missing1 = 'policy_revision')) ||
-                        (data1.expires_at === void 0 && (missing1 = 'expires_at')) ||
-                        (data1.ice_transport_policy === void 0 &&
-                          (missing1 = 'ice_transport_policy')) ||
-                        (data1.allow_wss === void 0 && (missing1 = 'allow_wss')) ||
-                        (data1.ice_servers === void 0 && (missing1 = 'ice_servers'))
-                      ) {
+                  if (errors === _errs4) {
+                    if (typeof data1 === 'string') {
+                      if (func1(data1) > 16384) {
                         validate27.errors = [
                           {
-                            instancePath: instancePath + '/ice_config',
-                            schemaPath: '#/$defs/ice_config/required',
-                            keyword: 'required',
-                            params: { missingProperty: missing1 },
-                            message: "must have required property '" + missing1 + "'",
+                            instancePath: instancePath + '/grant',
+                            schemaPath: '#/properties/grant/maxLength',
+                            keyword: 'maxLength',
+                            params: { limit: 16384 },
+                            message: 'must NOT have more than 16384 characters',
                           },
                         ];
                         return false;
                       } else {
-                        const _errs7 = errors;
-                        for (const key1 in data1) {
-                          if (!(
-                            key1 === 'revision' ||
-                            key1 === 'policy_revision' ||
-                            key1 === 'expires_at' ||
-                            key1 === 'ice_transport_policy' ||
-                            key1 === 'allow_wss' ||
-                            key1 === 'allow_http' ||
-                            key1 === 'ice_servers'
-                          )) {
-                            validate27.errors = [
-                              {
-                                instancePath: instancePath + '/ice_config',
-                                schemaPath: '#/$defs/ice_config/additionalProperties',
-                                keyword: 'additionalProperties',
-                                params: { additionalProperty: key1 },
-                                message: 'must NOT have additional properties',
-                              },
-                            ];
-                            return false;
-                            break;
-                          }
+                        if (func1(data1) < 1) {
+                          validate27.errors = [
+                            {
+                              instancePath: instancePath + '/grant',
+                              schemaPath: '#/properties/grant/minLength',
+                              keyword: 'minLength',
+                              params: { limit: 1 },
+                              message: 'must NOT have fewer than 1 characters',
+                            },
+                          ];
+                          return false;
                         }
-                        if (_errs7 === errors) {
-                          if (data1.revision !== void 0) {
-                            let data2 = data1.revision;
-                            const _errs8 = errors;
-                            if (errors === _errs8) {
-                              if (typeof data2 === 'string') {
-                                if (func1(data2) > 128) {
-                                  validate27.errors = [
-                                    {
-                                      instancePath: instancePath + '/ice_config/revision',
-                                      schemaPath:
-                                        '#/$defs/ice_config/properties/revision/maxLength',
-                                      keyword: 'maxLength',
-                                      params: { limit: 128 },
-                                      message: 'must NOT have more than 128 characters',
-                                    },
-                                  ];
-                                  return false;
-                                } else {
-                                  if (func1(data2) < 1) {
-                                    validate27.errors = [
-                                      {
-                                        instancePath: instancePath + '/ice_config/revision',
-                                        schemaPath:
-                                          '#/$defs/ice_config/properties/revision/minLength',
-                                        keyword: 'minLength',
-                                        params: { limit: 1 },
-                                        message: 'must NOT have fewer than 1 characters',
-                                      },
-                                    ];
-                                    return false;
-                                  }
-                                }
-                              } else {
-                                validate27.errors = [
-                                  {
-                                    instancePath: instancePath + '/ice_config/revision',
-                                    schemaPath: '#/$defs/ice_config/properties/revision/type',
-                                    keyword: 'type',
-                                    params: { type: 'string' },
-                                    message: 'must be string',
-                                  },
-                                ];
-                                return false;
-                              }
+                      }
+                    } else {
+                      validate27.errors = [
+                        {
+                          instancePath: instancePath + '/grant',
+                          schemaPath: '#/properties/grant/type',
+                          keyword: 'type',
+                          params: { type: 'string' },
+                          message: 'must be string',
+                        },
+                      ];
+                      return false;
+                    }
+                  }
+                  var valid0 = _errs4 === errors;
+                } else {
+                  var valid0 = true;
+                }
+                if (valid0) {
+                  if (data.ice_config !== void 0) {
+                    let data2 = data.ice_config;
+                    const _errs6 = errors;
+                    const _errs7 = errors;
+                    if (errors === _errs7) {
+                      if (data2 && typeof data2 == 'object' && !Array.isArray(data2)) {
+                        let missing1;
+                        if (
+                          (data2.revision === void 0 && (missing1 = 'revision')) ||
+                          (data2.policy_revision === void 0 && (missing1 = 'policy_revision')) ||
+                          (data2.expires_at === void 0 && (missing1 = 'expires_at')) ||
+                          (data2.ice_transport_policy === void 0 &&
+                            (missing1 = 'ice_transport_policy')) ||
+                          (data2.allow_wss === void 0 && (missing1 = 'allow_wss')) ||
+                          (data2.ice_servers === void 0 && (missing1 = 'ice_servers'))
+                        ) {
+                          validate27.errors = [
+                            {
+                              instancePath: instancePath + '/ice_config',
+                              schemaPath: '#/$defs/ice_config/required',
+                              keyword: 'required',
+                              params: { missingProperty: missing1 },
+                              message: "must have required property '" + missing1 + "'",
+                            },
+                          ];
+                          return false;
+                        } else {
+                          const _errs9 = errors;
+                          for (const key1 in data2) {
+                            if (!(
+                              key1 === 'revision' ||
+                              key1 === 'policy_revision' ||
+                              key1 === 'expires_at' ||
+                              key1 === 'ice_transport_policy' ||
+                              key1 === 'allow_wss' ||
+                              key1 === 'allow_http' ||
+                              key1 === 'ice_servers'
+                            )) {
+                              validate27.errors = [
+                                {
+                                  instancePath: instancePath + '/ice_config',
+                                  schemaPath: '#/$defs/ice_config/additionalProperties',
+                                  keyword: 'additionalProperties',
+                                  params: { additionalProperty: key1 },
+                                  message: 'must NOT have additional properties',
+                                },
+                              ];
+                              return false;
+                              break;
                             }
-                            var valid2 = _errs8 === errors;
-                          } else {
-                            var valid2 = true;
                           }
-                          if (valid2) {
-                            if (data1.policy_revision !== void 0) {
-                              let data3 = data1.policy_revision;
+                          if (_errs9 === errors) {
+                            if (data2.revision !== void 0) {
+                              let data3 = data2.revision;
                               const _errs10 = errors;
                               if (errors === _errs10) {
                                 if (typeof data3 === 'string') {
                                   if (func1(data3) > 128) {
                                     validate27.errors = [
                                       {
-                                        instancePath: instancePath + '/ice_config/policy_revision',
+                                        instancePath: instancePath + '/ice_config/revision',
                                         schemaPath:
-                                          '#/$defs/ice_config/properties/policy_revision/maxLength',
+                                          '#/$defs/ice_config/properties/revision/maxLength',
                                         keyword: 'maxLength',
                                         params: { limit: 128 },
                                         message: 'must NOT have more than 128 characters',
@@ -2924,10 +2912,9 @@ var require_control_schema = __commonJS({
                                     if (func1(data3) < 1) {
                                       validate27.errors = [
                                         {
-                                          instancePath:
-                                            instancePath + '/ice_config/policy_revision',
+                                          instancePath: instancePath + '/ice_config/revision',
                                           schemaPath:
-                                            '#/$defs/ice_config/properties/policy_revision/minLength',
+                                            '#/$defs/ice_config/properties/revision/minLength',
                                           keyword: 'minLength',
                                           params: { limit: 1 },
                                           message: 'must NOT have fewer than 1 characters',
@@ -2939,9 +2926,8 @@ var require_control_schema = __commonJS({
                                 } else {
                                   validate27.errors = [
                                     {
-                                      instancePath: instancePath + '/ice_config/policy_revision',
-                                      schemaPath:
-                                        '#/$defs/ice_config/properties/policy_revision/type',
+                                      instancePath: instancePath + '/ice_config/revision',
+                                      schemaPath: '#/$defs/ice_config/properties/revision/type',
                                       keyword: 'type',
                                       params: { type: 'string' },
                                       message: 'must be string',
@@ -2955,38 +2941,52 @@ var require_control_schema = __commonJS({
                               var valid2 = true;
                             }
                             if (valid2) {
-                              if (data1.expires_at !== void 0) {
-                                let data4 = data1.expires_at;
+                              if (data2.policy_revision !== void 0) {
+                                let data4 = data2.policy_revision;
                                 const _errs12 = errors;
                                 if (errors === _errs12) {
-                                  if (errors === _errs12) {
-                                    if (typeof data4 === 'string') {
-                                      if (!formats0.validate(data4)) {
+                                  if (typeof data4 === 'string') {
+                                    if (func1(data4) > 128) {
+                                      validate27.errors = [
+                                        {
+                                          instancePath:
+                                            instancePath + '/ice_config/policy_revision',
+                                          schemaPath:
+                                            '#/$defs/ice_config/properties/policy_revision/maxLength',
+                                          keyword: 'maxLength',
+                                          params: { limit: 128 },
+                                          message: 'must NOT have more than 128 characters',
+                                        },
+                                      ];
+                                      return false;
+                                    } else {
+                                      if (func1(data4) < 1) {
                                         validate27.errors = [
                                           {
-                                            instancePath: instancePath + '/ice_config/expires_at',
+                                            instancePath:
+                                              instancePath + '/ice_config/policy_revision',
                                             schemaPath:
-                                              '#/$defs/ice_config/properties/expires_at/format',
-                                            keyword: 'format',
-                                            params: { format: 'date-time' },
-                                            message: 'must match format "date-time"',
+                                              '#/$defs/ice_config/properties/policy_revision/minLength',
+                                            keyword: 'minLength',
+                                            params: { limit: 1 },
+                                            message: 'must NOT have fewer than 1 characters',
                                           },
                                         ];
                                         return false;
                                       }
-                                    } else {
-                                      validate27.errors = [
-                                        {
-                                          instancePath: instancePath + '/ice_config/expires_at',
-                                          schemaPath:
-                                            '#/$defs/ice_config/properties/expires_at/type',
-                                          keyword: 'type',
-                                          params: { type: 'string' },
-                                          message: 'must be string',
-                                        },
-                                      ];
-                                      return false;
                                     }
+                                  } else {
+                                    validate27.errors = [
+                                      {
+                                        instancePath: instancePath + '/ice_config/policy_revision',
+                                        schemaPath:
+                                          '#/$defs/ice_config/properties/policy_revision/type',
+                                        keyword: 'type',
+                                        params: { type: 'string' },
+                                        message: 'must be string',
+                                      },
+                                    ];
+                                    return false;
                                   }
                                 }
                                 var valid2 = _errs12 === errors;
@@ -2994,59 +2994,78 @@ var require_control_schema = __commonJS({
                                 var valid2 = true;
                               }
                               if (valid2) {
-                                if (data1.ice_transport_policy !== void 0) {
-                                  let data5 = data1.ice_transport_policy;
+                                if (data2.expires_at !== void 0) {
+                                  let data5 = data2.expires_at;
                                   const _errs14 = errors;
-                                  if (!(data5 === 'all' || data5 === 'relay')) {
-                                    validate27.errors = [
-                                      {
-                                        instancePath:
-                                          instancePath + '/ice_config/ice_transport_policy',
-                                        schemaPath:
-                                          '#/$defs/ice_config/properties/ice_transport_policy/enum',
-                                        keyword: 'enum',
-                                        params: {
-                                          allowedValues:
-                                            schema42.properties.ice_transport_policy.enum,
-                                        },
-                                        message: 'must be equal to one of the allowed values',
-                                      },
-                                    ];
-                                    return false;
+                                  if (errors === _errs14) {
+                                    if (errors === _errs14) {
+                                      if (typeof data5 === 'string') {
+                                        if (!formats0.validate(data5)) {
+                                          validate27.errors = [
+                                            {
+                                              instancePath: instancePath + '/ice_config/expires_at',
+                                              schemaPath:
+                                                '#/$defs/ice_config/properties/expires_at/format',
+                                              keyword: 'format',
+                                              params: { format: 'date-time' },
+                                              message: 'must match format "date-time"',
+                                            },
+                                          ];
+                                          return false;
+                                        }
+                                      } else {
+                                        validate27.errors = [
+                                          {
+                                            instancePath: instancePath + '/ice_config/expires_at',
+                                            schemaPath:
+                                              '#/$defs/ice_config/properties/expires_at/type',
+                                            keyword: 'type',
+                                            params: { type: 'string' },
+                                            message: 'must be string',
+                                          },
+                                        ];
+                                        return false;
+                                      }
+                                    }
                                   }
                                   var valid2 = _errs14 === errors;
                                 } else {
                                   var valid2 = true;
                                 }
                                 if (valid2) {
-                                  if (data1.allow_wss !== void 0) {
-                                    const _errs15 = errors;
-                                    if (typeof data1.allow_wss !== 'boolean') {
+                                  if (data2.ice_transport_policy !== void 0) {
+                                    let data6 = data2.ice_transport_policy;
+                                    const _errs16 = errors;
+                                    if (!(data6 === 'all' || data6 === 'relay')) {
                                       validate27.errors = [
                                         {
-                                          instancePath: instancePath + '/ice_config/allow_wss',
+                                          instancePath:
+                                            instancePath + '/ice_config/ice_transport_policy',
                                           schemaPath:
-                                            '#/$defs/ice_config/properties/allow_wss/type',
-                                          keyword: 'type',
-                                          params: { type: 'boolean' },
-                                          message: 'must be boolean',
+                                            '#/$defs/ice_config/properties/ice_transport_policy/enum',
+                                          keyword: 'enum',
+                                          params: {
+                                            allowedValues:
+                                              schema42.properties.ice_transport_policy.enum,
+                                          },
+                                          message: 'must be equal to one of the allowed values',
                                         },
                                       ];
                                       return false;
                                     }
-                                    var valid2 = _errs15 === errors;
+                                    var valid2 = _errs16 === errors;
                                   } else {
                                     var valid2 = true;
                                   }
                                   if (valid2) {
-                                    if (data1.allow_http !== void 0) {
+                                    if (data2.allow_wss !== void 0) {
                                       const _errs17 = errors;
-                                      if (typeof data1.allow_http !== 'boolean') {
+                                      if (typeof data2.allow_wss !== 'boolean') {
                                         validate27.errors = [
                                           {
-                                            instancePath: instancePath + '/ice_config/allow_http',
+                                            instancePath: instancePath + '/ice_config/allow_wss',
                                             schemaPath:
-                                              '#/$defs/ice_config/properties/allow_http/type',
+                                              '#/$defs/ice_config/properties/allow_wss/type',
                                             keyword: 'type',
                                             params: { type: 'boolean' },
                                             message: 'must be boolean',
@@ -3059,212 +3078,186 @@ var require_control_schema = __commonJS({
                                       var valid2 = true;
                                     }
                                     if (valid2) {
-                                      if (data1.ice_servers !== void 0) {
-                                        let data8 = data1.ice_servers;
+                                      if (data2.allow_http !== void 0) {
                                         const _errs19 = errors;
-                                        if (errors === _errs19) {
-                                          if (Array.isArray(data8)) {
-                                            if (data8.length > 16) {
-                                              validate27.errors = [
-                                                {
-                                                  instancePath:
-                                                    instancePath + '/ice_config/ice_servers',
-                                                  schemaPath:
-                                                    '#/$defs/ice_config/properties/ice_servers/maxItems',
-                                                  keyword: 'maxItems',
-                                                  params: { limit: 16 },
-                                                  message: 'must NOT have more than 16 items',
-                                                },
-                                              ];
-                                              return false;
-                                            } else {
-                                              var valid3 = true;
-                                              const len0 = data8.length;
-                                              for (let i0 = 0; i0 < len0; i0++) {
-                                                let data9 = data8[i0];
-                                                const _errs21 = errors;
-                                                const _errs24 = errors;
-                                                let valid5 = true;
-                                                const _errs25 = errors;
-                                                if (
-                                                  data9 &&
-                                                  typeof data9 == 'object' &&
-                                                  !Array.isArray(data9)
-                                                ) {
-                                                  if (data9.urls !== void 0) {
-                                                    let data10 = data9.urls;
-                                                    const _errs26 = errors;
-                                                    if (errors === _errs26) {
-                                                      if (Array.isArray(data10)) {
-                                                        const _errs28 = errors;
-                                                        const len1 = data10.length;
-                                                        for (let i1 = 0; i1 < len1; i1++) {
-                                                          let data11 = data10[i1];
-                                                          const _errs29 = errors;
-                                                          if (errors === _errs29) {
-                                                            if (typeof data11 === 'string') {
-                                                              if (!pattern7.test(data11)) {
-                                                                const err0 = {};
+                                        if (typeof data2.allow_http !== 'boolean') {
+                                          validate27.errors = [
+                                            {
+                                              instancePath: instancePath + '/ice_config/allow_http',
+                                              schemaPath:
+                                                '#/$defs/ice_config/properties/allow_http/type',
+                                              keyword: 'type',
+                                              params: { type: 'boolean' },
+                                              message: 'must be boolean',
+                                            },
+                                          ];
+                                          return false;
+                                        }
+                                        var valid2 = _errs19 === errors;
+                                      } else {
+                                        var valid2 = true;
+                                      }
+                                      if (valid2) {
+                                        if (data2.ice_servers !== void 0) {
+                                          let data9 = data2.ice_servers;
+                                          const _errs21 = errors;
+                                          if (errors === _errs21) {
+                                            if (Array.isArray(data9)) {
+                                              if (data9.length > 16) {
+                                                validate27.errors = [
+                                                  {
+                                                    instancePath:
+                                                      instancePath + '/ice_config/ice_servers',
+                                                    schemaPath:
+                                                      '#/$defs/ice_config/properties/ice_servers/maxItems',
+                                                    keyword: 'maxItems',
+                                                    params: { limit: 16 },
+                                                    message: 'must NOT have more than 16 items',
+                                                  },
+                                                ];
+                                                return false;
+                                              } else {
+                                                var valid3 = true;
+                                                const len0 = data9.length;
+                                                for (let i0 = 0; i0 < len0; i0++) {
+                                                  let data10 = data9[i0];
+                                                  const _errs23 = errors;
+                                                  const _errs26 = errors;
+                                                  let valid5 = true;
+                                                  const _errs27 = errors;
+                                                  if (
+                                                    data10 &&
+                                                    typeof data10 == 'object' &&
+                                                    !Array.isArray(data10)
+                                                  ) {
+                                                    if (data10.urls !== void 0) {
+                                                      let data11 = data10.urls;
+                                                      const _errs28 = errors;
+                                                      if (errors === _errs28) {
+                                                        if (Array.isArray(data11)) {
+                                                          const _errs30 = errors;
+                                                          const len1 = data11.length;
+                                                          for (let i1 = 0; i1 < len1; i1++) {
+                                                            let data12 = data11[i1];
+                                                            const _errs31 = errors;
+                                                            if (errors === _errs31) {
+                                                              if (typeof data12 === 'string') {
+                                                                if (!pattern7.test(data12)) {
+                                                                  const err0 = {};
+                                                                  if (vErrors === null) {
+                                                                    vErrors = [err0];
+                                                                  } else {
+                                                                    vErrors.push(err0);
+                                                                  }
+                                                                  errors++;
+                                                                }
+                                                              } else {
+                                                                const err1 = {};
                                                                 if (vErrors === null) {
-                                                                  vErrors = [err0];
+                                                                  vErrors = [err1];
                                                                 } else {
-                                                                  vErrors.push(err0);
+                                                                  vErrors.push(err1);
                                                                 }
                                                                 errors++;
                                                               }
-                                                            } else {
-                                                              const err1 = {};
-                                                              if (vErrors === null) {
-                                                                vErrors = [err1];
-                                                              } else {
-                                                                vErrors.push(err1);
-                                                              }
-                                                              errors++;
+                                                            }
+                                                            var valid7 = _errs31 === errors;
+                                                            if (valid7) {
+                                                              break;
                                                             }
                                                           }
-                                                          var valid7 = _errs29 === errors;
-                                                          if (valid7) {
-                                                            break;
-                                                          }
-                                                        }
-                                                        if (!valid7) {
-                                                          const err2 = {};
-                                                          if (vErrors === null) {
-                                                            vErrors = [err2];
+                                                          if (!valid7) {
+                                                            const err2 = {};
+                                                            if (vErrors === null) {
+                                                              vErrors = [err2];
+                                                            } else {
+                                                              vErrors.push(err2);
+                                                            }
+                                                            errors++;
                                                           } else {
-                                                            vErrors.push(err2);
+                                                            errors = _errs30;
+                                                            if (vErrors !== null) {
+                                                              if (_errs30) {
+                                                                vErrors.length = _errs30;
+                                                              } else {
+                                                                vErrors = null;
+                                                              }
+                                                            }
+                                                          }
+                                                        } else {
+                                                          const err3 = {};
+                                                          if (vErrors === null) {
+                                                            vErrors = [err3];
+                                                          } else {
+                                                            vErrors.push(err3);
                                                           }
                                                           errors++;
-                                                        } else {
-                                                          errors = _errs28;
-                                                          if (vErrors !== null) {
-                                                            if (_errs28) {
-                                                              vErrors.length = _errs28;
-                                                            } else {
-                                                              vErrors = null;
-                                                            }
-                                                          }
                                                         }
-                                                      } else {
-                                                        const err3 = {};
-                                                        if (vErrors === null) {
-                                                          vErrors = [err3];
-                                                        } else {
-                                                          vErrors.push(err3);
-                                                        }
-                                                        errors++;
                                                       }
                                                     }
                                                   }
-                                                }
-                                                var _valid0 = _errs25 === errors;
-                                                errors = _errs24;
-                                                if (vErrors !== null) {
-                                                  if (_errs24) {
-                                                    vErrors.length = _errs24;
-                                                  } else {
-                                                    vErrors = null;
-                                                  }
-                                                }
-                                                if (_valid0) {
-                                                  const _errs31 = errors;
-                                                  if (
-                                                    data9 &&
-                                                    typeof data9 == 'object' &&
-                                                    !Array.isArray(data9)
-                                                  ) {
-                                                    let missing2;
-                                                    if (
-                                                      (data9.username === void 0 &&
-                                                        (missing2 = 'username')) ||
-                                                      (data9.credential === void 0 &&
-                                                        (missing2 = 'credential')) ||
-                                                      (data9.credential_expires_at === void 0 &&
-                                                        (missing2 = 'credential_expires_at'))
-                                                    ) {
-                                                      validate27.errors = [
-                                                        {
-                                                          instancePath:
-                                                            instancePath +
-                                                            '/ice_config/ice_servers/' +
-                                                            i0,
-                                                          schemaPath:
-                                                            '#/$defs/ice_config/properties/ice_servers/items/allOf/0/then/required',
-                                                          keyword: 'required',
-                                                          params: { missingProperty: missing2 },
-                                                          message:
-                                                            "must have required property '" +
-                                                            missing2 +
-                                                            "'",
-                                                        },
-                                                      ];
-                                                      return false;
+                                                  var _valid0 = _errs27 === errors;
+                                                  errors = _errs26;
+                                                  if (vErrors !== null) {
+                                                    if (_errs26) {
+                                                      vErrors.length = _errs26;
                                                     } else {
-                                                      if (data9.username !== void 0) {
-                                                        let data12 = data9.username;
-                                                        const _errs32 = errors;
-                                                        if (errors === _errs32) {
-                                                          if (typeof data12 === 'string') {
-                                                            if (func1(data12) > 512) {
-                                                              validate27.errors = [
-                                                                {
-                                                                  instancePath:
-                                                                    instancePath +
-                                                                    '/ice_config/ice_servers/' +
-                                                                    i0 +
-                                                                    '/username',
-                                                                  schemaPath:
-                                                                    '#/$defs/ice_config/properties/ice_servers/items/allOf/0/then/properties/username/maxLength',
-                                                                  keyword: 'maxLength',
-                                                                  params: { limit: 512 },
-                                                                  message:
-                                                                    'must NOT have more than 512 characters',
-                                                                },
-                                                              ];
-                                                              return false;
-                                                            }
-                                                          } else {
-                                                            validate27.errors = [
-                                                              {
-                                                                instancePath:
-                                                                  instancePath +
-                                                                  '/ice_config/ice_servers/' +
-                                                                  i0 +
-                                                                  '/username',
-                                                                schemaPath:
-                                                                  '#/$defs/ice_config/properties/ice_servers/items/allOf/0/then/properties/username/type',
-                                                                keyword: 'type',
-                                                                params: { type: 'string' },
-                                                                message: 'must be string',
-                                                              },
-                                                            ];
-                                                            return false;
-                                                          }
-                                                        }
-                                                        var valid8 = _errs32 === errors;
+                                                      vErrors = null;
+                                                    }
+                                                  }
+                                                  if (_valid0) {
+                                                    const _errs33 = errors;
+                                                    if (
+                                                      data10 &&
+                                                      typeof data10 == 'object' &&
+                                                      !Array.isArray(data10)
+                                                    ) {
+                                                      let missing2;
+                                                      if (
+                                                        (data10.username === void 0 &&
+                                                          (missing2 = 'username')) ||
+                                                        (data10.credential === void 0 &&
+                                                          (missing2 = 'credential')) ||
+                                                        (data10.credential_expires_at === void 0 &&
+                                                          (missing2 = 'credential_expires_at'))
+                                                      ) {
+                                                        validate27.errors = [
+                                                          {
+                                                            instancePath:
+                                                              instancePath +
+                                                              '/ice_config/ice_servers/' +
+                                                              i0,
+                                                            schemaPath:
+                                                              '#/$defs/ice_config/properties/ice_servers/items/allOf/0/then/required',
+                                                            keyword: 'required',
+                                                            params: { missingProperty: missing2 },
+                                                            message:
+                                                              "must have required property '" +
+                                                              missing2 +
+                                                              "'",
+                                                          },
+                                                        ];
+                                                        return false;
                                                       } else {
-                                                        var valid8 = true;
-                                                      }
-                                                      if (valid8) {
-                                                        if (data9.credential !== void 0) {
-                                                          let data13 = data9.credential;
+                                                        if (data10.username !== void 0) {
+                                                          let data13 = data10.username;
                                                           const _errs34 = errors;
                                                           if (errors === _errs34) {
                                                             if (typeof data13 === 'string') {
-                                                              if (func1(data13) > 2048) {
+                                                              if (func1(data13) > 512) {
                                                                 validate27.errors = [
                                                                   {
                                                                     instancePath:
                                                                       instancePath +
                                                                       '/ice_config/ice_servers/' +
                                                                       i0 +
-                                                                      '/credential',
+                                                                      '/username',
                                                                     schemaPath:
-                                                                      '#/$defs/ice_config/properties/ice_servers/items/allOf/0/then/properties/credential/maxLength',
+                                                                      '#/$defs/ice_config/properties/ice_servers/items/allOf/0/then/properties/username/maxLength',
                                                                     keyword: 'maxLength',
-                                                                    params: { limit: 2048 },
+                                                                    params: { limit: 512 },
                                                                     message:
-                                                                      'must NOT have more than 2048 characters',
+                                                                      'must NOT have more than 512 characters',
                                                                   },
                                                                 ];
                                                                 return false;
@@ -3276,9 +3269,9 @@ var require_control_schema = __commonJS({
                                                                     instancePath +
                                                                     '/ice_config/ice_servers/' +
                                                                     i0 +
-                                                                    '/credential',
+                                                                    '/username',
                                                                   schemaPath:
-                                                                    '#/$defs/ice_config/properties/ice_servers/items/allOf/0/then/properties/credential/type',
+                                                                    '#/$defs/ice_config/properties/ice_servers/items/allOf/0/then/properties/username/type',
                                                                   keyword: 'type',
                                                                   params: { type: 'string' },
                                                                   message: 'must be string',
@@ -3292,16 +3285,85 @@ var require_control_schema = __commonJS({
                                                           var valid8 = true;
                                                         }
                                                         if (valid8) {
-                                                          if (
-                                                            data9.credential_expires_at !== void 0
-                                                          ) {
-                                                            let data14 =
-                                                              data9.credential_expires_at;
+                                                          if (data10.credential !== void 0) {
+                                                            let data14 = data10.credential;
                                                             const _errs36 = errors;
                                                             if (errors === _errs36) {
-                                                              if (errors === _errs36) {
-                                                                if (typeof data14 === 'string') {
-                                                                  if (!formats0.validate(data14)) {
+                                                              if (typeof data14 === 'string') {
+                                                                if (func1(data14) > 2048) {
+                                                                  validate27.errors = [
+                                                                    {
+                                                                      instancePath:
+                                                                        instancePath +
+                                                                        '/ice_config/ice_servers/' +
+                                                                        i0 +
+                                                                        '/credential',
+                                                                      schemaPath:
+                                                                        '#/$defs/ice_config/properties/ice_servers/items/allOf/0/then/properties/credential/maxLength',
+                                                                      keyword: 'maxLength',
+                                                                      params: { limit: 2048 },
+                                                                      message:
+                                                                        'must NOT have more than 2048 characters',
+                                                                    },
+                                                                  ];
+                                                                  return false;
+                                                                }
+                                                              } else {
+                                                                validate27.errors = [
+                                                                  {
+                                                                    instancePath:
+                                                                      instancePath +
+                                                                      '/ice_config/ice_servers/' +
+                                                                      i0 +
+                                                                      '/credential',
+                                                                    schemaPath:
+                                                                      '#/$defs/ice_config/properties/ice_servers/items/allOf/0/then/properties/credential/type',
+                                                                    keyword: 'type',
+                                                                    params: { type: 'string' },
+                                                                    message: 'must be string',
+                                                                  },
+                                                                ];
+                                                                return false;
+                                                              }
+                                                            }
+                                                            var valid8 = _errs36 === errors;
+                                                          } else {
+                                                            var valid8 = true;
+                                                          }
+                                                          if (valid8) {
+                                                            if (
+                                                              data10.credential_expires_at !==
+                                                              void 0
+                                                            ) {
+                                                              let data15 =
+                                                                data10.credential_expires_at;
+                                                              const _errs38 = errors;
+                                                              if (errors === _errs38) {
+                                                                if (errors === _errs38) {
+                                                                  if (typeof data15 === 'string') {
+                                                                    if (
+                                                                      !formats0.validate(data15)
+                                                                    ) {
+                                                                      validate27.errors = [
+                                                                        {
+                                                                          instancePath:
+                                                                            instancePath +
+                                                                            '/ice_config/ice_servers/' +
+                                                                            i0 +
+                                                                            '/credential_expires_at',
+                                                                          schemaPath:
+                                                                            '#/$defs/ice_config/properties/ice_servers/items/allOf/0/then/properties/credential_expires_at/format',
+                                                                          keyword: 'format',
+                                                                          params: {
+                                                                            format: 'date-time',
+                                                                          },
+                                                                          message:
+                                                                            'must match format "date-time"',
+                                                                        },
+                                                                      ];
+                                                                      return false;
+                                                                    }
+                                                                  } else {
                                                                     validate27.errors = [
                                                                       {
                                                                         instancePath:
@@ -3310,155 +3372,119 @@ var require_control_schema = __commonJS({
                                                                           i0 +
                                                                           '/credential_expires_at',
                                                                         schemaPath:
-                                                                          '#/$defs/ice_config/properties/ice_servers/items/allOf/0/then/properties/credential_expires_at/format',
-                                                                        keyword: 'format',
-                                                                        params: {
-                                                                          format: 'date-time',
-                                                                        },
-                                                                        message:
-                                                                          'must match format "date-time"',
+                                                                          '#/$defs/ice_config/properties/ice_servers/items/allOf/0/then/properties/credential_expires_at/type',
+                                                                        keyword: 'type',
+                                                                        params: { type: 'string' },
+                                                                        message: 'must be string',
                                                                       },
                                                                     ];
                                                                     return false;
                                                                   }
-                                                                } else {
-                                                                  validate27.errors = [
-                                                                    {
-                                                                      instancePath:
-                                                                        instancePath +
-                                                                        '/ice_config/ice_servers/' +
-                                                                        i0 +
-                                                                        '/credential_expires_at',
-                                                                      schemaPath:
-                                                                        '#/$defs/ice_config/properties/ice_servers/items/allOf/0/then/properties/credential_expires_at/type',
-                                                                      keyword: 'type',
-                                                                      params: { type: 'string' },
-                                                                      message: 'must be string',
-                                                                    },
-                                                                  ];
-                                                                  return false;
                                                                 }
                                                               }
+                                                              var valid8 = _errs38 === errors;
+                                                            } else {
+                                                              var valid8 = true;
                                                             }
-                                                            var valid8 = _errs36 === errors;
-                                                          } else {
-                                                            var valid8 = true;
                                                           }
                                                         }
                                                       }
                                                     }
+                                                    var _valid0 = _errs33 === errors;
+                                                    valid5 = _valid0;
+                                                    if (valid5) {
+                                                      var props0 = {};
+                                                      props0.username = true;
+                                                      props0.credential = true;
+                                                      props0.credential_expires_at = true;
+                                                      props0.urls = true;
+                                                    }
                                                   }
-                                                  var _valid0 = _errs31 === errors;
-                                                  valid5 = _valid0;
-                                                  if (valid5) {
-                                                    var props0 = {};
-                                                    props0.username = true;
-                                                    props0.credential = true;
-                                                    props0.credential_expires_at = true;
-                                                    props0.urls = true;
-                                                  }
-                                                }
-                                                if (!valid5) {
-                                                  const err4 = {
-                                                    instancePath:
-                                                      instancePath +
-                                                      '/ice_config/ice_servers/' +
-                                                      i0,
-                                                    schemaPath:
-                                                      '#/$defs/ice_config/properties/ice_servers/items/allOf/0/if',
-                                                    keyword: 'if',
-                                                    params: { failingKeyword: 'then' },
-                                                    message: 'must match "then" schema',
-                                                  };
-                                                  if (vErrors === null) {
-                                                    vErrors = [err4];
-                                                  } else {
-                                                    vErrors.push(err4);
-                                                  }
-                                                  errors++;
-                                                  validate27.errors = vErrors;
-                                                  return false;
-                                                }
-                                                if (errors === _errs21) {
-                                                  if (
-                                                    data9 &&
-                                                    typeof data9 == 'object' &&
-                                                    !Array.isArray(data9)
-                                                  ) {
-                                                    let missing3;
-                                                    if (
-                                                      data9.urls === void 0 &&
-                                                      (missing3 = 'urls')
-                                                    ) {
-                                                      validate27.errors = [
-                                                        {
-                                                          instancePath:
-                                                            instancePath +
-                                                            '/ice_config/ice_servers/' +
-                                                            i0,
-                                                          schemaPath:
-                                                            '#/$defs/ice_config/properties/ice_servers/items/required',
-                                                          keyword: 'required',
-                                                          params: { missingProperty: missing3 },
-                                                          message:
-                                                            "must have required property '" +
-                                                            missing3 +
-                                                            "'",
-                                                        },
-                                                      ];
-                                                      return false;
+                                                  if (!valid5) {
+                                                    const err4 = {
+                                                      instancePath:
+                                                        instancePath +
+                                                        '/ice_config/ice_servers/' +
+                                                        i0,
+                                                      schemaPath:
+                                                        '#/$defs/ice_config/properties/ice_servers/items/allOf/0/if',
+                                                      keyword: 'if',
+                                                      params: { failingKeyword: 'then' },
+                                                      message: 'must match "then" schema',
+                                                    };
+                                                    if (vErrors === null) {
+                                                      vErrors = [err4];
                                                     } else {
-                                                      const _errs38 = errors;
-                                                      for (const key2 in data9) {
-                                                        if (!(
-                                                          key2 === 'urls' ||
-                                                          key2 === 'username' ||
-                                                          key2 === 'credential' ||
-                                                          key2 === 'credential_expires_at'
-                                                        )) {
-                                                          validate27.errors = [
-                                                            {
-                                                              instancePath:
-                                                                instancePath +
-                                                                '/ice_config/ice_servers/' +
-                                                                i0,
-                                                              schemaPath:
-                                                                '#/$defs/ice_config/properties/ice_servers/items/additionalProperties',
-                                                              keyword: 'additionalProperties',
-                                                              params: { additionalProperty: key2 },
-                                                              message:
-                                                                'must NOT have additional properties',
-                                                            },
-                                                          ];
-                                                          return false;
-                                                          break;
+                                                      vErrors.push(err4);
+                                                    }
+                                                    errors++;
+                                                    validate27.errors = vErrors;
+                                                    return false;
+                                                  }
+                                                  if (errors === _errs23) {
+                                                    if (
+                                                      data10 &&
+                                                      typeof data10 == 'object' &&
+                                                      !Array.isArray(data10)
+                                                    ) {
+                                                      let missing3;
+                                                      if (
+                                                        data10.urls === void 0 &&
+                                                        (missing3 = 'urls')
+                                                      ) {
+                                                        validate27.errors = [
+                                                          {
+                                                            instancePath:
+                                                              instancePath +
+                                                              '/ice_config/ice_servers/' +
+                                                              i0,
+                                                            schemaPath:
+                                                              '#/$defs/ice_config/properties/ice_servers/items/required',
+                                                            keyword: 'required',
+                                                            params: { missingProperty: missing3 },
+                                                            message:
+                                                              "must have required property '" +
+                                                              missing3 +
+                                                              "'",
+                                                          },
+                                                        ];
+                                                        return false;
+                                                      } else {
+                                                        const _errs40 = errors;
+                                                        for (const key2 in data10) {
+                                                          if (!(
+                                                            key2 === 'urls' ||
+                                                            key2 === 'username' ||
+                                                            key2 === 'credential' ||
+                                                            key2 === 'credential_expires_at'
+                                                          )) {
+                                                            validate27.errors = [
+                                                              {
+                                                                instancePath:
+                                                                  instancePath +
+                                                                  '/ice_config/ice_servers/' +
+                                                                  i0,
+                                                                schemaPath:
+                                                                  '#/$defs/ice_config/properties/ice_servers/items/additionalProperties',
+                                                                keyword: 'additionalProperties',
+                                                                params: {
+                                                                  additionalProperty: key2,
+                                                                },
+                                                                message:
+                                                                  'must NOT have additional properties',
+                                                              },
+                                                            ];
+                                                            return false;
+                                                            break;
+                                                          }
                                                         }
-                                                      }
-                                                      if (_errs38 === errors) {
-                                                        if (data9.urls !== void 0) {
-                                                          let data15 = data9.urls;
-                                                          const _errs39 = errors;
-                                                          if (errors === _errs39) {
-                                                            if (Array.isArray(data15)) {
-                                                              if (data15.length > 8) {
-                                                                validate27.errors = [
-                                                                  {
-                                                                    instancePath:
-                                                                      instancePath +
-                                                                      '/ice_config/ice_servers/' +
-                                                                      i0 +
-                                                                      '/urls',
-                                                                    schemaPath:
-                                                                      '#/$defs/ice_config/properties/ice_servers/items/properties/urls/maxItems',
-                                                                    keyword: 'maxItems',
-                                                                    params: { limit: 8 },
-                                                                    message:
-                                                                      'must NOT have more than 8 items',
-                                                                  },
-                                                                ];
-                                                                return false;
-                                                              } else {
-                                                                if (data15.length < 1) {
+                                                        if (_errs40 === errors) {
+                                                          if (data10.urls !== void 0) {
+                                                            let data16 = data10.urls;
+                                                            const _errs41 = errors;
+                                                            if (errors === _errs41) {
+                                                              if (Array.isArray(data16)) {
+                                                                if (data16.length > 8) {
                                                                   validate27.errors = [
                                                                     {
                                                                       instancePath:
@@ -3467,51 +3493,48 @@ var require_control_schema = __commonJS({
                                                                         i0 +
                                                                         '/urls',
                                                                       schemaPath:
-                                                                        '#/$defs/ice_config/properties/ice_servers/items/properties/urls/minItems',
-                                                                      keyword: 'minItems',
-                                                                      params: { limit: 1 },
+                                                                        '#/$defs/ice_config/properties/ice_servers/items/properties/urls/maxItems',
+                                                                      keyword: 'maxItems',
+                                                                      params: { limit: 8 },
                                                                       message:
-                                                                        'must NOT have fewer than 1 items',
+                                                                        'must NOT have more than 8 items',
                                                                     },
                                                                   ];
                                                                   return false;
                                                                 } else {
-                                                                  var valid10 = true;
-                                                                  const len2 = data15.length;
-                                                                  for (
-                                                                    let i2 = 0;
-                                                                    i2 < len2;
-                                                                    i2++
-                                                                  ) {
-                                                                    let data16 = data15[i2];
-                                                                    const _errs41 = errors;
-                                                                    if (errors === _errs41) {
-                                                                      if (
-                                                                        typeof data16 === 'string'
-                                                                      ) {
-                                                                        if (func1(data16) > 2048) {
-                                                                          validate27.errors = [
-                                                                            {
-                                                                              instancePath:
-                                                                                instancePath +
-                                                                                '/ice_config/ice_servers/' +
-                                                                                i0 +
-                                                                                '/urls/' +
-                                                                                i2,
-                                                                              schemaPath:
-                                                                                '#/$defs/ice_config/properties/ice_servers/items/properties/urls/items/maxLength',
-                                                                              keyword: 'maxLength',
-                                                                              params: {
-                                                                                limit: 2048,
-                                                                              },
-                                                                              message:
-                                                                                'must NOT have more than 2048 characters',
-                                                                            },
-                                                                          ];
-                                                                          return false;
-                                                                        } else {
+                                                                  if (data16.length < 1) {
+                                                                    validate27.errors = [
+                                                                      {
+                                                                        instancePath:
+                                                                          instancePath +
+                                                                          '/ice_config/ice_servers/' +
+                                                                          i0 +
+                                                                          '/urls',
+                                                                        schemaPath:
+                                                                          '#/$defs/ice_config/properties/ice_servers/items/properties/urls/minItems',
+                                                                        keyword: 'minItems',
+                                                                        params: { limit: 1 },
+                                                                        message:
+                                                                          'must NOT have fewer than 1 items',
+                                                                      },
+                                                                    ];
+                                                                    return false;
+                                                                  } else {
+                                                                    var valid10 = true;
+                                                                    const len2 = data16.length;
+                                                                    for (
+                                                                      let i2 = 0;
+                                                                      i2 < len2;
+                                                                      i2++
+                                                                    ) {
+                                                                      let data17 = data16[i2];
+                                                                      const _errs43 = errors;
+                                                                      if (errors === _errs43) {
+                                                                        if (
+                                                                          typeof data17 === 'string'
+                                                                        ) {
                                                                           if (
-                                                                            !pattern8.test(data16)
+                                                                            func1(data17) > 2048
                                                                           ) {
                                                                             validate27.errors = [
                                                                               {
@@ -3522,94 +3545,73 @@ var require_control_schema = __commonJS({
                                                                                   '/urls/' +
                                                                                   i2,
                                                                                 schemaPath:
-                                                                                  '#/$defs/ice_config/properties/ice_servers/items/properties/urls/items/pattern',
-                                                                                keyword: 'pattern',
+                                                                                  '#/$defs/ice_config/properties/ice_servers/items/properties/urls/items/maxLength',
+                                                                                keyword:
+                                                                                  'maxLength',
                                                                                 params: {
-                                                                                  pattern:
-                                                                                    '^(stun|stuns|turn|turns):[^\\s]+$',
+                                                                                  limit: 2048,
                                                                                 },
                                                                                 message:
-                                                                                  'must match pattern "^(stun|stuns|turn|turns):[^\\s]+$"',
+                                                                                  'must NOT have more than 2048 characters',
                                                                               },
                                                                             ];
                                                                             return false;
+                                                                          } else {
+                                                                            if (
+                                                                              !pattern8.test(data17)
+                                                                            ) {
+                                                                              validate27.errors = [
+                                                                                {
+                                                                                  instancePath:
+                                                                                    instancePath +
+                                                                                    '/ice_config/ice_servers/' +
+                                                                                    i0 +
+                                                                                    '/urls/' +
+                                                                                    i2,
+                                                                                  schemaPath:
+                                                                                    '#/$defs/ice_config/properties/ice_servers/items/properties/urls/items/pattern',
+                                                                                  keyword:
+                                                                                    'pattern',
+                                                                                  params: {
+                                                                                    pattern:
+                                                                                      '^(stun|stuns|turn|turns):[^\\s]+$',
+                                                                                  },
+                                                                                  message:
+                                                                                    'must match pattern "^(stun|stuns|turn|turns):[^\\s]+$"',
+                                                                                },
+                                                                              ];
+                                                                              return false;
+                                                                            }
                                                                           }
-                                                                        }
-                                                                      } else {
-                                                                        validate27.errors = [
-                                                                          {
-                                                                            instancePath:
-                                                                              instancePath +
-                                                                              '/ice_config/ice_servers/' +
-                                                                              i0 +
-                                                                              '/urls/' +
-                                                                              i2,
-                                                                            schemaPath:
-                                                                              '#/$defs/ice_config/properties/ice_servers/items/properties/urls/items/type',
-                                                                            keyword: 'type',
-                                                                            params: {
-                                                                              type: 'string',
+                                                                        } else {
+                                                                          validate27.errors = [
+                                                                            {
+                                                                              instancePath:
+                                                                                instancePath +
+                                                                                '/ice_config/ice_servers/' +
+                                                                                i0 +
+                                                                                '/urls/' +
+                                                                                i2,
+                                                                              schemaPath:
+                                                                                '#/$defs/ice_config/properties/ice_servers/items/properties/urls/items/type',
+                                                                              keyword: 'type',
+                                                                              params: {
+                                                                                type: 'string',
+                                                                              },
+                                                                              message:
+                                                                                'must be string',
                                                                             },
-                                                                            message:
-                                                                              'must be string',
-                                                                          },
-                                                                        ];
-                                                                        return false;
+                                                                          ];
+                                                                          return false;
+                                                                        }
+                                                                      }
+                                                                      var valid10 =
+                                                                        _errs43 === errors;
+                                                                      if (!valid10) {
+                                                                        break;
                                                                       }
                                                                     }
-                                                                    var valid10 =
-                                                                      _errs41 === errors;
-                                                                    if (!valid10) {
-                                                                      break;
-                                                                    }
                                                                   }
-                                                                }
-                                                              }
-                                                            } else {
-                                                              validate27.errors = [
-                                                                {
-                                                                  instancePath:
-                                                                    instancePath +
-                                                                    '/ice_config/ice_servers/' +
-                                                                    i0 +
-                                                                    '/urls',
-                                                                  schemaPath:
-                                                                    '#/$defs/ice_config/properties/ice_servers/items/properties/urls/type',
-                                                                  keyword: 'type',
-                                                                  params: { type: 'array' },
-                                                                  message: 'must be array',
-                                                                },
-                                                              ];
-                                                              return false;
-                                                            }
-                                                          }
-                                                          var valid9 = _errs39 === errors;
-                                                        } else {
-                                                          var valid9 = true;
-                                                        }
-                                                        if (valid9) {
-                                                          if (data9.username !== void 0) {
-                                                            let data17 = data9.username;
-                                                            const _errs43 = errors;
-                                                            if (errors === _errs43) {
-                                                              if (typeof data17 === 'string') {
-                                                                if (func1(data17) > 512) {
-                                                                  validate27.errors = [
-                                                                    {
-                                                                      instancePath:
-                                                                        instancePath +
-                                                                        '/ice_config/ice_servers/' +
-                                                                        i0 +
-                                                                        '/username',
-                                                                      schemaPath:
-                                                                        '#/$defs/ice_config/properties/ice_servers/items/properties/username/maxLength',
-                                                                      keyword: 'maxLength',
-                                                                      params: { limit: 512 },
-                                                                      message:
-                                                                        'must NOT have more than 512 characters',
-                                                                    },
-                                                                  ];
-                                                                  return false;
                                                                 }
                                                               } else {
                                                                 validate27.errors = [
@@ -3618,41 +3620,41 @@ var require_control_schema = __commonJS({
                                                                       instancePath +
                                                                       '/ice_config/ice_servers/' +
                                                                       i0 +
-                                                                      '/username',
+                                                                      '/urls',
                                                                     schemaPath:
-                                                                      '#/$defs/ice_config/properties/ice_servers/items/properties/username/type',
+                                                                      '#/$defs/ice_config/properties/ice_servers/items/properties/urls/type',
                                                                     keyword: 'type',
-                                                                    params: { type: 'string' },
-                                                                    message: 'must be string',
+                                                                    params: { type: 'array' },
+                                                                    message: 'must be array',
                                                                   },
                                                                 ];
                                                                 return false;
                                                               }
                                                             }
-                                                            var valid9 = _errs43 === errors;
+                                                            var valid9 = _errs41 === errors;
                                                           } else {
                                                             var valid9 = true;
                                                           }
                                                           if (valid9) {
-                                                            if (data9.credential !== void 0) {
-                                                              let data18 = data9.credential;
+                                                            if (data10.username !== void 0) {
+                                                              let data18 = data10.username;
                                                               const _errs45 = errors;
                                                               if (errors === _errs45) {
                                                                 if (typeof data18 === 'string') {
-                                                                  if (func1(data18) > 2048) {
+                                                                  if (func1(data18) > 512) {
                                                                     validate27.errors = [
                                                                       {
                                                                         instancePath:
                                                                           instancePath +
                                                                           '/ice_config/ice_servers/' +
                                                                           i0 +
-                                                                          '/credential',
+                                                                          '/username',
                                                                         schemaPath:
-                                                                          '#/$defs/ice_config/properties/ice_servers/items/properties/credential/maxLength',
+                                                                          '#/$defs/ice_config/properties/ice_servers/items/properties/username/maxLength',
                                                                         keyword: 'maxLength',
-                                                                        params: { limit: 2048 },
+                                                                        params: { limit: 512 },
                                                                         message:
-                                                                          'must NOT have more than 2048 characters',
+                                                                          'must NOT have more than 512 characters',
                                                                       },
                                                                     ];
                                                                     return false;
@@ -3664,9 +3666,9 @@ var require_control_schema = __commonJS({
                                                                         instancePath +
                                                                         '/ice_config/ice_servers/' +
                                                                         i0 +
-                                                                        '/credential',
+                                                                        '/username',
                                                                       schemaPath:
-                                                                        '#/$defs/ice_config/properties/ice_servers/items/properties/credential/type',
+                                                                        '#/$defs/ice_config/properties/ice_servers/items/properties/username/type',
                                                                       keyword: 'type',
                                                                       params: { type: 'string' },
                                                                       message: 'must be string',
@@ -3680,21 +3682,87 @@ var require_control_schema = __commonJS({
                                                               var valid9 = true;
                                                             }
                                                             if (valid9) {
-                                                              if (
-                                                                data9.credential_expires_at !==
-                                                                void 0
-                                                              ) {
-                                                                let data19 =
-                                                                  data9.credential_expires_at;
+                                                              if (data10.credential !== void 0) {
+                                                                let data19 = data10.credential;
                                                                 const _errs47 = errors;
                                                                 if (errors === _errs47) {
-                                                                  if (errors === _errs47) {
-                                                                    if (
-                                                                      typeof data19 === 'string'
-                                                                    ) {
+                                                                  if (typeof data19 === 'string') {
+                                                                    if (func1(data19) > 2048) {
+                                                                      validate27.errors = [
+                                                                        {
+                                                                          instancePath:
+                                                                            instancePath +
+                                                                            '/ice_config/ice_servers/' +
+                                                                            i0 +
+                                                                            '/credential',
+                                                                          schemaPath:
+                                                                            '#/$defs/ice_config/properties/ice_servers/items/properties/credential/maxLength',
+                                                                          keyword: 'maxLength',
+                                                                          params: { limit: 2048 },
+                                                                          message:
+                                                                            'must NOT have more than 2048 characters',
+                                                                        },
+                                                                      ];
+                                                                      return false;
+                                                                    }
+                                                                  } else {
+                                                                    validate27.errors = [
+                                                                      {
+                                                                        instancePath:
+                                                                          instancePath +
+                                                                          '/ice_config/ice_servers/' +
+                                                                          i0 +
+                                                                          '/credential',
+                                                                        schemaPath:
+                                                                          '#/$defs/ice_config/properties/ice_servers/items/properties/credential/type',
+                                                                        keyword: 'type',
+                                                                        params: { type: 'string' },
+                                                                        message: 'must be string',
+                                                                      },
+                                                                    ];
+                                                                    return false;
+                                                                  }
+                                                                }
+                                                                var valid9 = _errs47 === errors;
+                                                              } else {
+                                                                var valid9 = true;
+                                                              }
+                                                              if (valid9) {
+                                                                if (
+                                                                  data10.credential_expires_at !==
+                                                                  void 0
+                                                                ) {
+                                                                  let data20 =
+                                                                    data10.credential_expires_at;
+                                                                  const _errs49 = errors;
+                                                                  if (errors === _errs49) {
+                                                                    if (errors === _errs49) {
                                                                       if (
-                                                                        !formats0.validate(data19)
+                                                                        typeof data20 === 'string'
                                                                       ) {
+                                                                        if (
+                                                                          !formats0.validate(data20)
+                                                                        ) {
+                                                                          validate27.errors = [
+                                                                            {
+                                                                              instancePath:
+                                                                                instancePath +
+                                                                                '/ice_config/ice_servers/' +
+                                                                                i0 +
+                                                                                '/credential_expires_at',
+                                                                              schemaPath:
+                                                                                '#/$defs/ice_config/properties/ice_servers/items/properties/credential_expires_at/format',
+                                                                              keyword: 'format',
+                                                                              params: {
+                                                                                format: 'date-time',
+                                                                              },
+                                                                              message:
+                                                                                'must match format "date-time"',
+                                                                            },
+                                                                          ];
+                                                                          return false;
+                                                                        }
+                                                                      } else {
                                                                         validate27.errors = [
                                                                           {
                                                                             instancePath:
@@ -3703,88 +3771,70 @@ var require_control_schema = __commonJS({
                                                                               i0 +
                                                                               '/credential_expires_at',
                                                                             schemaPath:
-                                                                              '#/$defs/ice_config/properties/ice_servers/items/properties/credential_expires_at/format',
-                                                                            keyword: 'format',
+                                                                              '#/$defs/ice_config/properties/ice_servers/items/properties/credential_expires_at/type',
+                                                                            keyword: 'type',
                                                                             params: {
-                                                                              format: 'date-time',
+                                                                              type: 'string',
                                                                             },
                                                                             message:
-                                                                              'must match format "date-time"',
+                                                                              'must be string',
                                                                           },
                                                                         ];
                                                                         return false;
                                                                       }
-                                                                    } else {
-                                                                      validate27.errors = [
-                                                                        {
-                                                                          instancePath:
-                                                                            instancePath +
-                                                                            '/ice_config/ice_servers/' +
-                                                                            i0 +
-                                                                            '/credential_expires_at',
-                                                                          schemaPath:
-                                                                            '#/$defs/ice_config/properties/ice_servers/items/properties/credential_expires_at/type',
-                                                                          keyword: 'type',
-                                                                          params: {
-                                                                            type: 'string',
-                                                                          },
-                                                                          message: 'must be string',
-                                                                        },
-                                                                      ];
-                                                                      return false;
                                                                     }
                                                                   }
+                                                                  var valid9 = _errs49 === errors;
+                                                                } else {
+                                                                  var valid9 = true;
                                                                 }
-                                                                var valid9 = _errs47 === errors;
-                                                              } else {
-                                                                var valid9 = true;
                                                               }
                                                             }
                                                           }
                                                         }
                                                       }
+                                                    } else {
+                                                      validate27.errors = [
+                                                        {
+                                                          instancePath:
+                                                            instancePath +
+                                                            '/ice_config/ice_servers/' +
+                                                            i0,
+                                                          schemaPath:
+                                                            '#/$defs/ice_config/properties/ice_servers/items/type',
+                                                          keyword: 'type',
+                                                          params: { type: 'object' },
+                                                          message: 'must be object',
+                                                        },
+                                                      ];
+                                                      return false;
                                                     }
-                                                  } else {
-                                                    validate27.errors = [
-                                                      {
-                                                        instancePath:
-                                                          instancePath +
-                                                          '/ice_config/ice_servers/' +
-                                                          i0,
-                                                        schemaPath:
-                                                          '#/$defs/ice_config/properties/ice_servers/items/type',
-                                                        keyword: 'type',
-                                                        params: { type: 'object' },
-                                                        message: 'must be object',
-                                                      },
-                                                    ];
-                                                    return false;
+                                                  }
+                                                  var valid3 = _errs23 === errors;
+                                                  if (!valid3) {
+                                                    break;
                                                   }
                                                 }
-                                                var valid3 = _errs21 === errors;
-                                                if (!valid3) {
-                                                  break;
-                                                }
                                               }
+                                            } else {
+                                              validate27.errors = [
+                                                {
+                                                  instancePath:
+                                                    instancePath + '/ice_config/ice_servers',
+                                                  schemaPath:
+                                                    '#/$defs/ice_config/properties/ice_servers/type',
+                                                  keyword: 'type',
+                                                  params: { type: 'array' },
+                                                  message: 'must be array',
+                                                },
+                                              ];
+                                              return false;
                                             }
-                                          } else {
-                                            validate27.errors = [
-                                              {
-                                                instancePath:
-                                                  instancePath + '/ice_config/ice_servers',
-                                                schemaPath:
-                                                  '#/$defs/ice_config/properties/ice_servers/type',
-                                                keyword: 'type',
-                                                params: { type: 'array' },
-                                                message: 'must be array',
-                                              },
-                                            ];
-                                            return false;
                                           }
+                                          var valid2 = _errs21 === errors;
+                                        } else {
+                                          var valid2 = true;
                                         }
-                                        var valid2 = _errs19 === errors;
-                                      } else {
-                                        var valid2 = true;
                                       }
                                     }
                                   }
@@ -3793,83 +3843,34 @@ var require_control_schema = __commonJS({
                             }
                           }
                         }
-                      }
-                    } else {
-                      validate27.errors = [
-                        {
-                          instancePath: instancePath + '/ice_config',
-                          schemaPath: '#/$defs/ice_config/type',
-                          keyword: 'type',
-                          params: { type: 'object' },
-                          message: 'must be object',
-                        },
-                      ];
-                      return false;
-                    }
-                  }
-                  var valid0 = _errs4 === errors;
-                } else {
-                  var valid0 = true;
-                }
-                if (valid0) {
-                  if (data.capability !== void 0) {
-                    let data20 = data.capability;
-                    const _errs49 = errors;
-                    if (errors === _errs49) {
-                      if (typeof data20 === 'string') {
-                        if (func1(data20) > 128) {
-                          validate27.errors = [
-                            {
-                              instancePath: instancePath + '/capability',
-                              schemaPath: '#/properties/capability/maxLength',
-                              keyword: 'maxLength',
-                              params: { limit: 128 },
-                              message: 'must NOT have more than 128 characters',
-                            },
-                          ];
-                          return false;
-                        } else {
-                          if (func1(data20) < 1) {
-                            validate27.errors = [
-                              {
-                                instancePath: instancePath + '/capability',
-                                schemaPath: '#/properties/capability/minLength',
-                                keyword: 'minLength',
-                                params: { limit: 1 },
-                                message: 'must NOT have fewer than 1 characters',
-                              },
-                            ];
-                            return false;
-                          }
-                        }
                       } else {
                         validate27.errors = [
                           {
-                            instancePath: instancePath + '/capability',
-                            schemaPath: '#/properties/capability/type',
+                            instancePath: instancePath + '/ice_config',
+                            schemaPath: '#/$defs/ice_config/type',
                             keyword: 'type',
-                            params: { type: 'string' },
-                            message: 'must be string',
+                            params: { type: 'object' },
+                            message: 'must be object',
                           },
                         ];
                         return false;
                       }
                     }
-                    var valid0 = _errs49 === errors;
+                    var valid0 = _errs6 === errors;
                   } else {
                     var valid0 = true;
                   }
                   if (valid0) {
-                    if (data.target_id !== void 0) {
-                      let data21 = data.target_id;
+                    if (data.capability !== void 0) {
+                      let data21 = data.capability;
                       const _errs51 = errors;
                       if (errors === _errs51) {
                         if (typeof data21 === 'string') {
                           if (func1(data21) > 128) {
                             validate27.errors = [
                               {
-                                instancePath: instancePath + '/target_id',
-                                schemaPath: '#/properties/target_id/maxLength',
+                                instancePath: instancePath + '/capability',
+                                schemaPath: '#/properties/capability/maxLength',
                                 keyword: 'maxLength',
                                 params: { limit: 128 },
                                 message: 'must NOT have more than 128 characters',
@@ -3880,8 +3881,8 @@ var require_control_schema = __commonJS({
                             if (func1(data21) < 1) {
                               validate27.errors = [
                                 {
-                                  instancePath: instancePath + '/target_id',
-                                  schemaPath: '#/properties/target_id/minLength',
+                                  instancePath: instancePath + '/capability',
+                                  schemaPath: '#/properties/capability/minLength',
                                   keyword: 'minLength',
                                   params: { limit: 1 },
                                   message: 'must NOT have fewer than 1 characters',
@@ -3893,8 +3894,8 @@ var require_control_schema = __commonJS({
                         } else {
                           validate27.errors = [
                             {
-                              instancePath: instancePath + '/target_id',
-                              schemaPath: '#/properties/target_id/type',
+                              instancePath: instancePath + '/capability',
+                              schemaPath: '#/properties/capability/type',
                               keyword: 'type',
                               params: { type: 'string' },
                               message: 'must be string',
@@ -3906,6 +3907,55 @@ var require_control_schema = __commonJS({
                       var valid0 = _errs51 === errors;
                     } else {
                       var valid0 = true;
+                    }
+                    if (valid0) {
+                      if (data.target_id !== void 0) {
+                        let data22 = data.target_id;
+                        const _errs53 = errors;
+                        if (errors === _errs53) {
+                          if (typeof data22 === 'string') {
+                            if (func1(data22) > 128) {
+                              validate27.errors = [
+                                {
+                                  instancePath: instancePath + '/target_id',
+                                  schemaPath: '#/properties/target_id/maxLength',
+                                  keyword: 'maxLength',
+                                  params: { limit: 128 },
+                                  message: 'must NOT have more than 128 characters',
+                                },
+                              ];
+                              return false;
+                            } else {
+                              if (func1(data22) < 1) {
+                                validate27.errors = [
+                                  {
+                                    instancePath: instancePath + '/target_id',
+                                    schemaPath: '#/properties/target_id/minLength',
+                                    keyword: 'minLength',
+                                    params: { limit: 1 },
+                                    message: 'must NOT have fewer than 1 characters',
+                                  },
+                                ];
+                                return false;
+                              }
+                            }
+                          } else {
+                            validate27.errors = [
+                              {
+                                instancePath: instancePath + '/target_id',
+                                schemaPath: '#/properties/target_id/type',
+                                keyword: 'type',
+                                params: { type: 'string' },
+                                message: 'must be string',
+                              },
+                            ];
+                            return false;
+                          }
+                        }
+                        var valid0 = _errs53 === errors;
+                      } else {
+                        var valid0 = true;
+                      }
                     }
                   }
                 }
@@ -3929,6 +3979,17 @@ var require_control_schema = __commonJS({
       return errors === 0;
     }
     validate27.evaluated = { props: true, dynamicProps: false, dynamicItems: false };
+    var schema49 = {
+      type: 'object',
+      properties: {
+        candidate_path: { enum: ['stun', 'turn', 'mixed'] },
+        available: { type: 'boolean' },
+        ice_config: { $ref: '#/$defs/ice_config' },
+        negotiation_generation: { type: 'string', pattern: '^[1-9][0-9]{0,19}$' },
+      },
+      required: ['negotiation_generation'],
+      additionalProperties: false,
+    };
     var pattern9 = new RegExp('^[1-9][0-9]{0,19}$', 'u');
     function validate29(
       data,
@@ -3952,10 +4013,7 @@ var require_control_schema = __commonJS({
       if (errors === 0) {
         if (data && typeof data == 'object' && !Array.isArray(data)) {
           let missing0;
-          if (
-            (data.ice_config === void 0 && (missing0 = 'ice_config')) ||
-            (data.negotiation_generation === void 0 && (missing0 = 'negotiation_generation'))
-          ) {
+          if (data.negotiation_generation === void 0 && (missing0 = 'negotiation_generation')) {
             validate29.errors = [
               {
                 instancePath,
@@ -3969,8 +4027,1184 @@ var require_control_schema = __commonJS({
           } else {
             const _errs1 = errors;
             for (const key0 in data) {
-              if (!(key0 === 'ice_config' || key0 === 'negotiation_generation')) {
+              if (!(
+                key0 === 'candidate_path' ||
+                key0 === 'available' ||
+                key0 === 'ice_config' ||
+                key0 === 'negotiation_generation'
+              )) {
                 validate29.errors = [
+                  {
+                    instancePath,
+                    schemaPath: '#/additionalProperties',
+                    keyword: 'additionalProperties',
+                    params: { additionalProperty: key0 },
+                    message: 'must NOT have additional properties',
+                  },
+                ];
+                return false;
+                break;
+              }
+            }
+            if (_errs1 === errors) {
+              if (data.candidate_path !== void 0) {
+                let data0 = data.candidate_path;
+                const _errs2 = errors;
+                if (!(data0 === 'stun' || data0 === 'turn' || data0 === 'mixed')) {
+                  validate29.errors = [
+                    {
+                      instancePath: instancePath + '/candidate_path',
+                      schemaPath: '#/properties/candidate_path/enum',
+                      keyword: 'enum',
+                      params: { allowedValues: schema49.properties.candidate_path.enum },
+                      message: 'must be equal to one of the allowed values',
+                    },
+                  ];
+                  return false;
+                }
+                var valid0 = _errs2 === errors;
+              } else {
+                var valid0 = true;
+              }
+              if (valid0) {
+                if (data.available !== void 0) {
+                  const _errs3 = errors;
+                  if (typeof data.available !== 'boolean') {
+                    validate29.errors = [
+                      {
+                        instancePath: instancePath + '/available',
+                        schemaPath: '#/properties/available/type',
+                        keyword: 'type',
+                        params: { type: 'boolean' },
+                        message: 'must be boolean',
+                      },
+                    ];
+                    return false;
+                  }
+                  var valid0 = _errs3 === errors;
+                } else {
+                  var valid0 = true;
+                }
+                if (valid0) {
+                  if (data.ice_config !== void 0) {
+                    let data2 = data.ice_config;
+                    const _errs5 = errors;
+                    const _errs6 = errors;
+                    if (errors === _errs6) {
+                      if (data2 && typeof data2 == 'object' && !Array.isArray(data2)) {
+                        let missing1;
+                        if (
+                          (data2.revision === void 0 && (missing1 = 'revision')) ||
+                          (data2.policy_revision === void 0 && (missing1 = 'policy_revision')) ||
+                          (data2.expires_at === void 0 && (missing1 = 'expires_at')) ||
+                          (data2.ice_transport_policy === void 0 &&
+                            (missing1 = 'ice_transport_policy')) ||
+                          (data2.allow_wss === void 0 && (missing1 = 'allow_wss')) ||
+                          (data2.ice_servers === void 0 && (missing1 = 'ice_servers'))
+                        ) {
+                          validate29.errors = [
+                            {
+                              instancePath: instancePath + '/ice_config',
+                              schemaPath: '#/$defs/ice_config/required',
+                              keyword: 'required',
+                              params: { missingProperty: missing1 },
+                              message: "must have required property '" + missing1 + "'",
+                            },
+                          ];
+                          return false;
+                        } else {
+                          const _errs8 = errors;
+                          for (const key1 in data2) {
+                            if (!(
+                              key1 === 'revision' ||
+                              key1 === 'policy_revision' ||
+                              key1 === 'expires_at' ||
+                              key1 === 'ice_transport_policy' ||
+                              key1 === 'allow_wss' ||
+                              key1 === 'allow_http' ||
+                              key1 === 'ice_servers'
+                            )) {
+                              validate29.errors = [
+                                {
+                                  instancePath: instancePath + '/ice_config',
+                                  schemaPath: '#/$defs/ice_config/additionalProperties',
+                                  keyword: 'additionalProperties',
+                                  params: { additionalProperty: key1 },
+                                  message: 'must NOT have additional properties',
+                                },
+                              ];
+                              return false;
+                              break;
+                            }
+                          }
+                          if (_errs8 === errors) {
+                            if (data2.revision !== void 0) {
+                              let data3 = data2.revision;
+                              const _errs9 = errors;
+                              if (errors === _errs9) {
+                                if (typeof data3 === 'string') {
+                                  if (func1(data3) > 128) {
+                                    validate29.errors = [
+                                      {
+                                        instancePath: instancePath + '/ice_config/revision',
+                                        schemaPath:
+                                          '#/$defs/ice_config/properties/revision/maxLength',
+                                        keyword: 'maxLength',
+                                        params: { limit: 128 },
+                                        message: 'must NOT have more than 128 characters',
+                                      },
+                                    ];
+                                    return false;
+                                  } else {
+                                    if (func1(data3) < 1) {
+                                      validate29.errors = [
+                                        {
+                                          instancePath: instancePath + '/ice_config/revision',
+                                          schemaPath:
+                                            '#/$defs/ice_config/properties/revision/minLength',
+                                          keyword: 'minLength',
+                                          params: { limit: 1 },
+                                          message: 'must NOT have fewer than 1 characters',
+                                        },
+                                      ];
+                                      return false;
+                                    }
+                                  }
+                                } else {
+                                  validate29.errors = [
+                                    {
+                                      instancePath: instancePath + '/ice_config/revision',
+                                      schemaPath: '#/$defs/ice_config/properties/revision/type',
+                                      keyword: 'type',
+                                      params: { type: 'string' },
+                                      message: 'must be string',
+                                    },
+                                  ];
+                                  return false;
+                                }
+                              }
+                              var valid2 = _errs9 === errors;
+                            } else {
+                              var valid2 = true;
+                            }
+                            if (valid2) {
+                              if (data2.policy_revision !== void 0) {
+                                let data4 = data2.policy_revision;
+                                const _errs11 = errors;
+                                if (errors === _errs11) {
+                                  if (typeof data4 === 'string') {
+                                    if (func1(data4) > 128) {
+                                      validate29.errors = [
+                                        {
+                                          instancePath:
+                                            instancePath + '/ice_config/policy_revision',
+                                          schemaPath:
+                                            '#/$defs/ice_config/properties/policy_revision/maxLength',
+                                          keyword: 'maxLength',
+                                          params: { limit: 128 },
+                                          message: 'must NOT have more than 128 characters',
+                                        },
+                                      ];
+                                      return false;
+                                    } else {
+                                      if (func1(data4) < 1) {
+                                        validate29.errors = [
+                                          {
+                                            instancePath:
+                                              instancePath + '/ice_config/policy_revision',
+                                            schemaPath:
+                                              '#/$defs/ice_config/properties/policy_revision/minLength',
+                                            keyword: 'minLength',
+                                            params: { limit: 1 },
+                                            message: 'must NOT have fewer than 1 characters',
+                                          },
+                                        ];
+                                        return false;
+                                      }
+                                    }
+                                  } else {
+                                    validate29.errors = [
+                                      {
+                                        instancePath: instancePath + '/ice_config/policy_revision',
+                                        schemaPath:
+                                          '#/$defs/ice_config/properties/policy_revision/type',
+                                        keyword: 'type',
+                                        params: { type: 'string' },
+                                        message: 'must be string',
+                                      },
+                                    ];
+                                    return false;
+                                  }
+                                }
+                                var valid2 = _errs11 === errors;
+                              } else {
+                                var valid2 = true;
+                              }
+                              if (valid2) {
+                                if (data2.expires_at !== void 0) {
+                                  let data5 = data2.expires_at;
+                                  const _errs13 = errors;
+                                  if (errors === _errs13) {
+                                    if (errors === _errs13) {
+                                      if (typeof data5 === 'string') {
+                                        if (!formats0.validate(data5)) {
+                                          validate29.errors = [
+                                            {
+                                              instancePath: instancePath + '/ice_config/expires_at',
+                                              schemaPath:
+                                                '#/$defs/ice_config/properties/expires_at/format',
+                                              keyword: 'format',
+                                              params: { format: 'date-time' },
+                                              message: 'must match format "date-time"',
+                                            },
+                                          ];
+                                          return false;
+                                        }
+                                      } else {
+                                        validate29.errors = [
+                                          {
+                                            instancePath: instancePath + '/ice_config/expires_at',
+                                            schemaPath:
+                                              '#/$defs/ice_config/properties/expires_at/type',
+                                            keyword: 'type',
+                                            params: { type: 'string' },
+                                            message: 'must be string',
+                                          },
+                                        ];
+                                        return false;
+                                      }
+                                    }
+                                  }
+                                  var valid2 = _errs13 === errors;
+                                } else {
+                                  var valid2 = true;
+                                }
+                                if (valid2) {
+                                  if (data2.ice_transport_policy !== void 0) {
+                                    let data6 = data2.ice_transport_policy;
+                                    const _errs15 = errors;
+                                    if (!(data6 === 'all' || data6 === 'relay')) {
+                                      validate29.errors = [
+                                        {
+                                          instancePath:
+                                            instancePath + '/ice_config/ice_transport_policy',
+                                          schemaPath:
+                                            '#/$defs/ice_config/properties/ice_transport_policy/enum',
+                                          keyword: 'enum',
+                                          params: {
+                                            allowedValues:
+                                              schema42.properties.ice_transport_policy.enum,
+                                          },
+                                          message: 'must be equal to one of the allowed values',
+                                        },
+                                      ];
+                                      return false;
+                                    }
+                                    var valid2 = _errs15 === errors;
+                                  } else {
+                                    var valid2 = true;
+                                  }
+                                  if (valid2) {
+                                    if (data2.allow_wss !== void 0) {
+                                      const _errs16 = errors;
+                                      if (typeof data2.allow_wss !== 'boolean') {
+                                        validate29.errors = [
+                                          {
+                                            instancePath: instancePath + '/ice_config/allow_wss',
+                                            schemaPath:
+                                              '#/$defs/ice_config/properties/allow_wss/type',
+                                            keyword: 'type',
+                                            params: { type: 'boolean' },
+                                            message: 'must be boolean',
+                                          },
+                                        ];
+                                        return false;
+                                      }
+                                      var valid2 = _errs16 === errors;
+                                    } else {
+                                      var valid2 = true;
+                                    }
+                                    if (valid2) {
+                                      if (data2.allow_http !== void 0) {
+                                        const _errs18 = errors;
+                                        if (typeof data2.allow_http !== 'boolean') {
+                                          validate29.errors = [
+                                            {
+                                              instancePath: instancePath + '/ice_config/allow_http',
+                                              schemaPath:
+                                                '#/$defs/ice_config/properties/allow_http/type',
+                                              keyword: 'type',
+                                              params: { type: 'boolean' },
+                                              message: 'must be boolean',
+                                            },
+                                          ];
+                                          return false;
+                                        }
+                                        var valid2 = _errs18 === errors;
+                                      } else {
+                                        var valid2 = true;
+                                      }
+                                      if (valid2) {
+                                        if (data2.ice_servers !== void 0) {
+                                          let data9 = data2.ice_servers;
+                                          const _errs20 = errors;
+                                          if (errors === _errs20) {
+                                            if (Array.isArray(data9)) {
+                                              if (data9.length > 16) {
+                                                validate29.errors = [
+                                                  {
+                                                    instancePath:
+                                                      instancePath + '/ice_config/ice_servers',
+                                                    schemaPath:
+                                                      '#/$defs/ice_config/properties/ice_servers/maxItems',
+                                                    keyword: 'maxItems',
+                                                    params: { limit: 16 },
+                                                    message: 'must NOT have more than 16 items',
+                                                  },
+                                                ];
+                                                return false;
+                                              } else {
+                                                var valid3 = true;
+                                                const len0 = data9.length;
+                                                for (let i0 = 0; i0 < len0; i0++) {
+                                                  let data10 = data9[i0];
+                                                  const _errs22 = errors;
+                                                  const _errs25 = errors;
+                                                  let valid5 = true;
+                                                  const _errs26 = errors;
+                                                  if (
+                                                    data10 &&
+                                                    typeof data10 == 'object' &&
+                                                    !Array.isArray(data10)
+                                                  ) {
+                                                    if (data10.urls !== void 0) {
+                                                      let data11 = data10.urls;
+                                                      const _errs27 = errors;
+                                                      if (errors === _errs27) {
+                                                        if (Array.isArray(data11)) {
+                                                          const _errs29 = errors;
+                                                          const len1 = data11.length;
+                                                          for (let i1 = 0; i1 < len1; i1++) {
+                                                            let data12 = data11[i1];
+                                                            const _errs30 = errors;
+                                                            if (errors === _errs30) {
+                                                              if (typeof data12 === 'string') {
+                                                                if (!pattern7.test(data12)) {
+                                                                  const err0 = {};
+                                                                  if (vErrors === null) {
+                                                                    vErrors = [err0];
+                                                                  } else {
+                                                                    vErrors.push(err0);
+                                                                  }
+                                                                  errors++;
+                                                                }
+                                                              } else {
+                                                                const err1 = {};
+                                                                if (vErrors === null) {
+                                                                  vErrors = [err1];
+                                                                } else {
+                                                                  vErrors.push(err1);
+                                                                }
+                                                                errors++;
+                                                              }
+                                                            }
+                                                            var valid7 = _errs30 === errors;
+                                                            if (valid7) {
+                                                              break;
+                                                            }
+                                                          }
+                                                          if (!valid7) {
+                                                            const err2 = {};
+                                                            if (vErrors === null) {
+                                                              vErrors = [err2];
+                                                            } else {
+                                                              vErrors.push(err2);
+                                                            }
+                                                            errors++;
+                                                          } else {
+                                                            errors = _errs29;
+                                                            if (vErrors !== null) {
+                                                              if (_errs29) {
+                                                                vErrors.length = _errs29;
+                                                              } else {
+                                                                vErrors = null;
+                                                              }
+                                                            }
+                                                          }
+                                                        } else {
+                                                          const err3 = {};
+                                                          if (vErrors === null) {
+                                                            vErrors = [err3];
+                                                          } else {
+                                                            vErrors.push(err3);
+                                                          }
+                                                          errors++;
+                                                        }
+                                                      }
+                                                    }
+                                                  }
+                                                  var _valid0 = _errs26 === errors;
+                                                  errors = _errs25;
+                                                  if (vErrors !== null) {
+                                                    if (_errs25) {
+                                                      vErrors.length = _errs25;
+                                                    } else {
+                                                      vErrors = null;
+                                                    }
+                                                  }
+                                                  if (_valid0) {
+                                                    const _errs32 = errors;
+                                                    if (
+                                                      data10 &&
+                                                      typeof data10 == 'object' &&
+                                                      !Array.isArray(data10)
+                                                    ) {
+                                                      let missing2;
+                                                      if (
+                                                        (data10.username === void 0 &&
+                                                          (missing2 = 'username')) ||
+                                                        (data10.credential === void 0 &&
+                                                          (missing2 = 'credential')) ||
+                                                        (data10.credential_expires_at === void 0 &&
+                                                          (missing2 = 'credential_expires_at'))
+                                                      ) {
+                                                        validate29.errors = [
+                                                          {
+                                                            instancePath:
+                                                              instancePath +
+                                                              '/ice_config/ice_servers/' +
+                                                              i0,
+                                                            schemaPath:
+                                                              '#/$defs/ice_config/properties/ice_servers/items/allOf/0/then/required',
+                                                            keyword: 'required',
+                                                            params: { missingProperty: missing2 },
+                                                            message:
+                                                              "must have required property '" +
+                                                              missing2 +
+                                                              "'",
+                                                          },
+                                                        ];
+                                                        return false;
+                                                      } else {
+                                                        if (data10.username !== void 0) {
+                                                          let data13 = data10.username;
+                                                          const _errs33 = errors;
+                                                          if (errors === _errs33) {
+                                                            if (typeof data13 === 'string') {
+                                                              if (func1(data13) > 512) {
+                                                                validate29.errors = [
+                                                                  {
+                                                                    instancePath:
+                                                                      instancePath +
+                                                                      '/ice_config/ice_servers/' +
+                                                                      i0 +
+                                                                      '/username',
+                                                                    schemaPath:
+                                                                      '#/$defs/ice_config/properties/ice_servers/items/allOf/0/then/properties/username/maxLength',
+                                                                    keyword: 'maxLength',
+                                                                    params: { limit: 512 },
+                                                                    message:
+                                                                      'must NOT have more than 512 characters',
+                                                                  },
+                                                                ];
+                                                                return false;
+                                                              }
+                                                            } else {
+                                                              validate29.errors = [
+                                                                {
+                                                                  instancePath:
+                                                                    instancePath +
+                                                                    '/ice_config/ice_servers/' +
+                                                                    i0 +
+                                                                    '/username',
+                                                                  schemaPath:
+                                                                    '#/$defs/ice_config/properties/ice_servers/items/allOf/0/then/properties/username/type',
+                                                                  keyword: 'type',
+                                                                  params: { type: 'string' },
+                                                                  message: 'must be string',
+                                                                },
+                                                              ];
+                                                              return false;
+                                                            }
+                                                          }
+                                                          var valid8 = _errs33 === errors;
+                                                        } else {
+                                                          var valid8 = true;
+                                                        }
+                                                        if (valid8) {
+                                                          if (data10.credential !== void 0) {
+                                                            let data14 = data10.credential;
+                                                            const _errs35 = errors;
+                                                            if (errors === _errs35) {
+                                                              if (typeof data14 === 'string') {
+                                                                if (func1(data14) > 2048) {
+                                                                  validate29.errors = [
+                                                                    {
+                                                                      instancePath:
+                                                                        instancePath +
+                                                                        '/ice_config/ice_servers/' +
+                                                                        i0 +
+                                                                        '/credential',
+                                                                      schemaPath:
+                                                                        '#/$defs/ice_config/properties/ice_servers/items/allOf/0/then/properties/credential/maxLength',
+                                                                      keyword: 'maxLength',
+                                                                      params: { limit: 2048 },
+                                                                      message:
+                                                                        'must NOT have more than 2048 characters',
+                                                                    },
+                                                                  ];
+                                                                  return false;
+                                                                }
+                                                              } else {
+                                                                validate29.errors = [
+                                                                  {
+                                                                    instancePath:
+                                                                      instancePath +
+                                                                      '/ice_config/ice_servers/' +
+                                                                      i0 +
+                                                                      '/credential',
+                                                                    schemaPath:
+                                                                      '#/$defs/ice_config/properties/ice_servers/items/allOf/0/then/properties/credential/type',
+                                                                    keyword: 'type',
+                                                                    params: { type: 'string' },
+                                                                    message: 'must be string',
+                                                                  },
+                                                                ];
+                                                                return false;
+                                                              }
+                                                            }
+                                                            var valid8 = _errs35 === errors;
+                                                          } else {
+                                                            var valid8 = true;
+                                                          }
+                                                          if (valid8) {
+                                                            if (
+                                                              data10.credential_expires_at !==
+                                                              void 0
+                                                            ) {
+                                                              let data15 =
+                                                                data10.credential_expires_at;
+                                                              const _errs37 = errors;
+                                                              if (errors === _errs37) {
+                                                                if (errors === _errs37) {
+                                                                  if (typeof data15 === 'string') {
+                                                                    if (
+                                                                      !formats0.validate(data15)
+                                                                    ) {
+                                                                      validate29.errors = [
+                                                                        {
+                                                                          instancePath:
+                                                                            instancePath +
+                                                                            '/ice_config/ice_servers/' +
+                                                                            i0 +
+                                                                            '/credential_expires_at',
+                                                                          schemaPath:
+                                                                            '#/$defs/ice_config/properties/ice_servers/items/allOf/0/then/properties/credential_expires_at/format',
+                                                                          keyword: 'format',
+                                                                          params: {
+                                                                            format: 'date-time',
+                                                                          },
+                                                                          message:
+                                                                            'must match format "date-time"',
+                                                                        },
+                                                                      ];
+                                                                      return false;
+                                                                    }
+                                                                  } else {
+                                                                    validate29.errors = [
+                                                                      {
+                                                                        instancePath:
+                                                                          instancePath +
+                                                                          '/ice_config/ice_servers/' +
+                                                                          i0 +
+                                                                          '/credential_expires_at',
+                                                                        schemaPath:
+                                                                          '#/$defs/ice_config/properties/ice_servers/items/allOf/0/then/properties/credential_expires_at/type',
+                                                                        keyword: 'type',
+                                                                        params: { type: 'string' },
+                                                                        message: 'must be string',
+                                                                      },
+                                                                    ];
+                                                                    return false;
+                                                                  }
+                                                                }
+                                                              }
+                                                              var valid8 = _errs37 === errors;
+                                                            } else {
+                                                              var valid8 = true;
+                                                            }
+                                                          }
+                                                        }
+                                                      }
+                                                    }
+                                                    var _valid0 = _errs32 === errors;
+                                                    valid5 = _valid0;
+                                                    if (valid5) {
+                                                      var props0 = {};
+                                                      props0.username = true;
+                                                      props0.credential = true;
+                                                      props0.credential_expires_at = true;
+                                                      props0.urls = true;
+                                                    }
+                                                  }
+                                                  if (!valid5) {
+                                                    const err4 = {
+                                                      instancePath:
+                                                        instancePath +
+                                                        '/ice_config/ice_servers/' +
+                                                        i0,
+                                                      schemaPath:
+                                                        '#/$defs/ice_config/properties/ice_servers/items/allOf/0/if',
+                                                      keyword: 'if',
+                                                      params: { failingKeyword: 'then' },
+                                                      message: 'must match "then" schema',
+                                                    };
+                                                    if (vErrors === null) {
+                                                      vErrors = [err4];
+                                                    } else {
+                                                      vErrors.push(err4);
+                                                    }
+                                                    errors++;
+                                                    validate29.errors = vErrors;
+                                                    return false;
+                                                  }
+                                                  if (errors === _errs22) {
+                                                    if (
+                                                      data10 &&
+                                                      typeof data10 == 'object' &&
+                                                      !Array.isArray(data10)
+                                                    ) {
+                                                      let missing3;
+                                                      if (
+                                                        data10.urls === void 0 &&
+                                                        (missing3 = 'urls')
+                                                      ) {
+                                                        validate29.errors = [
+                                                          {
+                                                            instancePath:
+                                                              instancePath +
+                                                              '/ice_config/ice_servers/' +
+                                                              i0,
+                                                            schemaPath:
+                                                              '#/$defs/ice_config/properties/ice_servers/items/required',
+                                                            keyword: 'required',
+                                                            params: { missingProperty: missing3 },
+                                                            message:
+                                                              "must have required property '" +
+                                                              missing3 +
+                                                              "'",
+                                                          },
+                                                        ];
+                                                        return false;
+                                                      } else {
+                                                        const _errs39 = errors;
+                                                        for (const key2 in data10) {
+                                                          if (!(
+                                                            key2 === 'urls' ||
+                                                            key2 === 'username' ||
+                                                            key2 === 'credential' ||
+                                                            key2 === 'credential_expires_at'
+                                                          )) {
+                                                            validate29.errors = [
+                                                              {
+                                                                instancePath:
+                                                                  instancePath +
+                                                                  '/ice_config/ice_servers/' +
+                                                                  i0,
+                                                                schemaPath:
+                                                                  '#/$defs/ice_config/properties/ice_servers/items/additionalProperties',
+                                                                keyword: 'additionalProperties',
+                                                                params: {
+                                                                  additionalProperty: key2,
+                                                                },
+                                                                message:
+                                                                  'must NOT have additional properties',
+                                                              },
+                                                            ];
+                                                            return false;
+                                                            break;
+                                                          }
+                                                        }
+                                                        if (_errs39 === errors) {
+                                                          if (data10.urls !== void 0) {
+                                                            let data16 = data10.urls;
+                                                            const _errs40 = errors;
+                                                            if (errors === _errs40) {
+                                                              if (Array.isArray(data16)) {
+                                                                if (data16.length > 8) {
+                                                                  validate29.errors = [
+                                                                    {
+                                                                      instancePath:
+                                                                        instancePath +
+                                                                        '/ice_config/ice_servers/' +
+                                                                        i0 +
+                                                                        '/urls',
+                                                                      schemaPath:
+                                                                        '#/$defs/ice_config/properties/ice_servers/items/properties/urls/maxItems',
+                                                                      keyword: 'maxItems',
+                                                                      params: { limit: 8 },
+                                                                      message:
+                                                                        'must NOT have more than 8 items',
+                                                                    },
+                                                                  ];
+                                                                  return false;
+                                                                } else {
+                                                                  if (data16.length < 1) {
+                                                                    validate29.errors = [
+                                                                      {
+                                                                        instancePath:
+                                                                          instancePath +
+                                                                          '/ice_config/ice_servers/' +
+                                                                          i0 +
+                                                                          '/urls',
+                                                                        schemaPath:
+                                                                          '#/$defs/ice_config/properties/ice_servers/items/properties/urls/minItems',
+                                                                        keyword: 'minItems',
+                                                                        params: { limit: 1 },
+                                                                        message:
+                                                                          'must NOT have fewer than 1 items',
+                                                                      },
+                                                                    ];
+                                                                    return false;
+                                                                  } else {
+                                                                    var valid10 = true;
+                                                                    const len2 = data16.length;
+                                                                    for (
+                                                                      let i2 = 0;
+                                                                      i2 < len2;
+                                                                      i2++
+                                                                    ) {
+                                                                      let data17 = data16[i2];
+                                                                      const _errs42 = errors;
+                                                                      if (errors === _errs42) {
+                                                                        if (
+                                                                          typeof data17 === 'string'
+                                                                        ) {
+                                                                          if (
+                                                                            func1(data17) > 2048
+                                                                          ) {
+                                                                            validate29.errors = [
+                                                                              {
+                                                                                instancePath:
+                                                                                  instancePath +
+                                                                                  '/ice_config/ice_servers/' +
+                                                                                  i0 +
+                                                                                  '/urls/' +
+                                                                                  i2,
+                                                                                schemaPath:
+                                                                                  '#/$defs/ice_config/properties/ice_servers/items/properties/urls/items/maxLength',
+                                                                                keyword:
+                                                                                  'maxLength',
+                                                                                params: {
+                                                                                  limit: 2048,
+                                                                                },
+                                                                                message:
+                                                                                  'must NOT have more than 2048 characters',
+                                                                              },
+                                                                            ];
+                                                                            return false;
+                                                                          } else {
+                                                                            if (
+                                                                              !pattern8.test(data17)
+                                                                            ) {
+                                                                              validate29.errors = [
+                                                                                {
+                                                                                  instancePath:
+                                                                                    instancePath +
+                                                                                    '/ice_config/ice_servers/' +
+                                                                                    i0 +
+                                                                                    '/urls/' +
+                                                                                    i2,
+                                                                                  schemaPath:
+                                                                                    '#/$defs/ice_config/properties/ice_servers/items/properties/urls/items/pattern',
+                                                                                  keyword:
+                                                                                    'pattern',
+                                                                                  params: {
+                                                                                    pattern:
+                                                                                      '^(stun|stuns|turn|turns):[^\\s]+$',
+                                                                                  },
+                                                                                  message:
+                                                                                    'must match pattern "^(stun|stuns|turn|turns):[^\\s]+$"',
+                                                                                },
+                                                                              ];
+                                                                              return false;
+                                                                            }
+                                                                          }
+                                                                        } else {
+                                                                          validate29.errors = [
+                                                                            {
+                                                                              instancePath:
+                                                                                instancePath +
+                                                                                '/ice_config/ice_servers/' +
+                                                                                i0 +
+                                                                                '/urls/' +
+                                                                                i2,
+                                                                              schemaPath:
+                                                                                '#/$defs/ice_config/properties/ice_servers/items/properties/urls/items/type',
+                                                                              keyword: 'type',
+                                                                              params: {
+                                                                                type: 'string',
+                                                                              },
+                                                                              message:
+                                                                                'must be string',
+                                                                            },
+                                                                          ];
+                                                                          return false;
+                                                                        }
+                                                                      }
+                                                                      var valid10 =
+                                                                        _errs42 === errors;
+                                                                      if (!valid10) {
+                                                                        break;
+                                                                      }
+                                                                    }
+                                                                  }
+                                                                }
+                                                              } else {
+                                                                validate29.errors = [
+                                                                  {
+                                                                    instancePath:
+                                                                      instancePath +
+                                                                      '/ice_config/ice_servers/' +
+                                                                      i0 +
+                                                                      '/urls',
+                                                                    schemaPath:
+                                                                      '#/$defs/ice_config/properties/ice_servers/items/properties/urls/type',
+                                                                    keyword: 'type',
+                                                                    params: { type: 'array' },
+                                                                    message: 'must be array',
+                                                                  },
+                                                                ];
+                                                                return false;
+                                                              }
+                                                            }
+                                                            var valid9 = _errs40 === errors;
+                                                          } else {
+                                                            var valid9 = true;
+                                                          }
+                                                          if (valid9) {
+                                                            if (data10.username !== void 0) {
+                                                              let data18 = data10.username;
+                                                              const _errs44 = errors;
+                                                              if (errors === _errs44) {
+                                                                if (typeof data18 === 'string') {
+                                                                  if (func1(data18) > 512) {
+                                                                    validate29.errors = [
+                                                                      {
+                                                                        instancePath:
+                                                                          instancePath +
+                                                                          '/ice_config/ice_servers/' +
+                                                                          i0 +
+                                                                          '/username',
+                                                                        schemaPath:
+                                                                          '#/$defs/ice_config/properties/ice_servers/items/properties/username/maxLength',
+                                                                        keyword: 'maxLength',
+                                                                        params: { limit: 512 },
+                                                                        message:
+                                                                          'must NOT have more than 512 characters',
+                                                                      },
+                                                                    ];
+                                                                    return false;
+                                                                  }
+                                                                } else {
+                                                                  validate29.errors = [
+                                                                    {
+                                                                      instancePath:
+                                                                        instancePath +
+                                                                        '/ice_config/ice_servers/' +
+                                                                        i0 +
+                                                                        '/username',
+                                                                      schemaPath:
+                                                                        '#/$defs/ice_config/properties/ice_servers/items/properties/username/type',
+                                                                      keyword: 'type',
+                                                                      params: { type: 'string' },
+                                                                      message: 'must be string',
+                                                                    },
+                                                                  ];
+                                                                  return false;
+                                                                }
+                                                              }
+                                                              var valid9 = _errs44 === errors;
+                                                            } else {
+                                                              var valid9 = true;
+                                                            }
+                                                            if (valid9) {
+                                                              if (data10.credential !== void 0) {
+                                                                let data19 = data10.credential;
+                                                                const _errs46 = errors;
+                                                                if (errors === _errs46) {
+                                                                  if (typeof data19 === 'string') {
+                                                                    if (func1(data19) > 2048) {
+                                                                      validate29.errors = [
+                                                                        {
+                                                                          instancePath:
+                                                                            instancePath +
+                                                                            '/ice_config/ice_servers/' +
+                                                                            i0 +
+                                                                            '/credential',
+                                                                          schemaPath:
+                                                                            '#/$defs/ice_config/properties/ice_servers/items/properties/credential/maxLength',
+                                                                          keyword: 'maxLength',
+                                                                          params: { limit: 2048 },
+                                                                          message:
+                                                                            'must NOT have more than 2048 characters',
+                                                                        },
+                                                                      ];
+                                                                      return false;
+                                                                    }
+                                                                  } else {
+                                                                    validate29.errors = [
+                                                                      {
+                                                                        instancePath:
+                                                                          instancePath +
+                                                                          '/ice_config/ice_servers/' +
+                                                                          i0 +
+                                                                          '/credential',
+                                                                        schemaPath:
+                                                                          '#/$defs/ice_config/properties/ice_servers/items/properties/credential/type',
+                                                                        keyword: 'type',
+                                                                        params: { type: 'string' },
+                                                                        message: 'must be string',
+                                                                      },
+                                                                    ];
+                                                                    return false;
+                                                                  }
+                                                                }
+                                                                var valid9 = _errs46 === errors;
+                                                              } else {
+                                                                var valid9 = true;
+                                                              }
+                                                              if (valid9) {
+                                                                if (
+                                                                  data10.credential_expires_at !==
+                                                                  void 0
+                                                                ) {
+                                                                  let data20 =
+                                                                    data10.credential_expires_at;
+                                                                  const _errs48 = errors;
+                                                                  if (errors === _errs48) {
+                                                                    if (errors === _errs48) {
+                                                                      if (
+                                                                        typeof data20 === 'string'
+                                                                      ) {
+                                                                        if (
+                                                                          !formats0.validate(data20)
+                                                                        ) {
+                                                                          validate29.errors = [
+                                                                            {
+                                                                              instancePath:
+                                                                                instancePath +
+                                                                                '/ice_config/ice_servers/' +
+                                                                                i0 +
+                                                                                '/credential_expires_at',
+                                                                              schemaPath:
+                                                                                '#/$defs/ice_config/properties/ice_servers/items/properties/credential_expires_at/format',
+                                                                              keyword: 'format',
+                                                                              params: {
+                                                                                format: 'date-time',
+                                                                              },
+                                                                              message:
+                                                                                'must match format "date-time"',
+                                                                            },
+                                                                          ];
+                                                                          return false;
+                                                                        }
+                                                                      } else {
+                                                                        validate29.errors = [
+                                                                          {
+                                                                            instancePath:
+                                                                              instancePath +
+                                                                              '/ice_config/ice_servers/' +
+                                                                              i0 +
+                                                                              '/credential_expires_at',
+                                                                            schemaPath:
+                                                                              '#/$defs/ice_config/properties/ice_servers/items/properties/credential_expires_at/type',
+                                                                            keyword: 'type',
+                                                                            params: {
+                                                                              type: 'string',
+                                                                            },
+                                                                            message:
+                                                                              'must be string',
+                                                                          },
+                                                                        ];
+                                                                        return false;
+                                                                      }
+                                                                    }
+                                                                  }
+                                                                  var valid9 = _errs48 === errors;
+                                                                } else {
+                                                                  var valid9 = true;
+                                                                }
+                                                              }
+                                                            }
+                                                          }
+                                                        }
+                                                      }
+                                                    } else {
+                                                      validate29.errors = [
+                                                        {
+                                                          instancePath:
+                                                            instancePath +
+                                                            '/ice_config/ice_servers/' +
+                                                            i0,
+                                                          schemaPath:
+                                                            '#/$defs/ice_config/properties/ice_servers/items/type',
+                                                          keyword: 'type',
+                                                          params: { type: 'object' },
+                                                          message: 'must be object',
+                                                        },
+                                                      ];
+                                                      return false;
+                                                    }
+                                                  }
+                                                  var valid3 = _errs22 === errors;
+                                                  if (!valid3) {
+                                                    break;
+                                                  }
+                                                }
+                                              }
+                                            } else {
+                                              validate29.errors = [
+                                                {
+                                                  instancePath:
+                                                    instancePath + '/ice_config/ice_servers',
+                                                  schemaPath:
+                                                    '#/$defs/ice_config/properties/ice_servers/type',
+                                                  keyword: 'type',
+                                                  params: { type: 'array' },
+                                                  message: 'must be array',
+                                                },
+                                              ];
+                                              return false;
+                                            }
+                                          }
+                                          var valid2 = _errs20 === errors;
+                                        } else {
+                                          var valid2 = true;
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      } else {
+                        validate29.errors = [
+                          {
+                            instancePath: instancePath + '/ice_config',
+                            schemaPath: '#/$defs/ice_config/type',
+                            keyword: 'type',
+                            params: { type: 'object' },
+                            message: 'must be object',
+                          },
+                        ];
+                        return false;
+                      }
+                    }
+                    var valid0 = _errs5 === errors;
+                  } else {
+                    var valid0 = true;
+                  }
+                  if (valid0) {
+                    if (data.negotiation_generation !== void 0) {
+                      let data21 = data.negotiation_generation;
+                      const _errs50 = errors;
+                      if (errors === _errs50) {
+                        if (typeof data21 === 'string') {
+                          if (!pattern9.test(data21)) {
+                            validate29.errors = [
+                              {
+                                instancePath: instancePath + '/negotiation_generation',
+                                schemaPath: '#/properties/negotiation_generation/pattern',
+                                keyword: 'pattern',
+                                params: { pattern: '^[1-9][0-9]{0,19}$' },
+                                message: 'must match pattern "^[1-9][0-9]{0,19}$"',
+                              },
+                            ];
+                            return false;
+                          }
+                        } else {
+                          validate29.errors = [
+                            {
+                              instancePath: instancePath + '/negotiation_generation',
+                              schemaPath: '#/properties/negotiation_generation/type',
+                              keyword: 'type',
+                              params: { type: 'string' },
+                              message: 'must be string',
+                            },
+                          ];
+                          return false;
+                        }
+                      }
+                      var valid0 = _errs50 === errors;
+                    } else {
+                      var valid0 = true;
+                    }
+                  }
+                }
+              }
+            }
+          }
+        } else {
+          validate29.errors = [
+            {
+              instancePath,
+              schemaPath: '#/type',
+              keyword: 'type',
+              params: { type: 'object' },
+              message: 'must be object',
+            },
+          ];
+          return false;
+        }
+      }
+      validate29.errors = vErrors;
+      return errors === 0;
+    }
+    validate29.evaluated = { props: true, dynamicProps: false, dynamicItems: false };
+    function validate31(
+      data,
+      {
+        instancePath = '',
+        parentData,
+        parentDataProperty,
+        rootData = data,
+        dynamicAnchors = {},
+      } = {},
+    ) {
+      let vErrors = null;
+      let errors = 0;
+      const evaluated0 = validate31.evaluated;
+      if (evaluated0.dynamicProps) {
+        evaluated0.props = void 0;
+      }
+      if (evaluated0.dynamicItems) {
+        evaluated0.items = void 0;
+      }
+      if (errors === 0) {
+        if (data && typeof data == 'object' && !Array.isArray(data)) {
+          let missing0;
+          if (
+            (data.ice_config === void 0 && (missing0 = 'ice_config')) ||
+            (data.negotiation_generation === void 0 && (missing0 = 'negotiation_generation'))
+          ) {
+            validate31.errors = [
+              {
+                instancePath,
+                schemaPath: '#/required',
+                keyword: 'required',
+                params: { missingProperty: missing0 },
+                message: "must have required property '" + missing0 + "'",
+              },
+            ];
+            return false;
+          } else {
+            const _errs1 = errors;
+            for (const key0 in data) {
+              if (!(key0 === 'ice_config' || key0 === 'negotiation_generation')) {
+                validate31.errors = [
                   {
                     instancePath,
                     schemaPath: '#/additionalProperties',
@@ -4000,7 +5234,7 @@ var require_control_schema = __commonJS({
                       (data0.allow_wss === void 0 && (missing1 = 'allow_wss')) ||
                       (data0.ice_servers === void 0 && (missing1 = 'ice_servers'))
                     ) {
-                      validate29.errors = [
+                      validate31.errors = [
                         {
                           instancePath: instancePath + '/ice_config',
                           schemaPath: '#/$defs/ice_config/required',
@@ -4022,7 +5256,7 @@ var require_control_schema = __commonJS({
                           key1 === 'allow_http' ||
                           key1 === 'ice_servers'
                         )) {
-                          validate29.errors = [
+                          validate31.errors = [
                             {
                               instancePath: instancePath + '/ice_config',
                               schemaPath: '#/$defs/ice_config/additionalProperties',
@@ -4042,7 +5276,7 @@ var require_control_schema = __commonJS({
                           if (errors === _errs6) {
                             if (typeof data1 === 'string') {
                               if (func1(data1) > 128) {
-                                validate29.errors = [
+                                validate31.errors = [
                                   {
                                     instancePath: instancePath + '/ice_config/revision',
                                     schemaPath: '#/$defs/ice_config/properties/revision/maxLength',
@@ -4054,7 +5288,7 @@ var require_control_schema = __commonJS({
                                 return false;
                               } else {
                                 if (func1(data1) < 1) {
-                                  validate29.errors = [
+                                  validate31.errors = [
                                     {
                                       instancePath: instancePath + '/ice_config/revision',
                                       schemaPath:
@@ -4068,7 +5302,7 @@ var require_control_schema = __commonJS({
                                 }
                               }
                             } else {
-                              validate29.errors = [
+                              validate31.errors = [
                                 {
                                   instancePath: instancePath + '/ice_config/revision',
                                   schemaPath: '#/$defs/ice_config/properties/revision/type',
@@ -4091,7 +5325,7 @@ var require_control_schema = __commonJS({
                             if (errors === _errs8) {
                               if (typeof data2 === 'string') {
                                 if (func1(data2) > 128) {
-                                  validate29.errors = [
+                                  validate31.errors = [
                                     {
                                       instancePath: instancePath + '/ice_config/policy_revision',
                                       schemaPath:
@@ -4104,7 +5338,7 @@ var require_control_schema = __commonJS({
                                   return false;
                                 } else {
                                   if (func1(data2) < 1) {
-                                    validate29.errors = [
+                                    validate31.errors = [
                                       {
                                         instancePath: instancePath + '/ice_config/policy_revision',
                                         schemaPath:
@@ -4118,7 +5352,7 @@ var require_control_schema = __commonJS({
                                   }
                                 }
                               } else {
-                                validate29.errors = [
+                                validate31.errors = [
                                   {
                                     instancePath: instancePath + '/ice_config/policy_revision',
                                     schemaPath:
@@ -4143,7 +5377,7 @@ var require_control_schema = __commonJS({
                                 if (errors === _errs10) {
                                   if (typeof data3 === 'string') {
                                     if (!formats0.validate(data3)) {
-                                      validate29.errors = [
+                                      validate31.errors = [
                                         {
                                           instancePath: instancePath + '/ice_config/expires_at',
                                           schemaPath:
@@ -4156,7 +5390,7 @@ var require_control_schema = __commonJS({
                                       return false;
                                     }
                                   } else {
-                                    validate29.errors = [
+                                    validate31.errors = [
                                       {
                                         instancePath: instancePath + '/ice_config/expires_at',
                                         schemaPath: '#/$defs/ice_config/properties/expires_at/type',
@@ -4178,7 +5412,7 @@ var require_control_schema = __commonJS({
                                 let data4 = data0.ice_transport_policy;
                                 const _errs12 = errors;
                                 if (!(data4 === 'all' || data4 === 'relay')) {
-                                  validate29.errors = [
+                                  validate31.errors = [
                                     {
                                       instancePath:
                                         instancePath + '/ice_config/ice_transport_policy',
@@ -4202,7 +5436,7 @@ var require_control_schema = __commonJS({
                                 if (data0.allow_wss !== void 0) {
                                   const _errs13 = errors;
                                   if (typeof data0.allow_wss !== 'boolean') {
-                                    validate29.errors = [
+                                    validate31.errors = [
                                       {
                                         instancePath: instancePath + '/ice_config/allow_wss',
                                         schemaPath: '#/$defs/ice_config/properties/allow_wss/type',
@@ -4221,7 +5455,7 @@ var require_control_schema = __commonJS({
                                   if (data0.allow_http !== void 0) {
                                     const _errs15 = errors;
                                     if (typeof data0.allow_http !== 'boolean') {
-                                      validate29.errors = [
+                                      validate31.errors = [
                                         {
                                           instancePath: instancePath + '/ice_config/allow_http',
                                           schemaPath:
@@ -4244,7 +5478,7 @@ var require_control_schema = __commonJS({
                                       if (errors === _errs17) {
                                         if (Array.isArray(data7)) {
                                           if (data7.length > 16) {
-                                            validate29.errors = [
+                                            validate31.errors = [
                                               {
                                                 instancePath:
                                                   instancePath + '/ice_config/ice_servers',
@@ -4361,7 +5595,7 @@ var require_control_schema = __commonJS({
                                                     (data8.credential_expires_at === void 0 &&
                                                       (missing2 = 'credential_expires_at'))
                                                   ) {
-                                                    validate29.errors = [
+                                                    validate31.errors = [
                                                       {
                                                         instancePath:
                                                           instancePath +
@@ -4385,7 +5619,7 @@ var require_control_schema = __commonJS({
                                                       if (errors === _errs30) {
                                                         if (typeof data11 === 'string') {
                                                           if (func1(data11) > 512) {
-                                                            validate29.errors = [
+                                                            validate31.errors = [
                                                               {
                                                                 instancePath:
                                                                   instancePath +
@@ -4403,7 +5637,7 @@ var require_control_schema = __commonJS({
                                                             return false;
                                                           }
                                                         } else {
-                                                          validate29.errors = [
+                                                          validate31.errors = [
                                                             {
                                                               instancePath:
                                                                 instancePath +
@@ -4431,7 +5665,7 @@ var require_control_schema = __commonJS({
                                                         if (errors === _errs32) {
                                                           if (typeof data12 === 'string') {
                                                             if (func1(data12) > 2048) {
-                                                              validate29.errors = [
+                                                              validate31.errors = [
                                                                 {
                                                                   instancePath:
                                                                     instancePath +
@@ -4449,7 +5683,7 @@ var require_control_schema = __commonJS({
                                                               return false;
                                                             }
                                                           } else {
-                                                            validate29.errors = [
+                                                            validate31.errors = [
                                                               {
                                                                 instancePath:
                                                                   instancePath +
@@ -4480,7 +5714,7 @@ var require_control_schema = __commonJS({
                                                             if (errors === _errs34) {
                                                               if (typeof data13 === 'string') {
                                                                 if (!formats0.validate(data13)) {
-                                                                  validate29.errors = [
+                                                                  validate31.errors = [
                                                                     {
                                                                       instancePath:
                                                                         instancePath +
@@ -4500,7 +5734,7 @@ var require_control_schema = __commonJS({
                                                                   return false;
                                                                 }
                                                               } else {
-                                                                validate29.errors = [
+                                                                validate31.errors = [
                                                                   {
                                                                     instancePath:
                                                                       instancePath +
@@ -4552,7 +5786,7 @@ var require_control_schema = __commonJS({
                                                   vErrors.push(err4);
                                                 }
                                                 errors++;
-                                                validate29.errors = vErrors;
+                                                validate31.errors = vErrors;
                                                 return false;
                                               }
                                               if (errors === _errs19) {
@@ -4566,7 +5800,7 @@ var require_control_schema = __commonJS({
                                                     data8.urls === void 0 &&
                                                     (missing3 = 'urls')
                                                   ) {
-                                                    validate29.errors = [
+                                                    validate31.errors = [
                                                       {
                                                         instancePath:
                                                           instancePath +
@@ -4592,7 +5826,7 @@ var require_control_schema = __commonJS({
                                                         key2 === 'credential' ||
                                                         key2 === 'credential_expires_at'
                                                       )) {
-                                                        validate29.errors = [
+                                                        validate31.errors = [
                                                           {
                                                             instancePath:
                                                               instancePath +
@@ -4617,7 +5851,7 @@ var require_control_schema = __commonJS({
                                                         if (errors === _errs37) {
                                                           if (Array.isArray(data14)) {
                                                             if (data14.length > 8) {
-                                                              validate29.errors = [
+                                                              validate31.errors = [
                                                                 {
                                                                   instancePath:
                                                                     instancePath +
@@ -4635,7 +5869,7 @@ var require_control_schema = __commonJS({
                                                               return false;
                                                             } else {
                                                               if (data14.length < 1) {
-                                                                validate29.errors = [
+                                                                validate31.errors = [
                                                                   {
                                                                     instancePath:
                                                                       instancePath +
@@ -4662,7 +5896,7 @@ var require_control_schema = __commonJS({
                                                                       typeof data15 === 'string'
                                                                     ) {
                                                                       if (func1(data15) > 2048) {
-                                                                        validate29.errors = [
+                                                                        validate31.errors = [
                                                                           {
                                                                             instancePath:
                                                                               instancePath +
@@ -4683,7 +5917,7 @@ var require_control_schema = __commonJS({
                                                                         if (
                                                                           !pattern8.test(data15)
                                                                         ) {
-                                                                          validate29.errors = [
+                                                                          validate31.errors = [
                                                                             {
                                                                               instancePath:
                                                                                 instancePath +
@@ -4706,7 +5940,7 @@ var require_control_schema = __commonJS({
                                                                         }
                                                                       }
                                                                     } else {
-                                                                      validate29.errors = [
+                                                                      validate31.errors = [
                                                                         {
                                                                           instancePath:
                                                                             instancePath +
@@ -4734,7 +5968,7 @@ var require_control_schema = __commonJS({
                                                               }
                                                             }
                                                           } else {
-                                                            validate29.errors = [
+                                                            validate31.errors = [
                                                               {
                                                                 instancePath:
                                                                   instancePath +
@@ -4762,7 +5996,7 @@ var require_control_schema = __commonJS({
                                                           if (errors === _errs41) {
                                                             if (typeof data16 === 'string') {
                                                               if (func1(data16) > 512) {
-                                                                validate29.errors = [
+                                                                validate31.errors = [
                                                                   {
                                                                     instancePath:
                                                                       instancePath +
@@ -4780,7 +6014,7 @@ var require_control_schema = __commonJS({
                                                                 return false;
                                                               }
                                                             } else {
-                                                              validate29.errors = [
+                                                              validate31.errors = [
                                                                 {
                                                                   instancePath:
                                                                     instancePath +
@@ -4808,7 +6042,7 @@ var require_control_schema = __commonJS({
                                                             if (errors === _errs43) {
                                                               if (typeof data17 === 'string') {
                                                                 if (func1(data17) > 2048) {
-                                                                  validate29.errors = [
+                                                                  validate31.errors = [
                                                                     {
                                                                       instancePath:
                                                                         instancePath +
@@ -4826,7 +6060,7 @@ var require_control_schema = __commonJS({
                                                                   return false;
                                                                 }
                                                               } else {
-                                                                validate29.errors = [
+                                                                validate31.errors = [
                                                                   {
                                                                     instancePath:
                                                                       instancePath +
@@ -4860,7 +6094,7 @@ var require_control_schema = __commonJS({
                                                                     if (
                                                                       !formats0.validate(data18)
                                                                     ) {
-                                                                      validate29.errors = [
+                                                                      validate31.errors = [
                                                                         {
                                                                           instancePath:
                                                                             instancePath +
@@ -4880,7 +6114,7 @@ var require_control_schema = __commonJS({
                                                                       return false;
                                                                     }
                                                                   } else {
-                                                                    validate29.errors = [
+                                                                    validate31.errors = [
                                                                       {
                                                                         instancePath:
                                                                           instancePath +
@@ -4908,7 +6142,7 @@ var require_control_schema = __commonJS({
                                                     }
                                                   }
                                                 } else {
-                                                  validate29.errors = [
+                                                  validate31.errors = [
                                                     {
                                                       instancePath:
                                                         instancePath +
@@ -4931,7 +6165,7 @@ var require_control_schema = __commonJS({
                                             }
                                           }
                                         } else {
-                                          validate29.errors = [
+                                          validate31.errors = [
                                             {
                                               instancePath:
                                                 instancePath + '/ice_config/ice_servers',
@@ -4958,7 +6192,7 @@ var require_control_schema = __commonJS({
                       }
                     }
                   } else {
-                    validate29.errors = [
+                    validate31.errors = [
                       {
                         instancePath: instancePath + '/ice_config',
                         schemaPath: '#/$defs/ice_config/type',
@@ -4981,7 +6215,7 @@ var require_control_schema = __commonJS({
                   if (errors === _errs47) {
                     if (typeof data19 === 'string') {
                       if (!pattern9.test(data19)) {
-                        validate29.errors = [
+                        validate31.errors = [
                           {
                             instancePath: instancePath + '/negotiation_generation',
                             schemaPath: '#/properties/negotiation_generation/pattern',
@@ -4993,7 +6227,7 @@ var require_control_schema = __commonJS({
                         return false;
                       }
                     } else {
-                      validate29.errors = [
+                      validate31.errors = [
                         {
                           instancePath: instancePath + '/negotiation_generation',
                           schemaPath: '#/properties/negotiation_generation/type',
@@ -5013,7 +6247,7 @@ var require_control_schema = __commonJS({
             }
           }
         } else {
-          validate29.errors = [
+          validate31.errors = [
             {
               instancePath,
               schemaPath: '#/type',
@@ -5025,11 +6259,11 @@ var require_control_schema = __commonJS({
           return false;
         }
       }
-      validate29.errors = vErrors;
+      validate31.errors = vErrors;
       return errors === 0;
     }
-    validate29.evaluated = { props: true, dynamicProps: false, dynamicItems: false };
-    var pattern14 = new RegExp('^[1-9][0-9]{0,18}$', 'u');
+    validate31.evaluated = { props: true, dynamicProps: false, dynamicItems: false };
+    var pattern16 = new RegExp('^[1-9][0-9]{0,18}$', 'u');
     function validate20(
       data,
       {
@@ -8207,7 +9441,10 @@ var require_control_schema = __commonJS({
                                           } else {
                                             const _errs175 = errors;
                                             for (const key9 in data52) {
-                                              if (!(key9 === 'negotiation_generation')) {
+                                              if (!(
+                                                key9 === 'candidate_path' ||
+                                                key9 === 'negotiation_generation'
+                                              )) {
                                                 validate20.errors = [
                                                   {
                                                     instancePath: instancePath + '/payload',
@@ -8223,42 +9460,78 @@ var require_control_schema = __commonJS({
                                               }
                                             }
                                             if (_errs175 === errors) {
-                                              if (data52.negotiation_generation !== void 0) {
-                                                let data53 = data52.negotiation_generation;
+                                              if (data52.candidate_path !== void 0) {
+                                                let data53 = data52.candidate_path;
                                                 const _errs176 = errors;
-                                                if (errors === _errs176) {
-                                                  if (typeof data53 === 'string') {
-                                                    if (!pattern9.test(data53)) {
+                                                if (!(
+                                                  data53 === 'stun' ||
+                                                  data53 === 'turn' ||
+                                                  data53 === 'mixed'
+                                                )) {
+                                                  validate20.errors = [
+                                                    {
+                                                      instancePath:
+                                                        instancePath + '/payload/candidate_path',
+                                                      schemaPath:
+                                                        '#/$defs/payload_relay_request/properties/candidate_path/enum',
+                                                      keyword: 'enum',
+                                                      params: {
+                                                        allowedValues:
+                                                          schema48.properties.candidate_path.enum,
+                                                      },
+                                                      message:
+                                                        'must be equal to one of the allowed values',
+                                                    },
+                                                  ];
+                                                  return false;
+                                                }
+                                                var valid60 = _errs176 === errors;
+                                              } else {
+                                                var valid60 = true;
+                                              }
+                                              if (valid60) {
+                                                if (data52.negotiation_generation !== void 0) {
+                                                  let data54 = data52.negotiation_generation;
+                                                  const _errs177 = errors;
+                                                  if (errors === _errs177) {
+                                                    if (typeof data54 === 'string') {
+                                                      if (!pattern9.test(data54)) {
+                                                        validate20.errors = [
+                                                          {
+                                                            instancePath:
+                                                              instancePath +
+                                                              '/payload/negotiation_generation',
+                                                            schemaPath:
+                                                              '#/$defs/payload_relay_request/properties/negotiation_generation/pattern',
+                                                            keyword: 'pattern',
+                                                            params: {
+                                                              pattern: '^[1-9][0-9]{0,19}$',
+                                                            },
+                                                            message:
+                                                              'must match pattern "^[1-9][0-9]{0,19}$"',
+                                                          },
+                                                        ];
+                                                        return false;
+                                                      }
+                                                    } else {
                                                       validate20.errors = [
                                                         {
                                                           instancePath:
                                                             instancePath +
                                                             '/payload/negotiation_generation',
                                                           schemaPath:
-                                                            '#/$defs/payload_relay_request/properties/negotiation_generation/pattern',
-                                                          keyword: 'pattern',
-                                                          params: { pattern: '^[1-9][0-9]{0,19}$' },
-                                                          message:
-                                                            'must match pattern "^[1-9][0-9]{0,19}$"',
+                                                            '#/$defs/payload_relay_request/properties/negotiation_generation/type',
+                                                          keyword: 'type',
+                                                          params: { type: 'string' },
+                                                          message: 'must be string',
                                                         },
                                                       ];
                                                       return false;
                                                     }
-                                                  } else {
-                                                    validate20.errors = [
-                                                      {
-                                                        instancePath:
-                                                          instancePath +
-                                                          '/payload/negotiation_generation',
-                                                        schemaPath:
-                                                          '#/$defs/payload_relay_request/properties/negotiation_generation/type',
-                                                        keyword: 'type',
-                                                        params: { type: 'string' },
-                                                        message: 'must be string',
-                                                      },
-                                                    ];
-                                                    return false;
                                                   }
+                                                  var valid60 = _errs177 === errors;
+                                                } else {
+                                                  var valid60 = true;
                                                 }
                                               }
                                             }
@@ -8282,11 +9555,11 @@ var require_control_schema = __commonJS({
                                     }
                                     if (valid58) {
                                       if (data.session_id !== void 0) {
-                                        let data54 = data.session_id;
-                                        const _errs179 = errors;
-                                        if (errors === _errs179) {
-                                          if (typeof data54 === 'string') {
-                                            if (func1(data54) > 128) {
+                                        let data55 = data.session_id;
+                                        const _errs180 = errors;
+                                        if (errors === _errs180) {
+                                          if (typeof data55 === 'string') {
+                                            if (func1(data55) > 128) {
                                               validate20.errors = [
                                                 {
                                                   instancePath: instancePath + '/session_id',
@@ -8299,7 +9572,7 @@ var require_control_schema = __commonJS({
                                               ];
                                               return false;
                                             } else {
-                                              if (func1(data54) < 1) {
+                                              if (func1(data55) < 1) {
                                                 validate20.errors = [
                                                   {
                                                     instancePath: instancePath + '/session_id',
@@ -8328,7 +9601,7 @@ var require_control_schema = __commonJS({
                                             return false;
                                           }
                                         }
-                                        var valid58 = _errs179 === errors;
+                                        var valid58 = _errs180 === errors;
                                       } else {
                                         var valid58 = true;
                                       }
@@ -8371,10 +9644,10 @@ var require_control_schema = __commonJS({
                                     Object.assign(props0, props13);
                                   }
                                 }
-                                const _errs181 = errors;
                                 const _errs182 = errors;
-                                let valid61 = true;
                                 const _errs183 = errors;
+                                let valid61 = true;
+                                const _errs184 = errors;
                                 if (data && typeof data == 'object' && !Array.isArray(data)) {
                                   let missing30;
                                   if (data.type === void 0 && (missing30 = 'type')) {
@@ -8399,17 +9672,17 @@ var require_control_schema = __commonJS({
                                     }
                                   }
                                 }
-                                var _valid14 = _errs183 === errors;
-                                errors = _errs182;
+                                var _valid14 = _errs184 === errors;
+                                errors = _errs183;
                                 if (vErrors !== null) {
-                                  if (_errs182) {
-                                    vErrors.length = _errs182;
+                                  if (_errs183) {
+                                    vErrors.length = _errs183;
                                   } else {
                                     vErrors = null;
                                   }
                                 }
                                 if (_valid14) {
-                                  const _errs185 = errors;
+                                  const _errs186 = errors;
                                   if (data && typeof data == 'object' && !Array.isArray(data)) {
                                     let missing31;
                                     if (data.session_id === void 0 && (missing31 = 'session_id')) {
@@ -8426,12 +9699,12 @@ var require_control_schema = __commonJS({
                                       return false;
                                     } else {
                                       if (data.payload !== void 0) {
-                                        let data56 = data.payload;
-                                        const _errs186 = errors;
+                                        let data57 = data.payload;
+                                        const _errs187 = errors;
                                         if (!(
-                                          data56 &&
-                                          typeof data56 == 'object' &&
-                                          !Array.isArray(data56)
+                                          data57 &&
+                                          typeof data57 == 'object' &&
+                                          !Array.isArray(data57)
                                         )) {
                                           validate20.errors = [
                                             {
@@ -8444,116 +9717,30 @@ var require_control_schema = __commonJS({
                                           ];
                                           return false;
                                         }
-                                        const _errs187 = errors;
-                                        if (errors === _errs187) {
-                                          if (
-                                            data56 &&
-                                            typeof data56 == 'object' &&
-                                            !Array.isArray(data56)
-                                          ) {
-                                            let missing32;
-                                            if (
-                                              data56.negotiation_generation === void 0 &&
-                                              (missing32 = 'negotiation_generation')
-                                            ) {
-                                              validate20.errors = [
-                                                {
-                                                  instancePath: instancePath + '/payload',
-                                                  schemaPath:
-                                                    '#/$defs/payload_relay_ready/required',
-                                                  keyword: 'required',
-                                                  params: { missingProperty: missing32 },
-                                                  message:
-                                                    "must have required property '" +
-                                                    missing32 +
-                                                    "'",
-                                                },
-                                              ];
-                                              return false;
-                                            } else {
-                                              const _errs189 = errors;
-                                              for (const key10 in data56) {
-                                                if (!(key10 === 'negotiation_generation')) {
-                                                  validate20.errors = [
-                                                    {
-                                                      instancePath: instancePath + '/payload',
-                                                      schemaPath:
-                                                        '#/$defs/payload_relay_ready/additionalProperties',
-                                                      keyword: 'additionalProperties',
-                                                      params: { additionalProperty: key10 },
-                                                      message:
-                                                        'must NOT have additional properties',
-                                                    },
-                                                  ];
-                                                  return false;
-                                                  break;
-                                                }
-                                              }
-                                              if (_errs189 === errors) {
-                                                if (data56.negotiation_generation !== void 0) {
-                                                  let data57 = data56.negotiation_generation;
-                                                  const _errs190 = errors;
-                                                  if (errors === _errs190) {
-                                                    if (typeof data57 === 'string') {
-                                                      if (!pattern9.test(data57)) {
-                                                        validate20.errors = [
-                                                          {
-                                                            instancePath:
-                                                              instancePath +
-                                                              '/payload/negotiation_generation',
-                                                            schemaPath:
-                                                              '#/$defs/payload_relay_ready/properties/negotiation_generation/pattern',
-                                                            keyword: 'pattern',
-                                                            params: {
-                                                              pattern: '^[1-9][0-9]{0,19}$',
-                                                            },
-                                                            message:
-                                                              'must match pattern "^[1-9][0-9]{0,19}$"',
-                                                          },
-                                                        ];
-                                                        return false;
-                                                      }
-                                                    } else {
-                                                      validate20.errors = [
-                                                        {
-                                                          instancePath:
-                                                            instancePath +
-                                                            '/payload/negotiation_generation',
-                                                          schemaPath:
-                                                            '#/$defs/payload_relay_ready/properties/negotiation_generation/type',
-                                                          keyword: 'type',
-                                                          params: { type: 'string' },
-                                                          message: 'must be string',
-                                                        },
-                                                      ];
-                                                      return false;
-                                                    }
-                                                  }
-                                                }
-                                              }
-                                            }
-                                          } else {
-                                            validate20.errors = [
-                                              {
-                                                instancePath: instancePath + '/payload',
-                                                schemaPath: '#/$defs/payload_relay_ready/type',
-                                                keyword: 'type',
-                                                params: { type: 'object' },
-                                                message: 'must be object',
-                                              },
-                                            ];
-                                            return false;
-                                          }
+                                        if (
+                                          !validate29(data57, {
+                                            instancePath: instancePath + '/payload',
+                                            parentData: data,
+                                            parentDataProperty: 'payload',
+                                            rootData,
+                                            dynamicAnchors,
+                                          })
+                                        ) {
+                                          vErrors =
+                                            vErrors === null
+                                              ? validate29.errors
+                                              : vErrors.concat(validate29.errors);
+                                          errors = vErrors.length;
                                         }
-                                        var valid63 = _errs186 === errors;
+                                        var valid63 = _errs187 === errors;
                                       } else {
                                         var valid63 = true;
                                       }
                                       if (valid63) {
                                         if (data.session_id !== void 0) {
                                           let data58 = data.session_id;
-                                          const _errs193 = errors;
-                                          if (errors === _errs193) {
+                                          const _errs189 = errors;
+                                          if (errors === _errs189) {
                                             if (typeof data58 === 'string') {
                                               if (func1(data58) > 128) {
                                                 validate20.errors = [
@@ -8598,14 +9785,14 @@ var require_control_schema = __commonJS({
                                               return false;
                                             }
                                           }
-                                          var valid63 = _errs193 === errors;
+                                          var valid63 = _errs189 === errors;
                                         } else {
                                           var valid63 = true;
                                         }
                                       }
                                     }
                                   }
-                                  var _valid14 = _errs185 === errors;
+                                  var _valid14 = _errs186 === errors;
                                   valid61 = _valid14;
                                   if (valid61) {
                                     var props14 = {};
@@ -8631,7 +9818,7 @@ var require_control_schema = __commonJS({
                                   validate20.errors = vErrors;
                                   return false;
                                 }
-                                var valid0 = _errs181 === errors;
+                                var valid0 = _errs182 === errors;
                                 if (valid0) {
                                   if (props0 !== true && props14 !== void 0) {
                                     if (props14 === true) {
@@ -8641,13 +9828,13 @@ var require_control_schema = __commonJS({
                                       Object.assign(props0, props14);
                                     }
                                   }
-                                  const _errs195 = errors;
-                                  const _errs196 = errors;
-                                  let valid66 = true;
-                                  const _errs197 = errors;
+                                  const _errs191 = errors;
+                                  const _errs192 = errors;
+                                  let valid64 = true;
+                                  const _errs193 = errors;
                                   if (data && typeof data == 'object' && !Array.isArray(data)) {
-                                    let missing33;
-                                    if (data.type === void 0 && (missing33 = 'type')) {
+                                    let missing32;
+                                    if (data.type === void 0 && (missing32 = 'type')) {
                                       const err53 = {};
                                       if (vErrors === null) {
                                         vErrors = [err53];
@@ -8669,38 +9856,38 @@ var require_control_schema = __commonJS({
                                       }
                                     }
                                   }
-                                  var _valid15 = _errs197 === errors;
-                                  errors = _errs196;
+                                  var _valid15 = _errs193 === errors;
+                                  errors = _errs192;
                                   if (vErrors !== null) {
-                                    if (_errs196) {
-                                      vErrors.length = _errs196;
+                                    if (_errs192) {
+                                      vErrors.length = _errs192;
                                     } else {
                                       vErrors = null;
                                     }
                                   }
                                   if (_valid15) {
-                                    const _errs199 = errors;
+                                    const _errs195 = errors;
                                     if (data && typeof data == 'object' && !Array.isArray(data)) {
-                                      let missing34;
+                                      let missing33;
                                       if (
                                         data.session_id === void 0 &&
-                                        (missing34 = 'session_id')
+                                        (missing33 = 'session_id')
                                       ) {
                                         validate20.errors = [
                                           {
                                             instancePath,
                                             schemaPath: '#/allOf/14/then/required',
                                             keyword: 'required',
-                                            params: { missingProperty: missing34 },
+                                            params: { missingProperty: missing33 },
                                             message:
-                                              "must have required property '" + missing34 + "'",
+                                              "must have required property '" + missing33 + "'",
                                           },
                                         ];
                                         return false;
                                       } else {
                                         if (data.payload !== void 0) {
                                           let data60 = data.payload;
-                                          const _errs200 = errors;
+                                          const _errs196 = errors;
                                           if (!(
                                             data60 &&
                                             typeof data60 == 'object' &&
@@ -8718,21 +9905,21 @@ var require_control_schema = __commonJS({
                                             ];
                                             return false;
                                           }
-                                          const _errs201 = errors;
-                                          if (errors === _errs201) {
+                                          const _errs197 = errors;
+                                          if (errors === _errs197) {
                                             if (
                                               data60 &&
                                               typeof data60 == 'object' &&
                                               !Array.isArray(data60)
                                             ) {
-                                              let missing35;
+                                              let missing34;
                                               if (
                                                 (data60.grant === void 0 &&
-                                                  (missing35 = 'grant')) ||
+                                                  (missing34 = 'grant')) ||
                                                 (data60.lease_version === void 0 &&
-                                                  (missing35 = 'lease_version')) ||
+                                                  (missing34 = 'lease_version')) ||
                                                 (data60.lease_expires_at === void 0 &&
-                                                  (missing35 = 'lease_expires_at'))
+                                                  (missing34 = 'lease_expires_at'))
                                               ) {
                                                 validate20.errors = [
                                                   {
@@ -8740,21 +9927,21 @@ var require_control_schema = __commonJS({
                                                     schemaPath:
                                                       '#/$defs/payload_lease_renew/required',
                                                     keyword: 'required',
-                                                    params: { missingProperty: missing35 },
+                                                    params: { missingProperty: missing34 },
                                                     message:
                                                       "must have required property '" +
-                                                      missing35 +
+                                                      missing34 +
                                                       "'",
                                                   },
                                                 ];
                                                 return false;
                                               } else {
-                                                const _errs203 = errors;
-                                                for (const key11 in data60) {
+                                                const _errs199 = errors;
+                                                for (const key10 in data60) {
                                                   if (!(
-                                                    key11 === 'grant' ||
-                                                    key11 === 'lease_version' ||
-                                                    key11 === 'lease_expires_at'
+                                                    key10 === 'grant' ||
+                                                    key10 === 'lease_version' ||
+                                                    key10 === 'lease_expires_at'
                                                   )) {
                                                     validate20.errors = [
                                                       {
@@ -8762,7 +9949,7 @@ var require_control_schema = __commonJS({
                                                         schemaPath:
                                                           '#/$defs/payload_lease_renew/additionalProperties',
                                                         keyword: 'additionalProperties',
-                                                        params: { additionalProperty: key11 },
+                                                        params: { additionalProperty: key10 },
                                                         message:
                                                           'must NOT have additional properties',
                                                       },
@@ -8771,11 +9958,11 @@ var require_control_schema = __commonJS({
                                                     break;
                                                   }
                                                 }
-                                                if (_errs203 === errors) {
+                                                if (_errs199 === errors) {
                                                   if (data60.grant !== void 0) {
                                                     let data61 = data60.grant;
-                                                    const _errs204 = errors;
-                                                    if (errors === _errs204) {
+                                                    const _errs200 = errors;
+                                                    if (errors === _errs200) {
                                                       if (typeof data61 === 'string') {
                                                         if (func1(data61) > 16384) {
                                                           validate20.errors = [
@@ -8823,17 +10010,17 @@ var require_control_schema = __commonJS({
                                                         return false;
                                                       }
                                                     }
-                                                    var valid70 = _errs204 === errors;
+                                                    var valid68 = _errs200 === errors;
                                                   } else {
-                                                    var valid70 = true;
+                                                    var valid68 = true;
                                                   }
-                                                  if (valid70) {
+                                                  if (valid68) {
                                                     if (data60.lease_version !== void 0) {
                                                       let data62 = data60.lease_version;
-                                                      const _errs206 = errors;
-                                                      if (errors === _errs206) {
+                                                      const _errs202 = errors;
+                                                      if (errors === _errs202) {
                                                         if (typeof data62 === 'string') {
-                                                          if (!pattern14.test(data62)) {
+                                                          if (!pattern16.test(data62)) {
                                                             validate20.errors = [
                                                               {
                                                                 instancePath:
@@ -8867,16 +10054,16 @@ var require_control_schema = __commonJS({
                                                           return false;
                                                         }
                                                       }
-                                                      var valid70 = _errs206 === errors;
+                                                      var valid68 = _errs202 === errors;
                                                     } else {
-                                                      var valid70 = true;
+                                                      var valid68 = true;
                                                     }
-                                                    if (valid70) {
+                                                    if (valid68) {
                                                       if (data60.lease_expires_at !== void 0) {
                                                         let data63 = data60.lease_expires_at;
-                                                        const _errs208 = errors;
-                                                        if (errors === _errs208) {
-                                                          if (errors === _errs208) {
+                                                        const _errs204 = errors;
+                                                        if (errors === _errs204) {
+                                                          if (errors === _errs204) {
                                                             if (typeof data63 === 'string') {
                                                               if (!formats0.validate(data63)) {
                                                                 validate20.errors = [
@@ -8911,9 +10098,9 @@ var require_control_schema = __commonJS({
                                                             }
                                                           }
                                                         }
-                                                        var valid70 = _errs208 === errors;
+                                                        var valid68 = _errs204 === errors;
                                                       } else {
-                                                        var valid70 = true;
+                                                        var valid68 = true;
                                                       }
                                                     }
                                                   }
@@ -8932,15 +10119,15 @@ var require_control_schema = __commonJS({
                                               return false;
                                             }
                                           }
-                                          var valid68 = _errs200 === errors;
+                                          var valid66 = _errs196 === errors;
                                         } else {
-                                          var valid68 = true;
+                                          var valid66 = true;
                                         }
-                                        if (valid68) {
+                                        if (valid66) {
                                           if (data.session_id !== void 0) {
                                             let data64 = data.session_id;
-                                            const _errs211 = errors;
-                                            if (errors === _errs211) {
+                                            const _errs207 = errors;
+                                            if (errors === _errs207) {
                                               if (typeof data64 === 'string') {
                                                 if (func1(data64) > 128) {
                                                   validate20.errors = [
@@ -8985,23 +10172,23 @@ var require_control_schema = __commonJS({
                                                 return false;
                                               }
                                             }
-                                            var valid68 = _errs211 === errors;
+                                            var valid66 = _errs207 === errors;
                                           } else {
-                                            var valid68 = true;
+                                            var valid66 = true;
                                           }
                                         }
                                       }
                                     }
-                                    var _valid15 = _errs199 === errors;
-                                    valid66 = _valid15;
-                                    if (valid66) {
+                                    var _valid15 = _errs195 === errors;
+                                    valid64 = _valid15;
+                                    if (valid64) {
                                       var props15 = {};
                                       props15.payload = true;
                                       props15.session_id = true;
                                       props15.type = true;
                                     }
                                   }
-                                  if (!valid66) {
+                                  if (!valid64) {
                                     const err55 = {
                                       instancePath,
                                       schemaPath: '#/allOf/14/if',
@@ -9018,7 +10205,7 @@ var require_control_schema = __commonJS({
                                     validate20.errors = vErrors;
                                     return false;
                                   }
-                                  var valid0 = _errs195 === errors;
+                                  var valid0 = _errs191 === errors;
                                   if (valid0) {
                                     if (props0 !== true && props15 !== void 0) {
                                       if (props15 === true) {
@@ -9028,13 +10215,13 @@ var require_control_schema = __commonJS({
                                         Object.assign(props0, props15);
                                       }
                                     }
-                                    const _errs213 = errors;
-                                    const _errs214 = errors;
-                                    let valid71 = true;
-                                    const _errs215 = errors;
+                                    const _errs209 = errors;
+                                    const _errs210 = errors;
+                                    let valid69 = true;
+                                    const _errs211 = errors;
                                     if (data && typeof data == 'object' && !Array.isArray(data)) {
-                                      let missing36;
-                                      if (data.type === void 0 && (missing36 = 'type')) {
+                                      let missing35;
+                                      if (data.type === void 0 && (missing35 = 'type')) {
                                         const err56 = {};
                                         if (vErrors === null) {
                                           vErrors = [err56];
@@ -9056,38 +10243,38 @@ var require_control_schema = __commonJS({
                                         }
                                       }
                                     }
-                                    var _valid16 = _errs215 === errors;
-                                    errors = _errs214;
+                                    var _valid16 = _errs211 === errors;
+                                    errors = _errs210;
                                     if (vErrors !== null) {
-                                      if (_errs214) {
-                                        vErrors.length = _errs214;
+                                      if (_errs210) {
+                                        vErrors.length = _errs210;
                                       } else {
                                         vErrors = null;
                                       }
                                     }
                                     if (_valid16) {
-                                      const _errs217 = errors;
+                                      const _errs213 = errors;
                                       if (data && typeof data == 'object' && !Array.isArray(data)) {
-                                        let missing37;
+                                        let missing36;
                                         if (
                                           data.session_id === void 0 &&
-                                          (missing37 = 'session_id')
+                                          (missing36 = 'session_id')
                                         ) {
                                           validate20.errors = [
                                             {
                                               instancePath,
                                               schemaPath: '#/allOf/15/then/required',
                                               keyword: 'required',
-                                              params: { missingProperty: missing37 },
+                                              params: { missingProperty: missing36 },
                                               message:
-                                                "must have required property '" + missing37 + "'",
+                                                "must have required property '" + missing36 + "'",
                                             },
                                           ];
                                           return false;
                                         } else {
                                           if (data.payload !== void 0) {
                                             let data66 = data.payload;
-                                            const _errs218 = errors;
+                                            const _errs214 = errors;
                                             if (!(
                                               data66 &&
                                               typeof data66 == 'object' &&
@@ -9105,11 +10292,11 @@ var require_control_schema = __commonJS({
                                               ];
                                               return false;
                                             }
+                                            const _errs215 = errors;
+                                            const _errs217 = errors;
+                                            const _errs218 = errors;
+                                            let valid74 = true;
                                             const _errs219 = errors;
-                                            const _errs221 = errors;
-                                            const _errs222 = errors;
-                                            let valid76 = true;
-                                            const _errs223 = errors;
                                             if (
                                               data66 &&
                                               typeof data66 == 'object' &&
@@ -9137,26 +10324,26 @@ var require_control_schema = __commonJS({
                                                 }
                                               }
                                             }
-                                            var _valid17 = _errs223 === errors;
-                                            errors = _errs222;
+                                            var _valid17 = _errs219 === errors;
+                                            errors = _errs218;
                                             if (vErrors !== null) {
-                                              if (_errs222) {
-                                                vErrors.length = _errs222;
+                                              if (_errs218) {
+                                                vErrors.length = _errs218;
                                               } else {
                                                 vErrors = null;
                                               }
                                             }
                                             if (_valid17) {
-                                              const _errs226 = errors;
+                                              const _errs222 = errors;
                                               if (
                                                 data66 &&
                                                 typeof data66 == 'object' &&
                                                 !Array.isArray(data66)
                                               ) {
-                                                let missing38;
+                                                let missing37;
                                                 if (
                                                   data66.lease_expires_at === void 0 &&
-                                                  (missing38 = 'lease_expires_at')
+                                                  (missing37 = 'lease_expires_at')
                                                 ) {
                                                   validate20.errors = [
                                                     {
@@ -9164,10 +10351,10 @@ var require_control_schema = __commonJS({
                                                       schemaPath:
                                                         '#/$defs/payload_lease_ack/allOf/0/then/required',
                                                       keyword: 'required',
-                                                      params: { missingProperty: missing38 },
+                                                      params: { missingProperty: missing37 },
                                                       message:
                                                         "must have required property '" +
-                                                        missing38 +
+                                                        missing37 +
                                                         "'",
                                                     },
                                                   ];
@@ -9175,9 +10362,9 @@ var require_control_schema = __commonJS({
                                                 } else {
                                                   if (data66.lease_expires_at !== void 0) {
                                                     let data68 = data66.lease_expires_at;
-                                                    const _errs227 = errors;
-                                                    if (errors === _errs227) {
-                                                      if (errors === _errs227) {
+                                                    const _errs223 = errors;
+                                                    if (errors === _errs223) {
+                                                      if (errors === _errs223) {
                                                         if (typeof data68 === 'string') {
                                                           if (!formats0.validate(data68)) {
                                                             validate20.errors = [
@@ -9215,15 +10402,15 @@ var require_control_schema = __commonJS({
                                                   }
                                                 }
                                               }
-                                              var _valid17 = _errs226 === errors;
-                                              valid76 = _valid17;
-                                              if (valid76) {
+                                              var _valid17 = _errs222 === errors;
+                                              valid74 = _valid17;
+                                              if (valid74) {
                                                 var props16 = {};
                                                 props16.lease_expires_at = true;
                                                 props16.accepted = true;
                                               }
                                             }
-                                            if (!valid76) {
+                                            if (!valid74) {
                                               const err60 = {
                                                 instancePath: instancePath + '/payload',
                                                 schemaPath: '#/$defs/payload_lease_ack/allOf/0/if',
@@ -9240,12 +10427,12 @@ var require_control_schema = __commonJS({
                                               validate20.errors = vErrors;
                                               return false;
                                             }
-                                            var valid75 = _errs221 === errors;
-                                            if (valid75) {
-                                              const _errs229 = errors;
-                                              const _errs230 = errors;
-                                              let valid79 = true;
-                                              const _errs231 = errors;
+                                            var valid73 = _errs217 === errors;
+                                            if (valid73) {
+                                              const _errs225 = errors;
+                                              const _errs226 = errors;
+                                              let valid77 = true;
+                                              const _errs227 = errors;
                                               if (
                                                 data66 &&
                                                 typeof data66 == 'object' &&
@@ -9273,26 +10460,26 @@ var require_control_schema = __commonJS({
                                                   }
                                                 }
                                               }
-                                              var _valid18 = _errs231 === errors;
-                                              errors = _errs230;
+                                              var _valid18 = _errs227 === errors;
+                                              errors = _errs226;
                                               if (vErrors !== null) {
-                                                if (_errs230) {
-                                                  vErrors.length = _errs230;
+                                                if (_errs226) {
+                                                  vErrors.length = _errs226;
                                                 } else {
                                                   vErrors = null;
                                                 }
                                               }
                                               if (_valid18) {
-                                                const _errs234 = errors;
+                                                const _errs230 = errors;
                                                 if (
                                                   data66 &&
                                                   typeof data66 == 'object' &&
                                                   !Array.isArray(data66)
                                                 ) {
-                                                  let missing39;
+                                                  let missing38;
                                                   if (
                                                     data66.code === void 0 &&
-                                                    (missing39 = 'code')
+                                                    (missing38 = 'code')
                                                   ) {
                                                     validate20.errors = [
                                                       {
@@ -9300,10 +10487,10 @@ var require_control_schema = __commonJS({
                                                         schemaPath:
                                                           '#/$defs/payload_lease_ack/allOf/1/then/required',
                                                         keyword: 'required',
-                                                        params: { missingProperty: missing39 },
+                                                        params: { missingProperty: missing38 },
                                                         message:
                                                           "must have required property '" +
-                                                          missing39 +
+                                                          missing38 +
                                                           "'",
                                                       },
                                                     ];
@@ -9311,8 +10498,8 @@ var require_control_schema = __commonJS({
                                                   } else {
                                                     if (data66.code !== void 0) {
                                                       let data70 = data66.code;
-                                                      const _errs235 = errors;
-                                                      if (errors === _errs235) {
+                                                      const _errs231 = errors;
+                                                      if (errors === _errs231) {
                                                         if (typeof data70 === 'string') {
                                                           if (func1(data70) > 128) {
                                                             validate20.errors = [
@@ -9363,15 +10550,15 @@ var require_control_schema = __commonJS({
                                                     }
                                                   }
                                                 }
-                                                var _valid18 = _errs234 === errors;
-                                                valid79 = _valid18;
-                                                if (valid79) {
+                                                var _valid18 = _errs230 === errors;
+                                                valid77 = _valid18;
+                                                if (valid77) {
                                                   var props17 = {};
                                                   props17.code = true;
                                                   props17.accepted = true;
                                                 }
                                               }
-                                              if (!valid79) {
+                                              if (!valid77) {
                                                 const err63 = {
                                                   instancePath: instancePath + '/payload',
                                                   schemaPath:
@@ -9389,8 +10576,8 @@ var require_control_schema = __commonJS({
                                                 validate20.errors = vErrors;
                                                 return false;
                                               }
-                                              var valid75 = _errs229 === errors;
-                                              if (valid75) {
+                                              var valid73 = _errs225 === errors;
+                                              if (valid73) {
                                                 if (props16 !== true && props17 !== void 0) {
                                                   if (props17 === true) {
                                                     props16 = true;
@@ -9401,18 +10588,18 @@ var require_control_schema = __commonJS({
                                                 }
                                               }
                                             }
-                                            if (errors === _errs219) {
+                                            if (errors === _errs215) {
                                               if (
                                                 data66 &&
                                                 typeof data66 == 'object' &&
                                                 !Array.isArray(data66)
                                               ) {
-                                                let missing40;
+                                                let missing39;
                                                 if (
                                                   (data66.lease_version === void 0 &&
-                                                    (missing40 = 'lease_version')) ||
+                                                    (missing39 = 'lease_version')) ||
                                                   (data66.accepted === void 0 &&
-                                                    (missing40 = 'accepted'))
+                                                    (missing39 = 'accepted'))
                                                 ) {
                                                   validate20.errors = [
                                                     {
@@ -9420,22 +10607,22 @@ var require_control_schema = __commonJS({
                                                       schemaPath:
                                                         '#/$defs/payload_lease_ack/required',
                                                       keyword: 'required',
-                                                      params: { missingProperty: missing40 },
+                                                      params: { missingProperty: missing39 },
                                                       message:
                                                         "must have required property '" +
-                                                        missing40 +
+                                                        missing39 +
                                                         "'",
                                                     },
                                                   ];
                                                   return false;
                                                 } else {
-                                                  const _errs237 = errors;
-                                                  for (const key12 in data66) {
+                                                  const _errs233 = errors;
+                                                  for (const key11 in data66) {
                                                     if (!(
-                                                      key12 === 'lease_version' ||
-                                                      key12 === 'accepted' ||
-                                                      key12 === 'lease_expires_at' ||
-                                                      key12 === 'code'
+                                                      key11 === 'lease_version' ||
+                                                      key11 === 'accepted' ||
+                                                      key11 === 'lease_expires_at' ||
+                                                      key11 === 'code'
                                                     )) {
                                                       validate20.errors = [
                                                         {
@@ -9443,7 +10630,7 @@ var require_control_schema = __commonJS({
                                                           schemaPath:
                                                             '#/$defs/payload_lease_ack/additionalProperties',
                                                           keyword: 'additionalProperties',
-                                                          params: { additionalProperty: key12 },
+                                                          params: { additionalProperty: key11 },
                                                           message:
                                                             'must NOT have additional properties',
                                                         },
@@ -9452,13 +10639,13 @@ var require_control_schema = __commonJS({
                                                       break;
                                                     }
                                                   }
-                                                  if (_errs237 === errors) {
+                                                  if (_errs233 === errors) {
                                                     if (data66.lease_version !== void 0) {
                                                       let data71 = data66.lease_version;
-                                                      const _errs238 = errors;
-                                                      if (errors === _errs238) {
+                                                      const _errs234 = errors;
+                                                      if (errors === _errs234) {
                                                         if (typeof data71 === 'string') {
-                                                          if (!pattern14.test(data71)) {
+                                                          if (!pattern16.test(data71)) {
                                                             validate20.errors = [
                                                               {
                                                                 instancePath:
@@ -9492,13 +10679,13 @@ var require_control_schema = __commonJS({
                                                           return false;
                                                         }
                                                       }
-                                                      var valid82 = _errs238 === errors;
+                                                      var valid80 = _errs234 === errors;
                                                     } else {
-                                                      var valid82 = true;
+                                                      var valid80 = true;
                                                     }
-                                                    if (valid82) {
+                                                    if (valid80) {
                                                       if (data66.accepted !== void 0) {
-                                                        const _errs240 = errors;
+                                                        const _errs236 = errors;
                                                         if (typeof data66.accepted !== 'boolean') {
                                                           validate20.errors = [
                                                             {
@@ -9513,16 +10700,16 @@ var require_control_schema = __commonJS({
                                                           ];
                                                           return false;
                                                         }
-                                                        var valid82 = _errs240 === errors;
+                                                        var valid80 = _errs236 === errors;
                                                       } else {
-                                                        var valid82 = true;
+                                                        var valid80 = true;
                                                       }
-                                                      if (valid82) {
+                                                      if (valid80) {
                                                         if (data66.lease_expires_at !== void 0) {
                                                           let data73 = data66.lease_expires_at;
-                                                          const _errs242 = errors;
-                                                          if (errors === _errs242) {
-                                                            if (errors === _errs242) {
+                                                          const _errs238 = errors;
+                                                          if (errors === _errs238) {
+                                                            if (errors === _errs238) {
                                                               if (typeof data73 === 'string') {
                                                                 if (!formats0.validate(data73)) {
                                                                   validate20.errors = [
@@ -9559,15 +10746,15 @@ var require_control_schema = __commonJS({
                                                               }
                                                             }
                                                           }
-                                                          var valid82 = _errs242 === errors;
+                                                          var valid80 = _errs238 === errors;
                                                         } else {
-                                                          var valid82 = true;
+                                                          var valid80 = true;
                                                         }
-                                                        if (valid82) {
+                                                        if (valid80) {
                                                           if (data66.code !== void 0) {
                                                             let data74 = data66.code;
-                                                            const _errs244 = errors;
-                                                            if (errors === _errs244) {
+                                                            const _errs240 = errors;
+                                                            if (errors === _errs240) {
                                                               if (typeof data74 === 'string') {
                                                                 if (func1(data74) > 128) {
                                                                   validate20.errors = [
@@ -9618,9 +10805,9 @@ var require_control_schema = __commonJS({
                                                                 return false;
                                                               }
                                                             }
-                                                            var valid82 = _errs244 === errors;
+                                                            var valid80 = _errs240 === errors;
                                                           } else {
-                                                            var valid82 = true;
+                                                            var valid80 = true;
                                                           }
                                                         }
                                                       }
@@ -9640,15 +10827,15 @@ var require_control_schema = __commonJS({
                                                 return false;
                                               }
                                             }
-                                            var valid73 = _errs218 === errors;
+                                            var valid71 = _errs214 === errors;
                                           } else {
-                                            var valid73 = true;
+                                            var valid71 = true;
                                           }
-                                          if (valid73) {
+                                          if (valid71) {
                                             if (data.session_id !== void 0) {
                                               let data75 = data.session_id;
-                                              const _errs247 = errors;
-                                              if (errors === _errs247) {
+                                              const _errs243 = errors;
+                                              if (errors === _errs243) {
                                                 if (typeof data75 === 'string') {
                                                   if (func1(data75) > 128) {
                                                     validate20.errors = [
@@ -9694,23 +10881,23 @@ var require_control_schema = __commonJS({
                                                   return false;
                                                 }
                                               }
-                                              var valid73 = _errs247 === errors;
+                                              var valid71 = _errs243 === errors;
                                             } else {
-                                              var valid73 = true;
+                                              var valid71 = true;
                                             }
                                           }
                                         }
                                       }
-                                      var _valid16 = _errs217 === errors;
-                                      valid71 = _valid16;
-                                      if (valid71) {
+                                      var _valid16 = _errs213 === errors;
+                                      valid69 = _valid16;
+                                      if (valid69) {
                                         var props18 = {};
                                         props18.payload = true;
                                         props18.session_id = true;
                                         props18.type = true;
                                       }
                                     }
-                                    if (!valid71) {
+                                    if (!valid69) {
                                       const err64 = {
                                         instancePath,
                                         schemaPath: '#/allOf/15/if',
@@ -9727,7 +10914,7 @@ var require_control_schema = __commonJS({
                                       validate20.errors = vErrors;
                                       return false;
                                     }
-                                    var valid0 = _errs213 === errors;
+                                    var valid0 = _errs209 === errors;
                                     if (valid0) {
                                       if (props0 !== true && props18 !== void 0) {
                                         if (props18 === true) {
@@ -9737,13 +10924,13 @@ var require_control_schema = __commonJS({
                                           Object.assign(props0, props18);
                                         }
                                       }
-                                      const _errs249 = errors;
-                                      const _errs250 = errors;
-                                      let valid83 = true;
-                                      const _errs251 = errors;
+                                      const _errs245 = errors;
+                                      const _errs246 = errors;
+                                      let valid81 = true;
+                                      const _errs247 = errors;
                                       if (data && typeof data == 'object' && !Array.isArray(data)) {
-                                        let missing41;
-                                        if (data.type === void 0 && (missing41 = 'type')) {
+                                        let missing40;
+                                        if (data.type === void 0 && (missing40 = 'type')) {
                                           const err65 = {};
                                           if (vErrors === null) {
                                             vErrors = [err65];
@@ -9765,42 +10952,42 @@ var require_control_schema = __commonJS({
                                           }
                                         }
                                       }
-                                      var _valid19 = _errs251 === errors;
-                                      errors = _errs250;
+                                      var _valid19 = _errs247 === errors;
+                                      errors = _errs246;
                                       if (vErrors !== null) {
-                                        if (_errs250) {
-                                          vErrors.length = _errs250;
+                                        if (_errs246) {
+                                          vErrors.length = _errs246;
                                         } else {
                                           vErrors = null;
                                         }
                                       }
                                       if (_valid19) {
-                                        const _errs253 = errors;
+                                        const _errs249 = errors;
                                         if (
                                           data &&
                                           typeof data == 'object' &&
                                           !Array.isArray(data)
                                         ) {
-                                          let missing42;
+                                          let missing41;
                                           if (
                                             data.session_id === void 0 &&
-                                            (missing42 = 'session_id')
+                                            (missing41 = 'session_id')
                                           ) {
                                             validate20.errors = [
                                               {
                                                 instancePath,
                                                 schemaPath: '#/allOf/16/then/required',
                                                 keyword: 'required',
-                                                params: { missingProperty: missing42 },
+                                                params: { missingProperty: missing41 },
                                                 message:
-                                                  "must have required property '" + missing42 + "'",
+                                                  "must have required property '" + missing41 + "'",
                                               },
                                             ];
                                             return false;
                                           } else {
                                             if (data.payload !== void 0) {
                                               let data77 = data.payload;
-                                              const _errs254 = errors;
+                                              const _errs250 = errors;
                                               if (!(
                                                 data77 &&
                                                 typeof data77 == 'object' &&
@@ -9819,7 +11006,7 @@ var require_control_schema = __commonJS({
                                                 return false;
                                               }
                                               if (
-                                                !validate29(data77, {
+                                                !validate31(data77, {
                                                   instancePath: instancePath + '/payload',
                                                   parentData: data,
                                                   parentDataProperty: 'payload',
@@ -9829,19 +11016,19 @@ var require_control_schema = __commonJS({
                                               ) {
                                                 vErrors =
                                                   vErrors === null
-                                                    ? validate29.errors
-                                                    : vErrors.concat(validate29.errors);
+                                                    ? validate31.errors
+                                                    : vErrors.concat(validate31.errors);
                                                 errors = vErrors.length;
                                               }
-                                              var valid85 = _errs254 === errors;
+                                              var valid83 = _errs250 === errors;
                                             } else {
-                                              var valid85 = true;
+                                              var valid83 = true;
                                             }
-                                            if (valid85) {
+                                            if (valid83) {
                                               if (data.session_id !== void 0) {
                                                 let data78 = data.session_id;
-                                                const _errs256 = errors;
-                                                if (errors === _errs256) {
+                                                const _errs252 = errors;
+                                                if (errors === _errs252) {
                                                   if (typeof data78 === 'string') {
                                                     if (func1(data78) > 128) {
                                                       validate20.errors = [
@@ -9888,23 +11075,23 @@ var require_control_schema = __commonJS({
                                                     return false;
                                                   }
                                                 }
-                                                var valid85 = _errs256 === errors;
+                                                var valid83 = _errs252 === errors;
                                               } else {
-                                                var valid85 = true;
+                                                var valid83 = true;
                                               }
                                             }
                                           }
                                         }
-                                        var _valid19 = _errs253 === errors;
-                                        valid83 = _valid19;
-                                        if (valid83) {
+                                        var _valid19 = _errs249 === errors;
+                                        valid81 = _valid19;
+                                        if (valid81) {
                                           var props19 = {};
                                           props19.payload = true;
                                           props19.session_id = true;
                                           props19.type = true;
                                         }
                                       }
-                                      if (!valid83) {
+                                      if (!valid81) {
                                         const err67 = {
                                           instancePath,
                                           schemaPath: '#/allOf/16/if',
@@ -9921,7 +11108,7 @@ var require_control_schema = __commonJS({
                                         validate20.errors = vErrors;
                                         return false;
                                       }
-                                      var valid0 = _errs249 === errors;
+                                      var valid0 = _errs245 === errors;
                                       if (valid0) {
                                         if (props0 !== true && props19 !== void 0) {
                                           if (props19 === true) {
@@ -9931,17 +11118,17 @@ var require_control_schema = __commonJS({
                                             Object.assign(props0, props19);
                                           }
                                         }
-                                        const _errs258 = errors;
-                                        const _errs259 = errors;
-                                        let valid86 = true;
-                                        const _errs260 = errors;
+                                        const _errs254 = errors;
+                                        const _errs255 = errors;
+                                        let valid84 = true;
+                                        const _errs256 = errors;
                                         if (
                                           data &&
                                           typeof data == 'object' &&
                                           !Array.isArray(data)
                                         ) {
-                                          let missing43;
-                                          if (data.type === void 0 && (missing43 = 'type')) {
+                                          let missing42;
+                                          if (data.type === void 0 && (missing42 = 'type')) {
                                             const err68 = {};
                                             if (vErrors === null) {
                                               vErrors = [err68];
@@ -9963,36 +11150,36 @@ var require_control_schema = __commonJS({
                                             }
                                           }
                                         }
-                                        var _valid20 = _errs260 === errors;
-                                        errors = _errs259;
+                                        var _valid20 = _errs256 === errors;
+                                        errors = _errs255;
                                         if (vErrors !== null) {
-                                          if (_errs259) {
-                                            vErrors.length = _errs259;
+                                          if (_errs255) {
+                                            vErrors.length = _errs255;
                                           } else {
                                             vErrors = null;
                                           }
                                         }
                                         if (_valid20) {
-                                          const _errs262 = errors;
+                                          const _errs258 = errors;
                                           if (
                                             data &&
                                             typeof data == 'object' &&
                                             !Array.isArray(data)
                                           ) {
-                                            let missing44;
+                                            let missing43;
                                             if (
                                               data.session_id === void 0 &&
-                                              (missing44 = 'session_id')
+                                              (missing43 = 'session_id')
                                             ) {
                                               validate20.errors = [
                                                 {
                                                   instancePath,
                                                   schemaPath: '#/allOf/17/then/required',
                                                   keyword: 'required',
-                                                  params: { missingProperty: missing44 },
+                                                  params: { missingProperty: missing43 },
                                                   message:
                                                     "must have required property '" +
-                                                    missing44 +
+                                                    missing43 +
                                                     "'",
                                                 },
                                               ];
@@ -10000,7 +11187,7 @@ var require_control_schema = __commonJS({
                                             } else {
                                               if (data.payload !== void 0) {
                                                 let data80 = data.payload;
-                                                const _errs263 = errors;
+                                                const _errs259 = errors;
                                                 if (!(
                                                   data80 &&
                                                   typeof data80 == 'object' &&
@@ -10018,17 +11205,17 @@ var require_control_schema = __commonJS({
                                                   ];
                                                   return false;
                                                 }
-                                                const _errs264 = errors;
-                                                if (errors === _errs264) {
+                                                const _errs260 = errors;
+                                                if (errors === _errs260) {
                                                   if (
                                                     data80 &&
                                                     typeof data80 == 'object' &&
                                                     !Array.isArray(data80)
                                                   ) {
-                                                    let missing45;
+                                                    let missing44;
                                                     if (
                                                       data80.reason === void 0 &&
-                                                      (missing45 = 'reason')
+                                                      (missing44 = 'reason')
                                                     ) {
                                                       validate20.errors = [
                                                         {
@@ -10036,18 +11223,18 @@ var require_control_schema = __commonJS({
                                                           schemaPath:
                                                             '#/$defs/payload_session_close/required',
                                                           keyword: 'required',
-                                                          params: { missingProperty: missing45 },
+                                                          params: { missingProperty: missing44 },
                                                           message:
                                                             "must have required property '" +
-                                                            missing45 +
+                                                            missing44 +
                                                             "'",
                                                         },
                                                       ];
                                                       return false;
                                                     } else {
-                                                      const _errs266 = errors;
-                                                      for (const key13 in data80) {
-                                                        if (!(key13 === 'reason')) {
+                                                      const _errs262 = errors;
+                                                      for (const key12 in data80) {
+                                                        if (!(key12 === 'reason')) {
                                                           validate20.errors = [
                                                             {
                                                               instancePath:
@@ -10055,7 +11242,7 @@ var require_control_schema = __commonJS({
                                                               schemaPath:
                                                                 '#/$defs/payload_session_close/additionalProperties',
                                                               keyword: 'additionalProperties',
-                                                              params: { additionalProperty: key13 },
+                                                              params: { additionalProperty: key12 },
                                                               message:
                                                                 'must NOT have additional properties',
                                                             },
@@ -10064,11 +11251,11 @@ var require_control_schema = __commonJS({
                                                           break;
                                                         }
                                                       }
-                                                      if (_errs266 === errors) {
+                                                      if (_errs262 === errors) {
                                                         if (data80.reason !== void 0) {
                                                           let data81 = data80.reason;
-                                                          const _errs267 = errors;
-                                                          if (errors === _errs267) {
+                                                          const _errs263 = errors;
+                                                          if (errors === _errs263) {
                                                             if (typeof data81 === 'string') {
                                                               if (func1(data81) > 128) {
                                                                 validate20.errors = [
@@ -10136,15 +11323,15 @@ var require_control_schema = __commonJS({
                                                     return false;
                                                   }
                                                 }
-                                                var valid88 = _errs263 === errors;
+                                                var valid86 = _errs259 === errors;
                                               } else {
-                                                var valid88 = true;
+                                                var valid86 = true;
                                               }
-                                              if (valid88) {
+                                              if (valid86) {
                                                 if (data.session_id !== void 0) {
                                                   let data82 = data.session_id;
-                                                  const _errs270 = errors;
-                                                  if (errors === _errs270) {
+                                                  const _errs266 = errors;
+                                                  if (errors === _errs266) {
                                                     if (typeof data82 === 'string') {
                                                       if (func1(data82) > 128) {
                                                         validate20.errors = [
@@ -10192,23 +11379,23 @@ var require_control_schema = __commonJS({
                                                       return false;
                                                     }
                                                   }
-                                                  var valid88 = _errs270 === errors;
+                                                  var valid86 = _errs266 === errors;
                                                 } else {
-                                                  var valid88 = true;
+                                                  var valid86 = true;
                                                 }
                                               }
                                             }
                                           }
-                                          var _valid20 = _errs262 === errors;
-                                          valid86 = _valid20;
-                                          if (valid86) {
+                                          var _valid20 = _errs258 === errors;
+                                          valid84 = _valid20;
+                                          if (valid84) {
                                             var props20 = {};
                                             props20.payload = true;
                                             props20.session_id = true;
                                             props20.type = true;
                                           }
                                         }
-                                        if (!valid86) {
+                                        if (!valid84) {
                                           const err70 = {
                                             instancePath,
                                             schemaPath: '#/allOf/17/if',
@@ -10225,7 +11412,7 @@ var require_control_schema = __commonJS({
                                           validate20.errors = vErrors;
                                           return false;
                                         }
-                                        var valid0 = _errs258 === errors;
+                                        var valid0 = _errs254 === errors;
                                         if (valid0) {
                                           if (props0 !== true && props20 !== void 0) {
                                             if (props20 === true) {
@@ -10235,17 +11422,17 @@ var require_control_schema = __commonJS({
                                               Object.assign(props0, props20);
                                             }
                                           }
-                                          const _errs272 = errors;
-                                          const _errs273 = errors;
-                                          let valid91 = true;
-                                          const _errs274 = errors;
+                                          const _errs268 = errors;
+                                          const _errs269 = errors;
+                                          let valid89 = true;
+                                          const _errs270 = errors;
                                           if (
                                             data &&
                                             typeof data == 'object' &&
                                             !Array.isArray(data)
                                           ) {
-                                            let missing46;
-                                            if (data.type === void 0 && (missing46 = 'type')) {
+                                            let missing45;
+                                            if (data.type === void 0 && (missing45 = 'type')) {
                                               const err71 = {};
                                               if (vErrors === null) {
                                                 vErrors = [err71];
@@ -10267,36 +11454,36 @@ var require_control_schema = __commonJS({
                                               }
                                             }
                                           }
-                                          var _valid21 = _errs274 === errors;
-                                          errors = _errs273;
+                                          var _valid21 = _errs270 === errors;
+                                          errors = _errs269;
                                           if (vErrors !== null) {
-                                            if (_errs273) {
-                                              vErrors.length = _errs273;
+                                            if (_errs269) {
+                                              vErrors.length = _errs269;
                                             } else {
                                               vErrors = null;
                                             }
                                           }
                                           if (_valid21) {
-                                            const _errs276 = errors;
+                                            const _errs272 = errors;
                                             if (
                                               data &&
                                               typeof data == 'object' &&
                                               !Array.isArray(data)
                                             ) {
-                                              let missing47;
+                                              let missing46;
                                               if (
                                                 data.session_id === void 0 &&
-                                                (missing47 = 'session_id')
+                                                (missing46 = 'session_id')
                                               ) {
                                                 validate20.errors = [
                                                   {
                                                     instancePath,
                                                     schemaPath: '#/allOf/18/then/required',
                                                     keyword: 'required',
-                                                    params: { missingProperty: missing47 },
+                                                    params: { missingProperty: missing46 },
                                                     message:
                                                       "must have required property '" +
-                                                      missing47 +
+                                                      missing46 +
                                                       "'",
                                                   },
                                                 ];
@@ -10304,7 +11491,7 @@ var require_control_schema = __commonJS({
                                               } else {
                                                 if (data.payload !== void 0) {
                                                   let data84 = data.payload;
-                                                  const _errs277 = errors;
+                                                  const _errs273 = errors;
                                                   if (!(
                                                     data84 &&
                                                     typeof data84 == 'object' &&
@@ -10322,17 +11509,17 @@ var require_control_schema = __commonJS({
                                                     ];
                                                     return false;
                                                   }
-                                                  const _errs278 = errors;
-                                                  if (errors === _errs278) {
+                                                  const _errs274 = errors;
+                                                  if (errors === _errs274) {
                                                     if (
                                                       data84 &&
                                                       typeof data84 == 'object' &&
                                                       !Array.isArray(data84)
                                                     ) {
-                                                      let missing48;
+                                                      let missing47;
                                                       if (
                                                         data84.reason === void 0 &&
-                                                        (missing48 = 'reason')
+                                                        (missing47 = 'reason')
                                                       ) {
                                                         validate20.errors = [
                                                           {
@@ -10340,18 +11527,18 @@ var require_control_schema = __commonJS({
                                                             schemaPath:
                                                               '#/$defs/payload_session_closed/required',
                                                             keyword: 'required',
-                                                            params: { missingProperty: missing48 },
+                                                            params: { missingProperty: missing47 },
                                                             message:
                                                               "must have required property '" +
-                                                              missing48 +
+                                                              missing47 +
                                                               "'",
                                                           },
                                                         ];
                                                         return false;
                                                       } else {
-                                                        const _errs280 = errors;
-                                                        for (const key14 in data84) {
-                                                          if (!(key14 === 'reason')) {
+                                                        const _errs276 = errors;
+                                                        for (const key13 in data84) {
+                                                          if (!(key13 === 'reason')) {
                                                             validate20.errors = [
                                                               {
                                                                 instancePath:
@@ -10360,7 +11547,7 @@ var require_control_schema = __commonJS({
                                                                   '#/$defs/payload_session_closed/additionalProperties',
                                                                 keyword: 'additionalProperties',
                                                                 params: {
-                                                                  additionalProperty: key14,
+                                                                  additionalProperty: key13,
                                                                 },
                                                                 message:
                                                                   'must NOT have additional properties',
@@ -10370,11 +11557,11 @@ var require_control_schema = __commonJS({
                                                             break;
                                                           }
                                                         }
-                                                        if (_errs280 === errors) {
+                                                        if (_errs276 === errors) {
                                                           if (data84.reason !== void 0) {
                                                             let data85 = data84.reason;
-                                                            const _errs281 = errors;
-                                                            if (errors === _errs281) {
+                                                            const _errs277 = errors;
+                                                            if (errors === _errs277) {
                                                               if (typeof data85 === 'string') {
                                                                 if (func1(data85) > 128) {
                                                                   validate20.errors = [
@@ -10442,15 +11629,15 @@ var require_control_schema = __commonJS({
                                                       return false;
                                                     }
                                                   }
-                                                  var valid93 = _errs277 === errors;
+                                                  var valid91 = _errs273 === errors;
                                                 } else {
-                                                  var valid93 = true;
+                                                  var valid91 = true;
                                                 }
-                                                if (valid93) {
+                                                if (valid91) {
                                                   if (data.session_id !== void 0) {
                                                     let data86 = data.session_id;
-                                                    const _errs284 = errors;
-                                                    if (errors === _errs284) {
+                                                    const _errs280 = errors;
+                                                    if (errors === _errs280) {
                                                       if (typeof data86 === 'string') {
                                                         if (func1(data86) > 128) {
                                                           validate20.errors = [
@@ -10498,23 +11685,23 @@ var require_control_schema = __commonJS({
                                                         return false;
                                                       }
                                                     }
-                                                    var valid93 = _errs284 === errors;
+                                                    var valid91 = _errs280 === errors;
                                                   } else {
-                                                    var valid93 = true;
+                                                    var valid91 = true;
                                                   }
                                                 }
                                               }
                                             }
-                                            var _valid21 = _errs276 === errors;
-                                            valid91 = _valid21;
-                                            if (valid91) {
+                                            var _valid21 = _errs272 === errors;
+                                            valid89 = _valid21;
+                                            if (valid89) {
                                               var props21 = {};
                                               props21.payload = true;
                                               props21.session_id = true;
                                               props21.type = true;
                                             }
                                           }
-                                          if (!valid91) {
+                                          if (!valid89) {
                                             const err73 = {
                                               instancePath,
                                               schemaPath: '#/allOf/18/if',
@@ -10531,7 +11718,7 @@ var require_control_schema = __commonJS({
                                             validate20.errors = vErrors;
                                             return false;
                                           }
-                                          var valid0 = _errs272 === errors;
+                                          var valid0 = _errs268 === errors;
                                           if (valid0) {
                                             if (props0 !== true && props21 !== void 0) {
                                               if (props21 === true) {
@@ -10541,17 +11728,17 @@ var require_control_schema = __commonJS({
                                                 Object.assign(props0, props21);
                                               }
                                             }
-                                            const _errs286 = errors;
-                                            const _errs287 = errors;
-                                            let valid96 = true;
-                                            const _errs288 = errors;
+                                            const _errs282 = errors;
+                                            const _errs283 = errors;
+                                            let valid94 = true;
+                                            const _errs284 = errors;
                                             if (
                                               data &&
                                               typeof data == 'object' &&
                                               !Array.isArray(data)
                                             ) {
-                                              let missing49;
-                                              if (data.type === void 0 && (missing49 = 'type')) {
+                                              let missing48;
+                                              if (data.type === void 0 && (missing48 = 'type')) {
                                                 const err74 = {};
                                                 if (vErrors === null) {
                                                   vErrors = [err74];
@@ -10573,17 +11760,17 @@ var require_control_schema = __commonJS({
                                                 }
                                               }
                                             }
-                                            var _valid22 = _errs288 === errors;
-                                            errors = _errs287;
+                                            var _valid22 = _errs284 === errors;
+                                            errors = _errs283;
                                             if (vErrors !== null) {
-                                              if (_errs287) {
-                                                vErrors.length = _errs287;
+                                              if (_errs283) {
+                                                vErrors.length = _errs283;
                                               } else {
                                                 vErrors = null;
                                               }
                                             }
                                             if (_valid22) {
-                                              const _errs290 = errors;
+                                              const _errs286 = errors;
                                               if (
                                                 data &&
                                                 typeof data == 'object' &&
@@ -10608,21 +11795,21 @@ var require_control_schema = __commonJS({
                                                     ];
                                                     return false;
                                                   }
-                                                  const _errs292 = errors;
-                                                  if (errors === _errs292) {
+                                                  const _errs288 = errors;
+                                                  if (errors === _errs288) {
                                                     if (
                                                       data88 &&
                                                       typeof data88 == 'object' &&
                                                       !Array.isArray(data88)
                                                     ) {
-                                                      let missing50;
+                                                      let missing49;
                                                       if (
                                                         (data88.code === void 0 &&
-                                                          (missing50 = 'code')) ||
+                                                          (missing49 = 'code')) ||
                                                         (data88.message === void 0 &&
-                                                          (missing50 = 'message')) ||
+                                                          (missing49 = 'message')) ||
                                                         (data88.retryable === void 0 &&
-                                                          (missing50 = 'retryable'))
+                                                          (missing49 = 'retryable'))
                                                       ) {
                                                         validate20.errors = [
                                                           {
@@ -10630,21 +11817,21 @@ var require_control_schema = __commonJS({
                                                             schemaPath:
                                                               '#/$defs/payload_error/required',
                                                             keyword: 'required',
-                                                            params: { missingProperty: missing50 },
+                                                            params: { missingProperty: missing49 },
                                                             message:
                                                               "must have required property '" +
-                                                              missing50 +
+                                                              missing49 +
                                                               "'",
                                                           },
                                                         ];
                                                         return false;
                                                       } else {
-                                                        const _errs294 = errors;
-                                                        for (const key15 in data88) {
+                                                        const _errs290 = errors;
+                                                        for (const key14 in data88) {
                                                           if (!(
-                                                            key15 === 'code' ||
-                                                            key15 === 'message' ||
-                                                            key15 === 'retryable'
+                                                            key14 === 'code' ||
+                                                            key14 === 'message' ||
+                                                            key14 === 'retryable'
                                                           )) {
                                                             validate20.errors = [
                                                               {
@@ -10654,7 +11841,7 @@ var require_control_schema = __commonJS({
                                                                   '#/$defs/payload_error/additionalProperties',
                                                                 keyword: 'additionalProperties',
                                                                 params: {
-                                                                  additionalProperty: key15,
+                                                                  additionalProperty: key14,
                                                                 },
                                                                 message:
                                                                   'must NOT have additional properties',
@@ -10664,11 +11851,11 @@ var require_control_schema = __commonJS({
                                                             break;
                                                           }
                                                         }
-                                                        if (_errs294 === errors) {
+                                                        if (_errs290 === errors) {
                                                           if (data88.code !== void 0) {
                                                             let data89 = data88.code;
-                                                            const _errs295 = errors;
-                                                            if (errors === _errs295) {
+                                                            const _errs291 = errors;
+                                                            if (errors === _errs291) {
                                                               if (typeof data89 === 'string') {
                                                                 if (func1(data89) > 128) {
                                                                   validate20.errors = [
@@ -10719,15 +11906,15 @@ var require_control_schema = __commonJS({
                                                                 return false;
                                                               }
                                                             }
-                                                            var valid100 = _errs295 === errors;
+                                                            var valid98 = _errs291 === errors;
                                                           } else {
-                                                            var valid100 = true;
+                                                            var valid98 = true;
                                                           }
-                                                          if (valid100) {
+                                                          if (valid98) {
                                                             if (data88.message !== void 0) {
                                                               let data90 = data88.message;
-                                                              const _errs297 = errors;
-                                                              if (errors === _errs297) {
+                                                              const _errs293 = errors;
+                                                              if (errors === _errs293) {
                                                                 if (typeof data90 === 'string') {
                                                                   if (func1(data90) > 1024) {
                                                                     validate20.errors = [
@@ -10761,13 +11948,13 @@ var require_control_schema = __commonJS({
                                                                   return false;
                                                                 }
                                                               }
-                                                              var valid100 = _errs297 === errors;
+                                                              var valid98 = _errs293 === errors;
                                                             } else {
-                                                              var valid100 = true;
+                                                              var valid98 = true;
                                                             }
-                                                            if (valid100) {
+                                                            if (valid98) {
                                                               if (data88.retryable !== void 0) {
-                                                                const _errs299 = errors;
+                                                                const _errs295 = errors;
                                                                 if (
                                                                   typeof data88.retryable !==
                                                                   'boolean'
@@ -10786,9 +11973,9 @@ var require_control_schema = __commonJS({
                                                                   ];
                                                                   return false;
                                                                 }
-                                                                var valid100 = _errs299 === errors;
+                                                                var valid98 = _errs295 === errors;
                                                               } else {
-                                                                var valid100 = true;
+                                                                var valid98 = true;
                                                               }
                                                             }
                                                           }
@@ -10809,15 +11996,15 @@ var require_control_schema = __commonJS({
                                                   }
                                                 }
                                               }
-                                              var _valid22 = _errs290 === errors;
-                                              valid96 = _valid22;
-                                              if (valid96) {
+                                              var _valid22 = _errs286 === errors;
+                                              valid94 = _valid22;
+                                              if (valid94) {
                                                 var props22 = {};
                                                 props22.payload = true;
                                                 props22.type = true;
                                               }
                                             }
-                                            if (!valid96) {
+                                            if (!valid94) {
                                               const err76 = {
                                                 instancePath,
                                                 schemaPath: '#/allOf/19/if',
@@ -10834,7 +12021,7 @@ var require_control_schema = __commonJS({
                                               validate20.errors = vErrors;
                                               return false;
                                             }
-                                            var valid0 = _errs286 === errors;
+                                            var valid0 = _errs282 === errors;
                                             if (valid0) {
                                               if (props0 !== true && props22 !== void 0) {
                                                 if (props22 === true) {
@@ -10844,17 +12031,17 @@ var require_control_schema = __commonJS({
                                                   Object.assign(props0, props22);
                                                 }
                                               }
-                                              const _errs302 = errors;
-                                              const _errs303 = errors;
-                                              let valid101 = true;
-                                              const _errs304 = errors;
+                                              const _errs298 = errors;
+                                              const _errs299 = errors;
+                                              let valid99 = true;
+                                              const _errs300 = errors;
                                               if (
                                                 data &&
                                                 typeof data == 'object' &&
                                                 !Array.isArray(data)
                                               ) {
-                                                let missing51;
-                                                if (data.type === void 0 && (missing51 = 'type')) {
+                                                let missing50;
+                                                if (data.type === void 0 && (missing50 = 'type')) {
                                                   const err77 = {};
                                                   if (vErrors === null) {
                                                     vErrors = [err77];
@@ -10876,36 +12063,36 @@ var require_control_schema = __commonJS({
                                                   }
                                                 }
                                               }
-                                              var _valid23 = _errs304 === errors;
-                                              errors = _errs303;
+                                              var _valid23 = _errs300 === errors;
+                                              errors = _errs299;
                                               if (vErrors !== null) {
-                                                if (_errs303) {
-                                                  vErrors.length = _errs303;
+                                                if (_errs299) {
+                                                  vErrors.length = _errs299;
                                                 } else {
                                                   vErrors = null;
                                                 }
                                               }
                                               if (_valid23) {
-                                                const _errs306 = errors;
+                                                const _errs302 = errors;
                                                 if (
                                                   data &&
                                                   typeof data == 'object' &&
                                                   !Array.isArray(data)
                                                 ) {
-                                                  let missing52;
+                                                  let missing51;
                                                   if (
                                                     data.session_id === void 0 &&
-                                                    (missing52 = 'session_id')
+                                                    (missing51 = 'session_id')
                                                   ) {
                                                     validate20.errors = [
                                                       {
                                                         instancePath,
                                                         schemaPath: '#/allOf/20/then/required',
                                                         keyword: 'required',
-                                                        params: { missingProperty: missing52 },
+                                                        params: { missingProperty: missing51 },
                                                         message:
                                                           "must have required property '" +
-                                                          missing52 +
+                                                          missing51 +
                                                           "'",
                                                       },
                                                     ];
@@ -10913,7 +12100,7 @@ var require_control_schema = __commonJS({
                                                   } else {
                                                     if (data.payload !== void 0) {
                                                       let data93 = data.payload;
-                                                      const _errs307 = errors;
+                                                      const _errs303 = errors;
                                                       if (!(
                                                         data93 &&
                                                         typeof data93 == 'object' &&
@@ -10931,21 +12118,21 @@ var require_control_schema = __commonJS({
                                                         ];
                                                         return false;
                                                       }
-                                                      const _errs308 = errors;
-                                                      if (errors === _errs308) {
+                                                      const _errs304 = errors;
+                                                      if (errors === _errs304) {
                                                         if (
                                                           data93 &&
                                                           typeof data93 == 'object' &&
                                                           !Array.isArray(data93)
                                                         ) {
-                                                          let missing53;
+                                                          let missing52;
                                                           if (
                                                             (data93.grant === void 0 &&
-                                                              (missing53 = 'grant')) ||
+                                                              (missing52 = 'grant')) ||
                                                             (data93.lease_version === void 0 &&
-                                                              (missing53 = 'lease_version')) ||
+                                                              (missing52 = 'lease_version')) ||
                                                             (data93.lease_expires_at === void 0 &&
-                                                              (missing53 = 'lease_expires_at'))
+                                                              (missing52 = 'lease_expires_at'))
                                                           ) {
                                                             validate20.errors = [
                                                               {
@@ -10955,23 +12142,23 @@ var require_control_schema = __commonJS({
                                                                   '#/$defs/payload_lease_update/required',
                                                                 keyword: 'required',
                                                                 params: {
-                                                                  missingProperty: missing53,
+                                                                  missingProperty: missing52,
                                                                 },
                                                                 message:
                                                                   "must have required property '" +
-                                                                  missing53 +
+                                                                  missing52 +
                                                                   "'",
                                                               },
                                                             ];
                                                             return false;
                                                           } else {
-                                                            const _errs310 = errors;
-                                                            for (const key16 in data93) {
+                                                            const _errs306 = errors;
+                                                            for (const key15 in data93) {
                                                               if (!(
-                                                                key16 === 'grant' ||
-                                                                key16 === 'lease_version' ||
-                                                                key16 === 'lease_expires_at' ||
-                                                                key16 === 'browser_access'
+                                                                key15 === 'grant' ||
+                                                                key15 === 'lease_version' ||
+                                                                key15 === 'lease_expires_at' ||
+                                                                key15 === 'browser_access'
                                                               )) {
                                                                 validate20.errors = [
                                                                   {
@@ -10981,7 +12168,7 @@ var require_control_schema = __commonJS({
                                                                       '#/$defs/payload_lease_update/additionalProperties',
                                                                     keyword: 'additionalProperties',
                                                                     params: {
-                                                                      additionalProperty: key16,
+                                                                      additionalProperty: key15,
                                                                     },
                                                                     message:
                                                                       'must NOT have additional properties',
@@ -10991,11 +12178,11 @@ var require_control_schema = __commonJS({
                                                                 break;
                                                               }
                                                             }
-                                                            if (_errs310 === errors) {
+                                                            if (_errs306 === errors) {
                                                               if (data93.grant !== void 0) {
                                                                 let data94 = data93.grant;
-                                                                const _errs311 = errors;
-                                                                if (errors === _errs311) {
+                                                                const _errs307 = errors;
+                                                                if (errors === _errs307) {
                                                                   if (typeof data94 === 'string') {
                                                                     if (func1(data94) > 16384) {
                                                                       validate20.errors = [
@@ -11046,21 +12233,21 @@ var require_control_schema = __commonJS({
                                                                     return false;
                                                                   }
                                                                 }
-                                                                var valid105 = _errs311 === errors;
+                                                                var valid103 = _errs307 === errors;
                                                               } else {
-                                                                var valid105 = true;
+                                                                var valid103 = true;
                                                               }
-                                                              if (valid105) {
+                                                              if (valid103) {
                                                                 if (
                                                                   data93.lease_version !== void 0
                                                                 ) {
                                                                   let data95 = data93.lease_version;
-                                                                  const _errs313 = errors;
-                                                                  if (errors === _errs313) {
+                                                                  const _errs309 = errors;
+                                                                  if (errors === _errs309) {
                                                                     if (
                                                                       typeof data95 === 'string'
                                                                     ) {
-                                                                      if (!pattern14.test(data95)) {
+                                                                      if (!pattern16.test(data95)) {
                                                                         validate20.errors = [
                                                                           {
                                                                             instancePath:
@@ -11097,21 +12284,21 @@ var require_control_schema = __commonJS({
                                                                       return false;
                                                                     }
                                                                   }
-                                                                  var valid105 =
-                                                                    _errs313 === errors;
+                                                                  var valid103 =
+                                                                    _errs309 === errors;
                                                                 } else {
-                                                                  var valid105 = true;
+                                                                  var valid103 = true;
                                                                 }
-                                                                if (valid105) {
+                                                                if (valid103) {
                                                                   if (
                                                                     data93.lease_expires_at !==
                                                                     void 0
                                                                   ) {
                                                                     let data96 =
                                                                       data93.lease_expires_at;
-                                                                    const _errs315 = errors;
-                                                                    if (errors === _errs315) {
-                                                                      if (errors === _errs315) {
+                                                                    const _errs311 = errors;
+                                                                    if (errors === _errs311) {
+                                                                      if (errors === _errs311) {
                                                                         if (
                                                                           typeof data96 === 'string'
                                                                         ) {
@@ -11158,39 +12345,39 @@ var require_control_schema = __commonJS({
                                                                         }
                                                                       }
                                                                     }
-                                                                    var valid105 =
-                                                                      _errs315 === errors;
+                                                                    var valid103 =
+                                                                      _errs311 === errors;
                                                                   } else {
-                                                                    var valid105 = true;
+                                                                    var valid103 = true;
                                                                   }
-                                                                  if (valid105) {
+                                                                  if (valid103) {
                                                                     if (
                                                                       data93.browser_access !==
                                                                       void 0
                                                                     ) {
                                                                       let data97 =
                                                                         data93.browser_access;
-                                                                      const _errs317 = errors;
-                                                                      if (errors === _errs317) {
+                                                                      const _errs313 = errors;
+                                                                      if (errors === _errs313) {
                                                                         if (
                                                                           data97 &&
                                                                           typeof data97 ==
                                                                             'object' &&
                                                                           !Array.isArray(data97)
                                                                         ) {
-                                                                          let missing54;
+                                                                          let missing53;
                                                                           if (
                                                                             (data97.token ===
                                                                               void 0 &&
-                                                                              (missing54 =
+                                                                              (missing53 =
                                                                                 'token')) ||
                                                                             (data97.expires_at ===
                                                                               void 0 &&
-                                                                              (missing54 =
+                                                                              (missing53 =
                                                                                 'expires_at')) ||
                                                                             (data97.audience ===
                                                                               void 0 &&
-                                                                              (missing54 =
+                                                                              (missing53 =
                                                                                 'audience'))
                                                                           ) {
                                                                             validate20.errors = [
@@ -11203,23 +12390,23 @@ var require_control_schema = __commonJS({
                                                                                 keyword: 'required',
                                                                                 params: {
                                                                                   missingProperty:
-                                                                                    missing54,
+                                                                                    missing53,
                                                                                 },
                                                                                 message:
                                                                                   "must have required property '" +
-                                                                                  missing54 +
+                                                                                  missing53 +
                                                                                   "'",
                                                                               },
                                                                             ];
                                                                             return false;
                                                                           } else {
-                                                                            const _errs319 = errors;
-                                                                            for (const key17 in data97) {
+                                                                            const _errs315 = errors;
+                                                                            for (const key16 in data97) {
                                                                               if (!(
-                                                                                key17 === 'token' ||
-                                                                                key17 ===
+                                                                                key16 === 'token' ||
+                                                                                key16 ===
                                                                                   'expires_at' ||
-                                                                                key17 === 'audience'
+                                                                                key16 === 'audience'
                                                                               )) {
                                                                                 validate20.errors =
                                                                                   [
@@ -11233,7 +12420,7 @@ var require_control_schema = __commonJS({
                                                                                         'additionalProperties',
                                                                                       params: {
                                                                                         additionalProperty:
-                                                                                          key17,
+                                                                                          key16,
                                                                                       },
                                                                                       message:
                                                                                         'must NOT have additional properties',
@@ -11244,7 +12431,7 @@ var require_control_schema = __commonJS({
                                                                               }
                                                                             }
                                                                             if (
-                                                                              _errs319 === errors
+                                                                              _errs315 === errors
                                                                             ) {
                                                                               if (
                                                                                 data97.token !==
@@ -11252,11 +12439,11 @@ var require_control_schema = __commonJS({
                                                                               ) {
                                                                                 let data98 =
                                                                                   data97.token;
-                                                                                const _errs320 =
+                                                                                const _errs316 =
                                                                                   errors;
                                                                                 if (
                                                                                   errors ===
-                                                                                  _errs320
+                                                                                  _errs316
                                                                                 ) {
                                                                                   if (
                                                                                     typeof data98 ===
@@ -11334,28 +12521,28 @@ var require_control_schema = __commonJS({
                                                                                     return false;
                                                                                   }
                                                                                 }
-                                                                                var valid106 =
-                                                                                  _errs320 ===
+                                                                                var valid104 =
+                                                                                  _errs316 ===
                                                                                   errors;
                                                                               } else {
-                                                                                var valid106 = true;
+                                                                                var valid104 = true;
                                                                               }
-                                                                              if (valid106) {
+                                                                              if (valid104) {
                                                                                 if (
                                                                                   data97.expires_at !==
                                                                                   void 0
                                                                                 ) {
                                                                                   let data99 =
                                                                                     data97.expires_at;
-                                                                                  const _errs322 =
+                                                                                  const _errs318 =
                                                                                     errors;
                                                                                   if (
                                                                                     errors ===
-                                                                                    _errs322
+                                                                                    _errs318
                                                                                   ) {
                                                                                     if (
                                                                                       errors ===
-                                                                                      _errs322
+                                                                                      _errs318
                                                                                     ) {
                                                                                       if (
                                                                                         typeof data99 ===
@@ -11410,18 +12597,18 @@ var require_control_schema = __commonJS({
                                                                                       }
                                                                                     }
                                                                                   }
-                                                                                  var valid106 =
-                                                                                    _errs322 ===
+                                                                                  var valid104 =
+                                                                                    _errs318 ===
                                                                                     errors;
                                                                                 } else {
-                                                                                  var valid106 = true;
+                                                                                  var valid104 = true;
                                                                                 }
-                                                                                if (valid106) {
+                                                                                if (valid104) {
                                                                                   if (
                                                                                     data97.audience !==
                                                                                     void 0
                                                                                   ) {
-                                                                                    const _errs324 =
+                                                                                    const _errs320 =
                                                                                       errors;
                                                                                     if (
                                                                                       'raccess-device-access-v2' !==
@@ -11448,11 +12635,11 @@ var require_control_schema = __commonJS({
                                                                                         ];
                                                                                       return false;
                                                                                     }
-                                                                                    var valid106 =
-                                                                                      _errs324 ===
+                                                                                    var valid104 =
+                                                                                      _errs320 ===
                                                                                       errors;
                                                                                   } else {
-                                                                                    var valid106 = true;
+                                                                                    var valid104 = true;
                                                                                   }
                                                                                 }
                                                                               }
@@ -11477,10 +12664,10 @@ var require_control_schema = __commonJS({
                                                                           return false;
                                                                         }
                                                                       }
-                                                                      var valid105 =
-                                                                        _errs317 === errors;
+                                                                      var valid103 =
+                                                                        _errs313 === errors;
                                                                     } else {
-                                                                      var valid105 = true;
+                                                                      var valid103 = true;
                                                                     }
                                                                   }
                                                                 }
@@ -11502,15 +12689,15 @@ var require_control_schema = __commonJS({
                                                           return false;
                                                         }
                                                       }
-                                                      var valid103 = _errs307 === errors;
+                                                      var valid101 = _errs303 === errors;
                                                     } else {
-                                                      var valid103 = true;
+                                                      var valid101 = true;
                                                     }
-                                                    if (valid103) {
+                                                    if (valid101) {
                                                       if (data.session_id !== void 0) {
                                                         let data101 = data.session_id;
-                                                        const _errs326 = errors;
-                                                        if (errors === _errs326) {
+                                                        const _errs322 = errors;
+                                                        if (errors === _errs322) {
                                                           if (typeof data101 === 'string') {
                                                             if (func1(data101) > 128) {
                                                               validate20.errors = [
@@ -11558,23 +12745,23 @@ var require_control_schema = __commonJS({
                                                             return false;
                                                           }
                                                         }
-                                                        var valid103 = _errs326 === errors;
+                                                        var valid101 = _errs322 === errors;
                                                       } else {
-                                                        var valid103 = true;
+                                                        var valid101 = true;
                                                       }
                                                     }
                                                   }
                                                 }
-                                                var _valid23 = _errs306 === errors;
-                                                valid101 = _valid23;
-                                                if (valid101) {
+                                                var _valid23 = _errs302 === errors;
+                                                valid99 = _valid23;
+                                                if (valid99) {
                                                   var props23 = {};
                                                   props23.payload = true;
                                                   props23.session_id = true;
                                                   props23.type = true;
                                                 }
                                               }
-                                              if (!valid101) {
+                                              if (!valid99) {
                                                 const err79 = {
                                                   instancePath,
                                                   schemaPath: '#/allOf/20/if',
@@ -11591,7 +12778,7 @@ var require_control_schema = __commonJS({
                                                 validate20.errors = vErrors;
                                                 return false;
                                               }
-                                              var valid0 = _errs302 === errors;
+                                              var valid0 = _errs298 === errors;
                                               if (valid0) {
                                                 if (props0 !== true && props23 !== void 0) {
                                                   if (props23 === true) {
@@ -11624,27 +12811,27 @@ var require_control_schema = __commonJS({
       }
       if (errors === 0) {
         if (data && typeof data == 'object' && !Array.isArray(data)) {
-          let missing55;
+          let missing54;
           if (
-            (data.v === void 0 && (missing55 = 'v')) ||
-            (data.type === void 0 && (missing55 = 'type')) ||
-            (data.request_id === void 0 && (missing55 = 'request_id')) ||
-            (data.connection_generation === void 0 && (missing55 = 'connection_generation')) ||
-            (data.payload === void 0 && (missing55 = 'payload'))
+            (data.v === void 0 && (missing54 = 'v')) ||
+            (data.type === void 0 && (missing54 = 'type')) ||
+            (data.request_id === void 0 && (missing54 = 'request_id')) ||
+            (data.connection_generation === void 0 && (missing54 = 'connection_generation')) ||
+            (data.payload === void 0 && (missing54 = 'payload'))
           ) {
             validate20.errors = [
               {
                 instancePath,
                 schemaPath: '#/required',
                 keyword: 'required',
-                params: { missingProperty: missing55 },
-                message: "must have required property '" + missing55 + "'",
+                params: { missingProperty: missing54 },
+                message: "must have required property '" + missing54 + "'",
               },
             ];
             return false;
           } else {
             if (data.v !== void 0) {
-              const _errs329 = errors;
+              const _errs325 = errors;
               if (2 !== data.v) {
                 validate20.errors = [
                   {
@@ -11657,14 +12844,14 @@ var require_control_schema = __commonJS({
                 ];
                 return false;
               }
-              var valid107 = _errs329 === errors;
+              var valid105 = _errs325 === errors;
             } else {
-              var valid107 = true;
+              var valid105 = true;
             }
-            if (valid107) {
+            if (valid105) {
               if (data.type !== void 0) {
                 let data103 = data.type;
-                const _errs330 = errors;
+                const _errs326 = errors;
                 if (!(
                   data103 === 'registered' ||
                   data103 === 'heartbeat' ||
@@ -11699,15 +12886,15 @@ var require_control_schema = __commonJS({
                   ];
                   return false;
                 }
-                var valid107 = _errs330 === errors;
+                var valid105 = _errs326 === errors;
               } else {
-                var valid107 = true;
+                var valid105 = true;
               }
-              if (valid107) {
+              if (valid105) {
                 if (data.request_id !== void 0) {
                   let data104 = data.request_id;
-                  const _errs331 = errors;
-                  if (errors === _errs331) {
+                  const _errs327 = errors;
+                  if (errors === _errs327) {
                     if (typeof data104 === 'string') {
                       if (func1(data104) > 128) {
                         validate20.errors = [
@@ -11747,15 +12934,15 @@ var require_control_schema = __commonJS({
                       return false;
                     }
                   }
-                  var valid107 = _errs331 === errors;
+                  var valid105 = _errs327 === errors;
                 } else {
-                  var valid107 = true;
+                  var valid105 = true;
                 }
-                if (valid107) {
+                if (valid105) {
                   if (data.connection_generation !== void 0) {
                     let data105 = data.connection_generation;
-                    const _errs333 = errors;
-                    if (errors === _errs333) {
+                    const _errs329 = errors;
+                    if (errors === _errs329) {
                       if (typeof data105 === 'string') {
                         if (!pattern9.test(data105)) {
                           validate20.errors = [
@@ -11782,15 +12969,15 @@ var require_control_schema = __commonJS({
                         return false;
                       }
                     }
-                    var valid107 = _errs333 === errors;
+                    var valid105 = _errs329 === errors;
                   } else {
-                    var valid107 = true;
+                    var valid105 = true;
                   }
-                  if (valid107) {
+                  if (valid105) {
                     if (data.session_id !== void 0) {
                       let data106 = data.session_id;
-                      const _errs335 = errors;
-                      if (errors === _errs335) {
+                      const _errs331 = errors;
+                      if (errors === _errs331) {
                         if (typeof data106 === 'string') {
                           if (func1(data106) > 128) {
                             validate20.errors = [
@@ -11830,14 +13017,14 @@ var require_control_schema = __commonJS({
                           return false;
                         }
                       }
-                      var valid107 = _errs335 === errors;
+                      var valid105 = _errs331 === errors;
                     } else {
-                      var valid107 = true;
+                      var valid105 = true;
                     }
-                    if (valid107) {
+                    if (valid105) {
                       if (data.payload !== void 0) {
                         let data107 = data.payload;
-                        const _errs337 = errors;
+                        const _errs333 = errors;
                         if (!(data107 && typeof data107 == 'object' && !Array.isArray(data107))) {
                           validate20.errors = [
                             {
@@ -11850,9 +13037,9 @@ var require_control_schema = __commonJS({
                           ];
                           return false;
                         }
-                        var valid107 = _errs337 === errors;
+                        var valid105 = _errs333 === errors;
                       } else {
-                        var valid107 = true;
+                        var valid105 = true;
                       }
                     }
                   }
@@ -11881,4 +13068,4 @@ var require_control_schema = __commonJS({
 });
 export default require_control_schema();
 
-export const schemaSHA256 = 'e262d6da0fa6772ed4943dd605761868cea1fb332a7292ee501069a796572ddd';
+export const schemaSHA256 = 'e037706b68bb458a87e1ef8816a9ca24854fe47763e9e2b0fd930491bbfd733e';

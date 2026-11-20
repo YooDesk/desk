@@ -1,5 +1,5 @@
 // Windows/Linux 端侧能力入口。普通 fetch/WS 与产品会话共用认证和生命周期。
-window.createDeskExtensions = function ({ request, api, state }) {
+window.createDeskExtensions = function ({ request, api, state, fileStreams }) {
   const el = (id) => document.getElementById(id);
   let caps = {};
   let audioContext;
@@ -8,7 +8,7 @@ window.createDeskExtensions = function ({ request, api, state }) {
   let audioEnabled = false;
   let timestamp = 0;
   let generation = 0;
-  const files = window.createDeskFiles({ request, api, state });
+  const files = window.createDeskFiles({ request, api, state, fileStreams });
   const diagnostic = () => (window.__yoodeskDesk ||= {});
   const endpoint = (body, session = state.sessionId) => {
     if (!session) return Promise.reject(new Error("请先连接桌面"));

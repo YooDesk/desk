@@ -373,6 +373,7 @@
     "payload_session_open": {
       "type": "object",
       "properties": {
+        "resume": { "type": "boolean" },
         "grant": {
           "type": "string",
           "minLength": 1,
@@ -531,6 +532,7 @@
     "payload_relay_request": {
       "type": "object",
       "properties": {
+        "candidate_path": { "enum": ["stun", "turn", "mixed"] },
         "negotiation_generation": {
           "type": "string",
           "pattern": "^[1-9][0-9]{0,19}$"
@@ -544,6 +546,9 @@
     "payload_relay_ready": {
       "type": "object",
       "properties": {
+        "candidate_path": { "enum": ["stun", "turn", "mixed"] },
+        "available": { "type": "boolean" },
+        "ice_config": { "$ref": "#/$defs/ice_config" },
         "negotiation_generation": {
           "type": "string",
           "pattern": "^[1-9][0-9]{0,19}$"

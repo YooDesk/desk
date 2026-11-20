@@ -73,7 +73,7 @@
     platform: {},
     cursor: { shapes: new Map(), image: null, x: 0, y: 0, visible: false, hotx: 0, hoty: 0 },
   };
-  var extensions = window.createDeskExtensions({ request: request, api: api, state: state });
+  var extensions = window.createDeskExtensions({ request: request, api: api, state: state, fileStreams: true });
   // 剪贴板失败保留诊断状态，按用户要求不显示同步提示。
   var clipboard = window.createDeskClipboard({ request: request, api: api, state: state, say: function (text) {
     window.__yoodeskDesk = window.__yoodeskDesk || {};
@@ -191,7 +191,7 @@
     if (payload && payload.error && payload.error.message) { return payload.error.message; }
     return fallback;
   }
-  function request(method, url, body, signal) {
+  function request(method, url, body, signal, binaryResponse, uploadId) {
     if (state.csrf && method !== 'GET' && url !== access + '/login/') {
       var id = requestId();
       var expectedInstance = state.accessInstance;
@@ -207,12 +207,12 @@
         };
         await refresh();
         var result;
-        try { result = await rawRequest(method, url, body, signal, id, expectedInstance); }
+        try { result = await rawRequest(method, url, body, signal, id, expectedInstance, binaryResponse, uploadId); }
         catch (error) {
           // CSRF阶段已拒绝的请求没有执行；保持请求id仅重发一次。
           if (!error.csrfRejected || (signal && signal.aborted)) { throw error; }
           await refresh();
-          result = await rawRequest(method, url, body, signal, id, expectedInstance);
+          result = await rawRequest(method, url, body, signal, id, expectedInstance, binaryResponse, uploadId);
         }
         if (url === access + '/session/renew/') { state.csrf = result.csrf_token; }
         return result;
@@ -222,10 +222,11 @@
       // 锁只协调有期限的续期，不等待任何远端业务I/O。
       return navigator.locks ? navigator.locks.request(productId + '-access-renew', {signal: signal}, write) : write();
     }
-    return rawRequest(method, url, body, signal);
+    return rawRequest(method, url, body, signal, undefined, undefined, binaryResponse, uploadId);
   }
-  function rawRequest(method, url, body, signal, id, instance) {
+  function rawRequest(method, url, body, signal, id, instance, binaryResponse, uploadId) {
     var init = { method: method, headers: headers(), credentials: 'same-origin' };
+    if (binaryResponse) { init.headers.Accept = 'application/octet-stream'; }
     if (id) { init.headers['X-Request-ID'] = id; }
     if (method !== 'GET' && url !== access + '/login/' && (instance || state.accessInstance)) {
       init.headers['X-Access-Instance'] = instance || state.accessInstance;
@@ -233,12 +234,23 @@
     // 页面退出仍发送小型关闭请求，避免浏览器导航取消资源回收。
     if (method === 'DELETE' && url.indexOf(api + '/sessions/') === 0) { init.keepalive = true; }
     if (signal) { init.signal = signal; }
-    if (body !== undefined) {
+    if (uploadId !== undefined) {
+      init.headers['Content-Type'] = 'application/octet-stream';
+      init.headers['X-Desk-Transfer-ID'] = String(uploadId);
+      init.body = body;
+    } else if (body !== undefined) {
       init.headers['Content-Type'] = 'application/json';
       init.body = JSON.stringify(body);
     }
     return fetch(url, init).then(function (response) {
       var type = response.headers.get('Content-Type') || '';
+      if (binaryResponse && response.ok) {
+        if (type !== 'application/octet-stream' || !response.body) {
+          if (response.body) { void response.body.cancel().catch(function () {}); }
+          throw new Error('Invalid file stream response');
+        }
+        return response.body;
+      }
       var parse = type.indexOf('application/json') === 0 ? response.json() : Promise.resolve(null);
       return parse.then(function (payload) {
         if (!response.ok) {

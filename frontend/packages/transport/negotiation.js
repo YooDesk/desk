@@ -26,7 +26,7 @@ export async function negotiateSession({
     !/^[1-9][0-9]{0,19}$/.test(session.negotiation_generation) ||
     typeof session.lease_version !== 'string' ||
     !/^[1-9][0-9]{0,18}$/.test(session.lease_version) ||
-    !['stun', 'turn', 'websocket'].includes(path) ||
+    !['stun', 'turn', 'websocket', 'resume'].includes(path) ||
     typeof csrfToken !== 'string' ||
     !/^[A-Za-z0-9_-]{16,128}$/.test(csrfToken) ||
     typeof requestID !== 'string' ||

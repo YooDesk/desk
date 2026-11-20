@@ -1093,7 +1093,8 @@
           "enum": [
             "stun",
             "turn",
-            "websocket"
+            "websocket",
+            "resume"
           ]
         }
       }
