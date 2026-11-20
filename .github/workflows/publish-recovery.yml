@@ -48,9 +48,29 @@ jobs:
                   assert hashlib.sha256(bundle.read(metadata['library'])).hexdigest() == metadata['sha256']
           assert not platforms
           PY
-      - uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v0.1.0-ci.139
-          make_latest: true
-          fail_on_unmatched_files: true
-          files: dist/*
+      - name: Upload assets without modifying the existing release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          import glob, json, os, urllib.parse, urllib.request
+          headers = {'Authorization': 'Bearer '+os.environ['GH_TOKEN'], 'Accept': 'application/vnd.github+json'}
+          base = 'https://api.github.com/repos/${{ github.repository }}'
+          def api(url, data=None, method=None, content='application/json'):
+              request = urllib.request.Request(url, data=data, headers={**headers, 'Content-Type':content}, method=method)
+              with urllib.request.urlopen(request, timeout=120) as response:
+                  raw = response.read()
+                  return json.loads(raw) if raw else None
+          release = api(base+'/releases/tags/v0.1.0-ci.139')
+          assert release['target_commitish'] == 'fa3b03c20e32012d92792c4a0a022b120776acfd'
+          existing = {item['name']:item for item in release['assets']}
+          for path in sorted(glob.glob('dist/*')):
+              name = os.path.basename(path)
+              if name in existing:
+                  api(base+'/releases/assets/'+str(existing[name]['id']), method='DELETE')
+              url = release['upload_url'].split('{')[0]+'?name='+urllib.parse.quote(name)
+              uploaded = api(url, open(path,'rb').read(), 'POST', 'application/octet-stream')
+              assert uploaded['size'] == os.path.getsize(path)
+              print('Uploaded '+name)
+          assert len(api(base+'/releases/tags/v0.1.0-ci.139')['assets']) == 16
+          PY
