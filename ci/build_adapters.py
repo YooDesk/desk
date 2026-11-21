@@ -9,7 +9,7 @@ import sys
 ADAPTER_PATHS = {
     'ci/build_adapters.py', 'ci/build_matrix.py', 'ci/linux-build.sh',
     'ci/audit_engine_sysroot.py', 'ci/native_sdk.py', 'ci/native-sdk.lock.json', 'ci/package.py',
-    'ci/windows_crt.py', 'ci/test_windows_crt.py', 'ci/test_oldworld.py',
+    'ci/windows_crt.py', 'ci/test_windows_crt.py', 'ci/test_oldworld.py', 'ci/publish_verified_plugins.py',
     'ci/oldworld-binfmt.py', 'ci/oldworld-build.sh', 'ci/oldworld-cargo.sh',
     'ci/oldworld-codecs.sh', 'ci/oldworld-qemu.sh', 'ci/oldworld-runner.py',
     'ci/oldworld-rust.lock.json', 'ci/oldworld-sysroot-download.lock.json',
@@ -19,7 +19,7 @@ ADAPTER_PATHS = {
     'scripts/prepare_vcpkg_downloads.py',
 }
 REVIEW_ONLY_PATHS = {
-    '.github/workflows/build.yml', '.github/workflows/audit-oldworld.yml',
+    '.github/workflows/build.yml', '.github/workflows/audit-oldworld.yml', '.github/workflows/publish-recovery.yml',
     'README.md', 'PROGRESS.md', 'MIGRATION.md',
 }
 
