@@ -321,6 +321,13 @@ jobs:
           name: sysroot-audit-${{ matrix.platform }}
           path: artifacts/sysroot-audit-${{ matrix.platform }}.json
           if-no-files-found: warn
+      - name: Upload old-world engine diagnostics
+        if: always() && matrix.oldworld
+        uses: actions/upload-artifact@v4
+        with:
+          name: oldworld-engine-diagnostics
+          path: artifacts/oldworld-engine-*
+          if-no-files-found: warn
       - name: Publish immutable third-party native library SDK
         if: always() && matrix.cross && hashFiles('artifacts/native-sdk/*.tar.xz') != ''
         uses: softprops/action-gh-release@v2

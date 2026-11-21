@@ -90,7 +90,18 @@ if [[ "$kind" == desk ]]; then
     python3 scripts/prepare_linux_native.py
     python3 scripts/patch_hwcodec.py
     python3 scripts/prepare_nix.py
-    python3 scripts/build_engine.py
+    cp desk-engine/Cargo.lock artifacts/oldworld-engine-lock.before
+    if ! python3 scripts/build_engine.py 2>&1 | tee artifacts/oldworld-engine-build.log; then
+        # Diagnose vendor Cargo's required lock change, without accepting it as
+        # a release build. A reviewed, committed lock is still mandatory.
+        if grep -q 'cannot update the lock file' artifacts/oldworld-engine-build.log; then
+            (cd desk-engine && cargo fetch) || true
+            cp desk-engine/Cargo.lock artifacts/oldworld-engine-lock.after
+            git diff -- desk-engine/Cargo.lock > artifacts/oldworld-engine-lock.diff
+            cat artifacts/oldworld-engine-lock.diff
+        fi
+        exit 1
+    fi
     export YOODESK_DESK_ENGINE_LIB_DIR="$workspace/desk-engine/target/$target/release"
     export YOODESK_DESK_ENGINE=1
     mkdir -p target/release

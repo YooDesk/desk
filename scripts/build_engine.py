@@ -147,7 +147,7 @@ def main() -> int:
     subprocess.run([sys.executable, str(ROOT / "scripts" / "prepare_ring.py")], env=env, check=True)
     subprocess.run([sys.executable, str(ROOT / "scripts" / "prepare_mozjpeg.py")], env=env, check=True)
     fetch = ["cargo", "fetch", "--locked"]
-    if os.name == "nt" or sys.platform == "darwin":
+    if os.name == "nt" or sys.platform == "darwin" or env.get("YOODESK_OLDWORLD_TOOLS"):
         target = env.get("CARGO_BUILD_TARGET")
         if not target:
             info = subprocess.check_output(["rustc", "-vV"], env=env, text=True)
