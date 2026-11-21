@@ -20,22 +20,34 @@ jobs:
           "$YOODESK_OLDWORLD_COMPILER" --version
           "$YOODESK_OLDWORLD_RUSTC" -vV
           mkdir -p artifacts/oldworld
+          # The old loader's statx probes must see target files, including libc.
+          # QEMU's -L prefix does not redirect every filesystem operation.
+          sudo mkdir -p "$YOODESK_OLDWORLD_ROOT/tmp/yoodesk-audit"
+          sudo cp "$YOODESK_OLDWORLD_QEMU" "$YOODESK_OLDWORLD_ROOT/tmp/yoodesk-audit/qemu"
+          sudo cp Cargo.toml "$YOODESK_OLDWORLD_ROOT/tmp/yoodesk-audit/Cargo.toml"
+          run_guest() {
+            local binary="$1"
+            sudo cp "$binary" "$YOODESK_OLDWORLD_ROOT/tmp/yoodesk-audit/program"
+            sudo env QEMU_LD_PREFIX=/ chroot "$YOODESK_OLDWORLD_ROOT" \
+              /tmp/yoodesk-audit/qemu -strace /tmp/yoodesk-audit/program \
+              2> "${binary}.strace"
+          }
           printf '#include <stdio.h>\nint main(void) { puts("old-world C runtime OK"); return 0; }\n' > artifacts/oldworld/probe.c
           "$YOODESK_OLDWORLD_COMPILER" artifacts/oldworld/probe.c -o artifacts/oldworld/probe-c
-          "$YOODESK_OLDWORLD_QEMU" artifacts/oldworld/probe-c
+          run_guest artifacts/oldworld/probe-c
           cat > artifacts/oldworld/probe.rs <<'RS'
           use std::{fs, net::TcpListener, thread};
           fn main() {
               let listener = TcpListener::bind("127.0.0.1:0").unwrap();
               assert_ne!(listener.local_addr().unwrap().port(), 0);
-              assert!(fs::metadata("Cargo.toml").unwrap().is_file());
+              assert!(fs::metadata("/tmp/yoodesk-audit/Cargo.toml").unwrap().is_file());
               assert_eq!(thread::spawn(|| 42).join().unwrap(), 42);
               println!("old-world Rust runtime OK");
           }
           RS
           "$YOODESK_OLDWORLD_RUSTC" artifacts/oldworld/probe.rs --target loongarch64-unknown-linux-gnu \
             -C linker="$YOODESK_OLDWORLD_COMPILER" -o artifacts/oldworld/probe-rust
-          "$YOODESK_OLDWORLD_QEMU" artifacts/oldworld/probe-rust
+          run_guest artifacts/oldworld/probe-rust
           for binary in artifacts/oldworld/probe-c artifacts/oldworld/probe-rust; do
             readelf -h -l -V "$binary"
             python3 - "$binary" <<'PY'
