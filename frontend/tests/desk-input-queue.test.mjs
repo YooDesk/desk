@@ -17,6 +17,8 @@ function fixture() {
   const state = { sessionId: 'old', readonly: false, inputVersion: 0, modePending: false, inputController: new AbortController() };
   const context = vm.createContext({
     state,
+    performance,
+    inputDiagnostic: { batches: 0, failures: 0, maxQueueMs: 0, maxRequestMs: 0 },
     api: '/desk',
     inputTail: Promise.resolve(),
     inputPending: 0,
