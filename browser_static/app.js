@@ -6,8 +6,7 @@
   'use strict';
 
   var productId = document.documentElement.dataset.productId;
-  // IP沿用当前访问地址，不附带端口；机器名来自被控端渲染的转义属性。
-  document.title = document.documentElement.dataset.productName + '-' + document.documentElement.dataset.machineName + '(' + location.hostname + ')';
+  document.title = document.documentElement.dataset.productName || 'YooDesk';
   var base = '/' + productId + '/webclient';
   var api = base + '/desk/api/v2';
   var connectorAccess = new URLSearchParams(window.__yoodeskViewer?.query ?? location.search).get('gateway') === '1';
@@ -159,7 +158,18 @@
     anchor.click(); setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
   }; }
   var toolbarTimer;
+  var toolbarRevealTimer;
+  function cancelToolbarReveal() {
+    clearTimeout(toolbarRevealTimer);
+  }
+  function scheduleToolbarReveal() {
+    cancelToolbarReveal();
+    if (el('toolbar').classList.contains('auto-hidden')) {
+      toolbarRevealTimer = setTimeout(revealToolbar, 1000);
+    }
+  }
   function revealToolbar() {
+    cancelToolbarReveal();
     el('toolbar').classList.remove('auto-hidden');
     clearTimeout(toolbarTimer);
     toolbarTimer = setTimeout(function () {
@@ -169,11 +179,26 @@
       }
     }, 1500);
   }
-  el('toolbar-reveal').addEventListener('pointerenter', revealToolbar);
-  el('toolbar').addEventListener('pointerenter', revealToolbar);
-  el('toolbar').addEventListener('pointerleave', revealToolbar);
+  el('toolbar-reveal').addEventListener('pointerenter', scheduleToolbarReveal);
+  el('toolbar-reveal').addEventListener('pointermove', scheduleToolbarReveal);
+  el('toolbar-reveal').addEventListener('pointerleave', cancelToolbarReveal);
+  el('toolbar-reveal').addEventListener('pointercancel', cancelToolbarReveal);
+  el('toolbar').addEventListener('pointerenter', function () {
+    if (el('toolbar').classList.contains('auto-hidden')) { scheduleToolbarReveal(); }
+    else { revealToolbar(); }
+  });
+  el('toolbar').addEventListener('pointermove', scheduleToolbarReveal);
+  el('toolbar').addEventListener('pointercancel', cancelToolbarReveal);
+  el('toolbar').addEventListener('pointerleave', function () {
+    cancelToolbarReveal();
+    if (!el('toolbar').classList.contains('auto-hidden')) { revealToolbar(); }
+  });
   el('toolbar').addEventListener('focusin', revealToolbar);
   el('toolbar').addEventListener('focusout', revealToolbar);
+  window.addEventListener('pagehide', function () {
+    cancelToolbarReveal();
+    clearTimeout(toolbarTimer);
+  }, {once: true});
   var fit = true;
 
   function fitStage() {
@@ -243,6 +268,11 @@
     statusEl.textContent = ({active: '已连接', connecting: '连接中', transport_ready: '准备就绪', failed: '连接失败', closed: '已断开'})[text] || text;
     if (kind) { statusEl.dataset.state = kind; } else { delete statusEl.dataset.state; }
     if (kind) { recordDiagnostic('viewer_state', {state: kind}); }
+    if (kind === 'active') {
+      var machineName = document.documentElement.dataset.machineName;
+      var machineIP = document.documentElement.dataset.machineIp;
+      if (machineName) { document.title = machineName + (machineIP ? '(' + machineIP + ')' : ''); }
+    }
   }
   function say(text, isError) {
     message.textContent = text || '';
