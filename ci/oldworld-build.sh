@@ -7,7 +7,9 @@ platform=linux-loong64-oldworld
 target=loongarch64-unknown-linux-gnu
 tools=/opt/yoodesk-oldworld
 # Match the existing disposable GitHub runner cleanup before engine builds.
-sudo rm -rf /opt/ghc /usr/local/lib/android /usr/share/dotnet
+if [[ "${GITHUB_ACTIONS:-}" == true ]]; then
+    sudo rm -rf /opt/ghc /usr/local/lib/android /usr/share/dotnet
+fi
 sudo mkdir -p "$tools"
 sudo chown "$(id -u):$(id -g)" "$tools"
 sudo apt-get update
@@ -122,6 +124,12 @@ for entry in "$workspace" /proc /dev; do
 done
 cargo test --locked --lib
 cleanup
+for entry in "${mounts[@]}"; do
+    if mountpoint -q "$entry"; then
+        echo "Cannot package a sysroot with a remaining test mount: $entry" >&2
+        exit 1
+    fi
+done
 mounts=()
 python3 ci/package.py "$kind" --platform "$platform"
 if [[ "$kind" == desk ]]; then

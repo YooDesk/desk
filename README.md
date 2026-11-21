@@ -8,9 +8,10 @@ webservice 在运行时加载本库，转发 HTTP/WebSocket；本仓库不依赖
 
 ## 构建与发布
 
-`.github/workflows/build.yml` 在 push/手动运行时构建 Windows x64/arm64、Linux x64/arm64 和 macOS arm64/x64。
-Linux 原生代码及依赖在 Ubuntu 18.04 中编译，发布包验证 glibc <= 2.27。
-macOS 在原生 runner 上构建，只允许链接 Apple 系统框架，x64 切片由 arm64 runner 交叉编译。
+`.github/workflows/build.yml` 在 push/手动运行时构建 Windows x86/x64/arm64、Linux x64/arm64/loong64/loong64-oldworld/mips64el 和 macOS arm64/x64。
+Linux x64/arm64 的原生代码及依赖在 Ubuntu 18.04 中编译，发布包验证 glibc <= 2.27。
+龙芯旧世界 `linux-loong64-oldworld` 使用 ABI 1.0 和 glibc 2.28，与现有新世界产物独立；工具链与验证说明见 [平台构建说明](docs/ci-platforms.md)。
+macOS 在对应架构的原生 runner 上构建，只允许链接 Apple 系统框架。
 只有全部平台成功才发布最新 Release。每个平台产物为 `yoodesk-desk-<platform>.zip`
 及 `.sha256`，包含动态库、`plugin.json`、浏览器 JS/WASM 和相应运行附件/许可证。
 webservice 流水线通过公共 Release API 下载这些产物，不需要额外 PAT。

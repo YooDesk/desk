@@ -109,7 +109,9 @@ def package(platform):
     output = ROOT / "artifacts/native-sdk"
     output.mkdir(parents=True, exist_ok=True)
     archive = output / ("native-sdk-" + VERSION + "-" + platform + ".tar.xz")
-    subprocess.run(["tar", "--sort=name", "--mtime=@0", "--owner=0", "--group=0", "--numeric-owner",
+    excludes = ["--exclude=./" + name for name in
+                ("tmp", "proc", "dev", "home", "run", "root", ".qt-acceptance")] if platform == "linux-loong64-oldworld" else []
+    subprocess.run(["tar", *excludes, "--sort=name", "--mtime=@0", "--owner=0", "--group=0", "--numeric-owner",
                     "-I", "xz -T0", "-cf", str(archive), "-C", str(root), "."], check=True)
     checksum = digest(archive)
     (output / (archive.name + ".sha256")).write_text(checksum + "  " + archive.name + "\n", encoding="utf-8")
