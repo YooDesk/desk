@@ -42,6 +42,9 @@ export CC_loongarch64_unknown_linux_gnu="$tools/toolchain/bin/clang"
 export CXX_loongarch64_unknown_linux_gnu="$tools/toolchain/bin/clang++"
 export AR_loongarch64_unknown_linux_gnu="$tools/toolchain/llvm/bin/llvm-ar"
 export CARGO_TARGET_LOONGARCH64_UNKNOWN_LINUX_GNU_LINKER="$CC_loongarch64_unknown_linux_gnu"
+export CARGO_TARGET_LOONGARCH64_UNKNOWN_LINUX_GNU_RUSTFLAGS='-C code-model=large'
+export CFLAGS_loongarch64_unknown_linux_gnu='-mcmodel=large'
+export CXXFLAGS_loongarch64_unknown_linux_gnu='-mcmodel=large'
 export CC="$CC_loongarch64_unknown_linux_gnu" CXX="$CXX_loongarch64_unknown_linux_gnu"
 export YOODESK_BINDGEN_CLANG="$CC_loongarch64_unknown_linux_gnu"
 export HOST_CC=/usr/bin/gcc HOST_CXX=/usr/bin/g++

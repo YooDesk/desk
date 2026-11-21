@@ -13,6 +13,13 @@ from the existing new-world `linux-loong64` platform. Both use Rust's
 `loongarch64-unknown-linux-gnu` target name; their compiler, standard library,
 native dependencies and runtime must remain separate.
 
+Builds use official Cargo 1.99.0 with the vendor rustc and standard library.
+The vendor Cargo hardcodes a crates.io replacement whose checksums differ
+for libc, linux-raw-sys and rustix; using upstream Cargo preserves the existing
+reviewed lockfiles. This follows the independently published
+[old-world Rust build recipe](https://github.com/sudoytang/codex-loongarch-oldworld).
+Target C/C++ and Rust code use the large code model for native engine links.
+
 The old-world toolchain is published at
 [oldworld-toolchain-v1](https://github.com/YooDesk/desk/releases/tag/oldworld-toolchain-v1).
 `ci/oldworld-tools.lock.json` pins the exact archive and SHA256 for consumers.
