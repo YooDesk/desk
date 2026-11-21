@@ -6,6 +6,8 @@ workspace="$PWD"
 platform=linux-loong64-oldworld
 target=loongarch64-unknown-linux-gnu
 tools=/opt/yoodesk-oldworld
+# Match the existing disposable GitHub runner cleanup before engine builds.
+sudo rm -rf /opt/ghc /usr/local/lib/android /usr/share/dotnet
 sudo mkdir -p "$tools"
 sudo chown "$(id -u):$(id -g)" "$tools"
 sudo apt-get update
