@@ -5,6 +5,7 @@ import subprocess
 import urllib.request
 import re
 import sys
+from build_adapters import review_changes
 
 targets = [
     dict(platform='windows-x86', os='windows-2022', target='i686-pc-windows-msvc', triplet='x86-windows-static', msvc='x64_x86'),
@@ -31,10 +32,7 @@ if reuse:
     if platform != 'all' or not reuse.isdecimal():
         raise ValueError('Reuse requires the complete release matrix and a numeric run ID')
     subprocess.run(['git','fetch','--depth','1','origin',source],check=True)
-    changes = subprocess.check_output(['git','diff','--name-only',source,'HEAD'],text=True).splitlines()
-    allowed = {'.github/workflows/build.yml','ci/build_matrix.py','ci/linux-build.sh','scripts/prepare_vcpkg_tool.py','scripts/prepare_vcpkg_downloads.py','PROGRESS.md','MIGRATION.md'}
-    if any(name not in allowed and not name.startswith('docs/') for name in changes):
-        raise ValueError('Artifact reuse is restricted to build-tool/documentation changes')
+    review_changes(source)
     base = 'https://api.github.com/repos/'+os.environ['GITHUB_REPOSITORY']
     def api(path):
         request = urllib.request.Request(base+path,headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json','User-Agent':'yoodesk-matrix'})

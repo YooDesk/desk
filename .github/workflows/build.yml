@@ -98,9 +98,8 @@ jobs:
           BUILD_TOOLS_SHA: ${{ github.sha }}
         run: |
           git fetch --depth 1 origin "$BUILD_TOOLS_SHA"
-          git show "$BUILD_TOOLS_SHA:scripts/prepare_vcpkg_downloads.py" > scripts/prepare_vcpkg_downloads.py
-          git show "$BUILD_TOOLS_SHA:scripts/prepare_vcpkg_tool.py" > scripts/prepare_vcpkg_tool.py
-          git show "$BUILD_TOOLS_SHA:ci/linux-build.sh" > ci/linux-build.sh
+          git show "$BUILD_TOOLS_SHA:ci/build_adapters.py" > "$RUNNER_TEMP/yoodesk-build-adapters.py"
+          python "$RUNNER_TEMP/yoodesk-build-adapters.py" "$YOODESK_SOURCE_SHA" "$BUILD_TOOLS_SHA"
       # Windows 的 build.rs 用这里的 Node 依赖生成可执行文件图标。
       - uses: actions/setup-node@v4
         if: runner.os == 'Windows'
