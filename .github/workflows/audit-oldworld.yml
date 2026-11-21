@@ -13,7 +13,8 @@ jobs:
         id: tools
         with:
           path: .ci-cache/oldworld/
-          key: oldworld-rust199-glibc228-61698744-v2
+          key: oldworld-rust199-glibc228-qemufe2ec9-v3
+          restore-keys: oldworld-rust199-glibc228-61698744-v2
       - name: Compile and execute ABI 1.0 C and Rust programs
         shell: bash
         run: |
@@ -69,7 +70,7 @@ jobs:
         if: always() && steps.tools.outputs.cache-hit != 'true' && hashFiles('.ci-cache/oldworld/rust/bin/rustc') != ''
         with:
           path: .ci-cache/oldworld/
-          key: oldworld-rust199-glibc228-61698744-v2
+          key: oldworld-rust199-glibc228-qemufe2ec9-v3
       - uses: actions/upload-artifact@v4
         if: always()
         with:
