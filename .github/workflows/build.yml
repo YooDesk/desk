@@ -243,7 +243,7 @@ jobs:
           $env:VCPKG_INSTALLED_ROOT="$env:VCPKG_ROOT/installed"
           $env:VCPKG_DEFAULT_TRIPLET='${{ matrix.triplet }}'
           $env:VCPKG_DEFAULT_HOST_TRIPLET='${{ matrix.triplet }}'
-          if ($env:CARGO_BUILD_TARGET -eq 'aarch64-pc-windows-msvc') {
+          if ($env:CARGO_BUILD_TARGET -in @('i686-pc-windows-msvc', 'aarch64-pc-windows-msvc')) {
             $env:SODIUM_LIB_DIR="$env:VCPKG_ROOT/installed/${{ matrix.triplet }}/lib"
           }
           python scripts/build_engine.py
