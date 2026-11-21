@@ -9,7 +9,8 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/cache@v4
+      - uses: actions/cache/restore@v4
+        id: tools
         with:
           path: .ci-cache/oldworld/
           key: oldworld-rust199-glibc228-61698744-v2
@@ -64,6 +65,11 @@ jobs:
           assert all(tuple(map(int, v.split('.'))) <= (2, 28) for v in re.findall(r'GLIBC_(\d+\.\d+)', versions))
           PY
           done
+      - uses: actions/cache/save@v4
+        if: always() && steps.tools.outputs.cache-hit != 'true' && hashFiles('.ci-cache/oldworld/rust/bin/rustc') != ''
+        with:
+          path: .ci-cache/oldworld/
+          key: oldworld-rust199-glibc228-61698744-v2
       - uses: actions/upload-artifact@v4
         if: always()
         with:
