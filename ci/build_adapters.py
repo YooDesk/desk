@@ -8,7 +8,7 @@ import sys
 # Runtime sources, dependency manifests, locks and engine patches are excluded.
 ADAPTER_PATHS = {
     'ci/build_adapters.py', 'ci/build_matrix.py', 'ci/linux-build.sh',
-    'ci/audit_engine_sysroot.py', 'ci/native_sdk.py', 'ci/package.py',
+    'ci/audit_engine_sysroot.py', 'ci/native_sdk.py', 'ci/native-sdk.lock.json', 'ci/package.py',
     'ci/windows_crt.py', 'ci/test_windows_crt.py', 'ci/test_oldworld.py',
     'ci/oldworld-binfmt.py', 'ci/oldworld-build.sh', 'ci/oldworld-cargo.sh',
     'ci/oldworld-codecs.sh', 'ci/oldworld-qemu.sh', 'ci/oldworld-runner.py',

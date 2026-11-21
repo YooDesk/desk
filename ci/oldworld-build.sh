@@ -36,6 +36,21 @@ bash ci/oldworld-cargo.sh "$tools" "$workspace/.ci-cache/oldworld-upstream-cargo
 export YOODESK_OLDWORLD_TOOLS="$tools"
 export YOODESK_OLDWORLD_ROOT="$tools/toolchain/sysroot"
 root="$YOODESK_OLDWORLD_ROOT"
+if [[ "$kind" == desk ]]; then
+    sdk_record=$(python3 ci/native_sdk.py location "$platform")
+    if [[ -n "$sdk_record" ]]; then
+        read -r native_url native_sha <<< "$sdk_record"
+        native_archive="$workspace/.ci-cache/oldworld-native-sdk.tar.xz"
+        if [[ ! -f "$native_archive" ]] || ! echo "$native_sha  $native_archive" | sha256sum -c - >/dev/null 2>&1; then
+            curl -fL --retry 3 --connect-timeout 30 "$native_url" -o "$native_archive"
+            echo "$native_sha  $native_archive" | sha256sum -c -
+        fi
+        tar -xJf "$native_archive" -C "$root"
+        python3 ci/native_sdk.py verify "$platform" "$root"
+        export OPENH264_LIB_DIR="$root/yoodesk-native/openh264"
+        export MOZJPEG_LIB_DIR="$root/yoodesk-native/mozjpeg"
+    fi
+fi
 python3 ci/oldworld-sysroot.py "$root" "$workspace/.ci-cache/oldworld-debs"
 export PATH="$tools/upstream-cargo/bin:$tools/rust/bin:$tools/toolchain/bin:$tools/toolchain/llvm/bin:$PATH"
 export RUSTC="$tools/rust/bin/rustc" RUSTDOC="$tools/rust/bin/rustdoc"

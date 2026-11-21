@@ -425,6 +425,9 @@ jobs:
           tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('v0.1.0-ci.{0}', github.run_number) }}
           name: 'desk ${{ needs.targets.outputs.source_sha }}'
           target_commitish: ${{ needs.targets.outputs.source_sha }}
+          body: |
+            Runtime source: `${{ needs.targets.outputs.source_sha }}`
+            Build configuration: `${{ github.sha }}`
           make_latest: true
           fail_on_unmatched_files: true
           files: dist/*
