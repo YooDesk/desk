@@ -9,7 +9,7 @@ on:
         description: Build one platform for diagnosis, or all platforms for release
         type: choice
         default: all
-        options: [all, windows-x64, windows-arm64, linux-x64, linux-arm64, linux-loong64, linux-mips64el, macos-arm64, macos-x64]
+        options: [all, windows-x86, windows-x64, windows-arm64, linux-x64, linux-arm64, linux-loong64, linux-mips64el, macos-arm64, macos-x64]
       audit_only:
         description: Audit the selected cross sysroot without compiling the engine
         type: boolean
@@ -364,7 +364,7 @@ jobs:
           merge-multiple: true
       - name: Require all four platform archives before publishing
         run: |
-          for platform in windows-x64 windows-arm64 linux-x64 linux-arm64 linux-loong64 linux-mips64el macos-arm64 macos-x64; do
+          for platform in windows-x86 windows-x64 windows-arm64 linux-x64 linux-arm64 linux-loong64 linux-mips64el macos-arm64 macos-x64; do
             test -s "dist/yoodesk-desk-$platform.zip"
             (cd dist && sha256sum -c "yoodesk-desk-$platform.zip.sha256")
           done
@@ -375,7 +375,7 @@ jobs:
           python3 - <<'PY'
           import glob, hashlib, json, os, zipfile
           archives = glob.glob('dist/*.zip')
-          assert len(archives) == 8
+          assert len(archives) == 9
           for archive in archives:
               with zipfile.ZipFile(archive) as bundle:
                   metadata = json.loads(bundle.read('plugin.json'))

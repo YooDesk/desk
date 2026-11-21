@@ -49,6 +49,7 @@ def prepare_plugin_exports(library,platform):
     if exported!=PUBLIC_EXPORTS:raise ValueError(f'{library}: unexpected exported symbols: {sorted(exported)}')
 
 PLATFORMS = {
+    "windows-x86": ("i686-pc-windows-msvc", 0x014C),
     "windows-x64": ("x86_64-pc-windows-msvc", 0x8664),
     "windows-arm64": ("aarch64-pc-windows-msvc", 0xAA64),
     "linux-x64": ("x86_64-unknown-linux-gnu", 62),

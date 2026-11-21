@@ -7,6 +7,7 @@ import re
 import sys
 
 targets = [
+    dict(platform='windows-x86', os='windows-2022', target='i686-pc-windows-msvc', triplet='x86-windows-static', msvc='x64_x86'),
     dict(platform='windows-x64', os='windows-2022', target='x86_64-pc-windows-msvc', triplet='x64-windows-static', msvc='x64'),
     dict(platform='windows-arm64', os='windows-11-arm', target='aarch64-pc-windows-msvc', triplet='arm64-windows-static', msvc='x64_arm64'),
     dict(platform='linux-x64', os='ubuntu-22.04', target='x86_64-unknown-linux-gnu', triplet='x64-linux'),
