@@ -117,6 +117,7 @@
   var diagnosticEvents = [];
   var lastTransportKey = '';
   var transportSamplePending = false;
+  var viewerMetricsSupported = true;
   var inputDiagnostic = {batches: 0, failures: 0, maxQueueMs: 0, maxRequestMs: 0};
   function recordDiagnostic(event, data) {
     var entry = {at: new Date().toISOString(), event: event, data: data};
@@ -145,7 +146,7 @@
         localCandidate: pair.local || null, remoteCandidate: pair.remote || null,
         protocol: pair.protocol || null, relayProtocol: pair.relayProtocol || null,
         iceRttMs: pair.rttMs ?? null, bytesSent: pair.bytesSent ?? null, bytesReceived: pair.bytesReceived ?? null,
-        attempts: info.attempts || [], probeEvents: info.probeEvents || []};
+        attempts: info.attempts || [], probeEvents: info.probeEvents || [], iceDiagnostics: pair.diagnostics || null};
       window.__yoodeskDesk = window.__yoodeskDesk || {};
       window.__yoodeskDesk.connection = summary;
       if (el('transport-info')) { el('transport-info').textContent = summary.label; }
@@ -170,6 +171,15 @@
       width: canvas.width, height: canvas.height,
       input: Object.assign({}, inputDiagnostic),
     });
+    if (viewerMetricsSupported && d.connection && state.csrf) {
+      request('POST', base + '/desk/diagnostics/v1/', {
+        v: 1, path: d.connection.path, fps: d.fps || 0,
+        rtt_ms: d.rttMs ?? null, ice_rtt_ms: d.connection.iceRttMs ?? null,
+        decode_ms: d.decodeMs ?? null, frames: d.decodedFrames || 0,
+        input_queue_ms: inputDiagnostic.maxQueueMs, input_request_ms: inputDiagnostic.maxRequestMs,
+        ice_diagnostics: d.connection.iceDiagnostics || null,
+      }).catch(function (error) { if (error.status === 404 || error.status === 405) { viewerMetricsSupported = false; } });
+    }
     inputDiagnostic = {batches: 0, failures: 0, maxQueueMs: 0, maxRequestMs: 0};
   }, 10000);
   window.addEventListener('pagehide', function () { clearInterval(transportInfoTimer); clearInterval(performanceLogTimer); }, {once: true});

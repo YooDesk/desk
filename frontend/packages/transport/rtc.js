@@ -65,6 +65,15 @@ export async function connectRTC({
       rttMs: Number.isFinite(pair.currentRoundTripTime) ? pair.currentRoundTripTime * 1000 : null,
       bytesSent: pair.bytesSent,
       bytesReceived: pair.bytesReceived,
+      diagnostics: {
+        pairs: [...stats.values()].filter((s) => s.type === 'candidate-pair').slice(0, 64).map((s) => ({
+          selected: s.id === pair.id, nominated: !!s.nominated, state: s.state,
+          sent: s.bytesSent || 0, received: s.bytesReceived || 0,
+          rttMs: Number.isFinite(s.currentRoundTripTime) ? s.currentRoundTripTime * 1000 : null,
+        })),
+        dataSent: [...stats.values()].filter((s) => s.type === 'data-channel').reduce((sum, s) => sum + (s.bytesSent || 0), 0),
+        dataReceived: [...stats.values()].filter((s) => s.type === 'data-channel').reduce((sum, s) => sum + (s.bytesReceived || 0), 0),
+      },
     };
   };
   const fail = (error) => {

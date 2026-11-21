@@ -46,3 +46,8 @@ After connection becomes active, the tab shows controlled hostName(ip), using ba
 ## 2026-11-21 reload recovery
 
 Connector viewers retain only a server-issued five-minute refresh proof in per-device sessionStorage, never an access password or invitation secret. After refresh the normal device entry creates a fresh page authorization and the proof unlocks its new signed Connector scope. Proofs refresh with access renewal at most every two minutes, are cleared on logout/failed recovery, and expired proofs fall back to authentication. LAN continues to use its HttpOnly access cookie. Gateway SDK source is synchronized with its standalone Desk navigation fix. Real LAN, WSS, STUN, TURN and resume connections each recovered decoded video after two consecutive reloads; password-based remote WSS did too.
+
+
+## 2026-11-21 automatic low-FPS diagnostics
+
+The existing ten-second viewer performance snapshot is also sent to the authenticated controlled host. It contains only typed numeric timings/counters and carrier kinds, including safe candidate-pair counters; no password, invitation, SDP, addresses or input content. Older hosts returning 404/405 disable these submissions for the page. This supports investigation without manual diagnostic exports. Existing browser fixtures and real resume/reload sampling passed.
