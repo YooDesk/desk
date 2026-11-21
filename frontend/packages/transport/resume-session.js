@@ -40,6 +40,10 @@ export async function connectResumableSession({ context, grant, prepareCarrier, 
     pending = dialCarrier(path, previousTurnExpiry);
     try {
       await pending;
+    } catch (error) {
+      attempts.push({ path, outcome: 'failed', reason: error.name });
+      if (attempts.length > 40) attempts.shift();
+      throw error;
     } finally {
       pending = undefined;
     }
@@ -87,6 +91,7 @@ export async function connectResumableSession({ context, grant, prepareCarrier, 
     clearTimeout(turnRefreshTimer);
     if (selectedPath === 'turn' && Number.isFinite(turnExpiry)) scheduleTURNRefresh(replacement, turnExpiry);
     attempts.push({ path: selectedPath, outcome: 'connected' });
+    if (attempts.length > 40) attempts.shift();
   }
 
   function scheduleTURNRefresh(carrier, expiry, retry = false) {

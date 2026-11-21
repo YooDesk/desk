@@ -7,6 +7,7 @@ import { installShim } from './shim.js';
 import { SignalControl } from './signaling.js';
 import { connectResumableSession } from './resume-session.js';
 import { ConnectivityError } from './rtc.js';
+import { describeTransport } from './status.js';
 
 export async function attachViewer(productID) {
   let owner = window;
@@ -129,6 +130,7 @@ export async function connectViewer(productID, recovery) {
     'X-YooDesk-Viewer-Page': bootstrap.page_id,
   };
   let authorized, context, common;
+  const probeEvents = [];
   const deskScope = () => ({
     deviceID: authorized.device_id, capability: authorized.capability,
     targetID: authorized.target_id, path: requestedPath, nativeFetch, NativeWebSocket,
@@ -328,6 +330,10 @@ export async function connectViewer(productID, recovery) {
           grant: authorized.grant,
           signal: abort.signal,
           policy: created.policy,
+          onProbeError(error) {
+            probeEvents.push({ at: new Date().toISOString(), event: 'ice_probe_failed', error: error.name });
+            if (probeEvents.length > 20) probeEvents.shift();
+          },
           async prepareCarrier(path, { signal }) {
             if (path === 'websocket') return {
               url: approved.url,
@@ -381,16 +387,27 @@ export async function connectViewer(productID, recovery) {
       throw abort.signal.reason;
     }
     maintain(link.signalControl, authorized);
-    const pair = await link.selectedPair();
+    let pairPath = link.path;
+    let pair = await link.selectedPair();
     const state = Object.freeze({
-      path: link.path,
-      pair,
-      attempts: link.attempts.map((x) => ({ ...x })),
+      get path() { return link.path; },
+      get pair() { return pairPath === link.path ? pair : null; },
+      get attempts() { return link.attempts.map((x) => ({ ...x })); },
     });
     return {
       productID,
       origin,
       state,
+      async getTransportState() {
+        if (closed) throw new Error('viewer transport closed');
+        const path = link.path;
+        const currentPair = await link.selectedPair();
+        if (closed || path !== link.path) return null;
+        pair = currentPair;
+        pairPath = path;
+        return { path, pair: currentPair, channel: describeTransport(path, currentPair),
+          attempts: state.attempts, probeEvents: probeEvents.map((event) => ({ ...event })) };
+      },
       ...(requestedPath === 'resume' ? { switchTransport: link.switchTo } : {}),
       // Only the top-level Desk owns this grant. Re-enter the normal device
       // launch route after a connector restart; never reuse the old grant.

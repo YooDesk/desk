@@ -82,12 +82,82 @@
   var chat = window.createDeskChat({request: request, api: api, state: state});
 
   var el = function (id) { return document.getElementById(id); };
+  if (invitationCredential) {
+    el('login').querySelector('h1').textContent = '正在验证邀请';
+    el('login').querySelector('p').textContent = '邀请验证通过后将自动连接。';
+  }
   var message = el('message');
   var statusEl = el('status');
   var canvas = el('screen');
   var ctx = canvas.getContext('2d', { alpha: false });
   var overlay = el('overlay');
   var overlayCtx = overlay.getContext('2d');
+  // Bounded, credential-free diagnostics. Never store URLs, grants, input contents or addresses.
+  var diagnosticEvents = [];
+  var lastTransportKey = '';
+  var transportSamplePending = false;
+  var inputDiagnostic = {batches: 0, failures: 0, maxQueueMs: 0, maxRequestMs: 0};
+  function recordDiagnostic(event, data) {
+    var entry = {at: new Date().toISOString(), event: event, data: data};
+    diagnosticEvents.push(entry);
+    if (diagnosticEvents.length > 180) { diagnosticEvents.shift(); }
+    console.info('[YooDesk diagnostic]', entry);
+  }
+  async function updateTransportInfo() {
+    if (transportSamplePending) { return; }
+    transportSamplePending = true;
+    try {
+      var info;
+      if (!connectorAccess) {
+        info = {path: 'lan', channel: {label: 'TCP P2P', detail: '直接访问被控端（HTTPS / 局域网）', direct: true}};
+      } else {
+        var transport = await Promise.resolve(window.__yoodeskTransportReady);
+        if (!transport || typeof transport.getTransportState !== 'function') {
+          if (el('transport-info')) { el('transport-info').textContent = '连接通道检测不可用，请更新网关'; }
+          return;
+        }
+        info = await transport.getTransportState();
+        if (!info) { return; }
+      }
+      var pair = info.pair || {};
+      var summary = {path: info.path, label: info.channel.label, detail: info.channel.detail,
+        localCandidate: pair.local || null, remoteCandidate: pair.remote || null,
+        protocol: pair.protocol || null, relayProtocol: pair.relayProtocol || null,
+        iceRttMs: pair.rttMs ?? null, bytesSent: pair.bytesSent ?? null, bytesReceived: pair.bytesReceived ?? null,
+        attempts: info.attempts || [], probeEvents: info.probeEvents || []};
+      window.__yoodeskDesk = window.__yoodeskDesk || {};
+      window.__yoodeskDesk.connection = summary;
+      if (el('transport-info')) { el('transport-info').textContent = summary.label; }
+      var key = [summary.path, summary.label, summary.localCandidate, summary.remoteCandidate].join(':');
+      if (key !== lastTransportKey) { lastTransportKey = key; recordDiagnostic('transport_changed', summary); }
+    } catch (error) {
+      if (el('transport-info')) { el('transport-info').textContent = '连接通道检测中'; }
+      if (lastTransportKey !== 'unavailable') {
+        lastTransportKey = 'unavailable';
+        recordDiagnostic('transport_unavailable', {error: error.name});
+      }
+    } finally { transportSamplePending = false; }
+  }
+  var transportInfoTimer = setInterval(updateTransportInfo, 1000);
+  var performanceLogTimer = setInterval(function () {
+    if (!state.sessionId) { return; }
+    var d = window.__yoodeskDesk || {};
+    recordDiagnostic('viewer_performance', {
+      connection: d.connection || null, fps: d.fps ?? null, bitrateMbps: d.bitrateMbps ?? null,
+      rttMs: d.rttMs ?? null, decodeMs: d.decodeMs ?? null, decodedFrames: d.decodedFrames || 0,
+      decodeErrors: d.decodeErrors || 0, chunkErrors: d.chunkErrors || 0, inputPending: inputPending,
+      width: canvas.width, height: canvas.height,
+      input: Object.assign({}, inputDiagnostic),
+    });
+    inputDiagnostic = {batches: 0, failures: 0, maxQueueMs: 0, maxRequestMs: 0};
+  }, 10000);
+  window.addEventListener('pagehide', function () { clearInterval(transportInfoTimer); clearInterval(performanceLogTimer); }, {once: true});
+  if (el('connection-diagnostics')) { el('connection-diagnostics').onclick = function () {
+    var blob = new Blob([JSON.stringify({version: 1, events: diagnosticEvents}, null, 2)], {type: 'application/json'});
+    var url = URL.createObjectURL(blob);
+    var anchor = document.createElement('a'); anchor.href = url; anchor.download = 'yoodesk-diagnostics.json';
+    anchor.click(); setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+  }; }
   var toolbarTimer;
   function revealToolbar() {
     el('toolbar').classList.remove('auto-hidden');
@@ -172,6 +242,7 @@
   function setStatus(text, kind) {
     statusEl.textContent = ({active: '已连接', connecting: '连接中', transport_ready: '准备就绪', failed: '连接失败', closed: '已断开'})[text] || text;
     if (kind) { statusEl.dataset.state = kind; } else { delete statusEl.dataset.state; }
+    if (kind) { recordDiagnostic('viewer_state', {state: kind}); }
   }
   function say(text, isError) {
     message.textContent = text || '';
@@ -272,6 +343,11 @@
   }
 
   function showLogin(show) {
+    document.body.classList.remove('auth-pending');
+    if (show) {
+      el('login').querySelector('h1').textContent = '访问验证';
+      el('login').querySelector('p').textContent = '输入访问密码以连接这台电脑。';
+    }
     el('login').classList.toggle('hidden', !show);
     document.body.classList.toggle('login-required', show);
   }
@@ -1356,15 +1432,24 @@
     return batch.done;
   }
   function scheduleInputBatch(batch) {
+    var queuedAt = performance.now();
     // 同时只发送一个请求；等响应期间收集后续事件，不让每次按键都等待网络往返。
     inputTail = inputTail.then(async function () {
       if (queuedInputBatch === batch) { queuedInputBatch = null; }
       if (pendingMouseMove && pendingMouseMove.batch === batch) { pendingMouseMove = null; }
       if (state.sessionId !== batch.session || state.readonly || state.inputVersion !== batch.version || batch.signal.aborted) { return; }
       var body = batch.events.length === 1 ? batch.events[0] : {type: 'batch', events: batch.events};
-      await request('POST', api + '/sessions/' + batch.session + '/input/', body, batch.signal);
+      var startedAt = performance.now();
+      inputDiagnostic.maxQueueMs = Math.max(inputDiagnostic.maxQueueMs, startedAt - queuedAt);
+      inputDiagnostic.batches += 1;
+      try {
+        await request('POST', api + '/sessions/' + batch.session + '/input/', body, batch.signal);
+      } finally {
+        inputDiagnostic.maxRequestMs = Math.max(inputDiagnostic.maxRequestMs, performance.now() - startedAt);
+      }
     }).catch(function (error) {
       if (state.sessionId !== batch.session || state.inputVersion !== batch.version || batch.signal.aborted) { return; }
+      inputDiagnostic.failures += 1;
       say(error.message, true);
       // 执行结果不明时不能重放。关闭旧会话以释放可能仍按下的键和按钮。
       restartConnection(true, 'input_batch_failed');

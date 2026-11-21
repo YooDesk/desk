@@ -29,3 +29,10 @@ Original repository visibility and workflow activation were restored after the b
 ## 2026-11-20 local migration validation
 
 Independent release builds and the real five-route concurrent Windows Desk pressure test passed. Each route completed 500 MiB in each direction and 100 small-file round trips with zero decode/chunk errors. The four Gateway routes covered every directed WSS/STUN/TURN switch and in-flight RTC recovery. Native Host media reconnect restored decoding in 1,241 ms. Details: `E:/YooDeskGroup/gateway/docs/acceptance-20261120.md`.
+
+
+## 2026-11-21 invitation startup and connection diagnostics
+
+Desk invitation startup keeps the password form hidden during automatic validation and reveals it on authentication failure. The connection tooltip shows only TCP, UDP, TCP P2P or UDP P2P, sampled from the current selected carrier and ICE pair rather than the initial WebSocket snapshot. Diagnostics retain 180 credential-free events with transport transitions, ICE candidate types/protocols and byte counters, 10-second video/input timing samples and an export action. No invitation, password, grant, network address or input contents are included.
+
+Validation: browser fixtures passed for valid/invalid invitations, password access, direct access, carrier changes and diagnostic export/redaction. A real isolated Global/Edge, Connector, WebService and released native Desk stack decoded video on LAN, WSS, STUN, TURN and automatic WSS-to-WebRTC upgrade; all five channel labels and diagnostic exports passed. These are local transport tests, not proof of cross-network STUN connectivity.

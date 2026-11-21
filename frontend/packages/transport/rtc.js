@@ -60,6 +60,9 @@ export async function connectRTC({
     return {
       local: local.candidateType,
       remote: remote.candidateType,
+      protocol: local.protocol || remote.protocol || null,
+      relayProtocol: local.relayProtocol || remote.relayProtocol || null,
+      rttMs: Number.isFinite(pair.currentRoundTripTime) ? pair.currentRoundTripTime * 1000 : null,
       bytesSent: pair.bytesSent,
       bytesReceived: pair.bytesReceived,
     };
