@@ -61,3 +61,8 @@ Desk, SSH, RDP, VNC, WebService, then `yoodeskclient`'s Android workflow; the in
 complete Android releases and their commit IDs before packaging.
 
 The Android APK loads Desk, SSH, RDP and VNC plugins. Gateway retains its existing server builds and has no Android workflow.
+
+
+## 2026-11-21 MIPS plugin startup correction
+
+WebService dynamic-plugin acceptance exposed startup failure in released MIPS plugins. Vendor the exact libc 0.2.191 archive with Connector's reviewed five MIPS64 architecture-selector corrections (socket options/types, signals, sigaction and pthread mutex ABI). Keep upstream licenses and PATCHES provenance. Remove the old MIPS socket-test exclusions. Add an exported-C-ABI startup regression that binds the actual plugin loopback listener, verifies missing transport token returns HTTP 403, stops the runtime and checks the listener is released. Full platform builds and WebService dynamic integration remain required before replacing released dependencies.

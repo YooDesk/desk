@@ -51,3 +51,8 @@ Connector viewers retain only a server-issued five-minute refresh proof in per-d
 ## 2026-11-21 automatic low-FPS diagnostics
 
 The existing ten-second viewer performance snapshot is also sent to the authenticated controlled host. It contains only typed numeric timings/counters and carrier kinds, including safe candidate-pair counters; no password, invitation, SDP, addresses or input content. Older hosts returning 404/405 disable these submissions for the page. This supports investigation without manual diagnostic exports. Existing browser fixtures and real resume/reload sampling passed.
+
+
+## 2026-11-21 MIPS plugin startup correction
+
+WebService dynamic-plugin acceptance exposed startup failure in released MIPS plugins. Vendor the exact libc 0.2.191 archive with Connector's reviewed five MIPS64 architecture-selector corrections (socket options/types, signals, sigaction and pthread mutex ABI). Keep upstream licenses and PATCHES provenance. Remove the old MIPS socket-test exclusions. Add an exported-C-ABI startup regression that binds the actual plugin loopback listener, verifies missing transport token returns HTTP 403, stops the runtime and checks the listener is released. Full platform builds and WebService dynamic integration remain required before replacing released dependencies.

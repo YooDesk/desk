@@ -102,4 +102,5 @@ all = "warn"
 # Protocol-specific implementation; the host is never linked as a Rust crate.
 
 [patch.crates-io]
+libc = { path = "vendor/libc" }
 openh264-sys2 = { path = "artifacts/openh264-sys2-patched" }
