@@ -387,6 +387,14 @@ export async function connectViewer(productID, recovery) {
       throw abort.signal.reason;
     }
     maintain(link.signalControl, authorized);
+    // Keep a non-secret device selector in the navigation entry. Reload must create
+    // a fresh resource authorization instead of racing the old generation's release.
+    if (window.parent === window && location.pathname.endsWith('/desk/')) {
+      const entry = new URL(location.href);
+      entry.searchParams.set('device_id', authorized.device_id);
+      history.replaceState(history.state, '', entry.pathname + entry.search + entry.hash);
+    }
+
     let pairPath = link.path;
     let pair = await link.selectedPair();
     const state = Object.freeze({

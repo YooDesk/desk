@@ -41,3 +41,8 @@ Validation: browser fixtures passed for valid/invalid invitations, password acce
 ## 2026-11-21 viewer title and toolbar
 
 After connection becomes active, the tab shows controlled hostName(ip), using backend machine metadata. The hidden top toolbar requires a stationary 1-second pointer dwell; movement resets it, leaving cancels it, and keyboard focus/pinning remain immediate. Browser fixtures cover dwell timing, movement and cancellation as well as invitation/authentication and diagnostics.
+
+
+## 2026-11-21 reload recovery
+
+Connector viewers retain only a server-issued five-minute refresh proof in per-device sessionStorage, never an access password or invitation secret. After refresh the normal device entry creates a fresh page authorization and the proof unlocks its new signed Connector scope. Proofs refresh with access renewal at most every two minutes, are cleared on logout/failed recovery, and expired proofs fall back to authentication. LAN continues to use its HttpOnly access cookie. Gateway SDK source is synchronized with its standalone Desk navigation fix. Real LAN, WSS, STUN, TURN and resume connections each recovered decoded video after two consecutive reloads; password-based remote WSS did too.

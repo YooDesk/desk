@@ -14,6 +14,28 @@
   var viewerRecoveryTransport = null;
   // 只保留本页已验证的访问密码；不写入浏览器存储、URL 或诊断。
   var viewerRecoveryCredential = '';
+  function refreshProofKey() {
+    var device = new URLSearchParams(location.search).get('device_id');
+    return connectorAccess && device ? productId + ':desk-refresh:' + device : null;
+  }
+  function clearRefreshProof() {
+    try { var key = refreshProofKey(); if (key) { sessionStorage.removeItem(key); } } catch (_) {}
+  }
+  function readRefreshProof() {
+    try {
+      var key = refreshProofKey();
+      var saved = key && JSON.parse(sessionStorage.getItem(key) || 'null');
+      if (saved && saved.expires > Date.now() && typeof saved.proof === 'string' && saved.proof.startsWith('r1.')) { return saved.proof; }
+    } catch (_) {}
+    clearRefreshProof();
+    return '';
+  }
+  function saveRefreshProof(info) {
+    if (!connectorAccess || typeof info.refresh_proof !== 'string') { return; }
+    var expires = Number(info.refresh_proof.split('.')[1]) * 1000;
+    if (!Number.isFinite(expires) || expires <= Date.now()) { return; }
+    try { var key = refreshProofKey(); if (key) { sessionStorage.setItem(key, JSON.stringify({proof: info.refresh_proof, expires: expires})); } } catch (_) {}
+  }
   var transportReady = connectorAccess ? import('/' + productId + '/transport/viewer.js').then(function (module) {
     return module.attachViewer(productId).then(function (state) {
       return Promise.resolve(window.__yoodeskTransportReady).then(function (transport) {
@@ -1326,6 +1348,7 @@
     showLogin(true);
   }
   function logout() {
+    clearRefreshProof();
     stopAccessRenewal();
     return stopConnection().then(function () {
       return request('POST', access + '/logout/');
@@ -1847,9 +1870,10 @@
     clearTimeout(accessRenewalTimer);
   }
   function scheduleAccessRenewal(info) {
+    saveRefreshProof(info);
     clearTimeout(accessRenewalTimer);
     var generation = accessRenewalGeneration;
-    var delay = Math.max(1000, Math.min(300000, (Date.parse(info.expires_at) - Date.now()) / 2));
+    var delay = Math.max(1000, Math.min(connectorAccess ? 120000 : 300000, (Date.parse(info.expires_at) - Date.now()) / 2));
     accessRenewalTimer = setTimeout(function () {
       if (!connectionWanted || !state.csrf || generation !== accessRenewalGeneration) { return; }
       request('POST', access + '/session/renew/').then(function (renewed) {
@@ -1895,7 +1919,11 @@
     invitationCredential = '';
     login(invitationInput).catch(function () {});
   } else { loadSession().then(function (info) {
-    if (!info) { showLogin(true); return; }
+    if (!info) {
+      var proof = readRefreshProof();
+      if (proof) { return login(proof).catch(function () { clearRefreshProof(); }); }
+      showLogin(true); return;
+    }
     return afterLogin(info);
   }).catch(function (error) {
     if (transportRecoveryPending) { return; }
