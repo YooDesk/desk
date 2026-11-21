@@ -14,12 +14,32 @@ export async function connectRTC({
   getGrant,
   acceptCarrier,
   timeoutMs = 15000,
+  onDiagnostic,
   signal,
 }) {
   validateContext(context);
   if (!configuration || !signaling || typeof signaling.onClose !== 'function' || timeoutMs <= 0)
     throw new TypeError('explicit RTC configuration and signaling required');
   const pc = new RTCPeerConnection(configuration);
+  const started = performance.now();
+  const progress = { phase: 'created', local: 0, remote: 0, errors: 0 };
+  const snapshot = async (phase) => {
+    if (!onDiagnostic) return;
+    const report = { phase, elapsed: Math.round(performance.now() - started),
+      local: progress.local, remote: progress.remote, errors: progress.errors, pairs: [] };
+    try {
+      const stats = await pc.getStats();
+      report.pairs = [...stats.values()].filter(s => s.type === 'candidate-pair').slice(0, 32).map(s => ({
+        local: stats.get(s.localCandidateId)?.candidateType || 'unknown',
+        remote: stats.get(s.remoteCandidateId)?.candidateType || 'unknown',
+        state: s.state, requests: s.requestsSent || 0, responses: s.responsesReceived || 0,
+        incoming: s.requestsReceived || 0,
+      }));
+    } catch {}
+    onDiagnostic(report);
+  };
+  pc.addEventListener('icecandidate', e => { if (e.candidate) progress.local++; });
+  pc.addEventListener('icecandidateerror', () => { progress.errors++; });
   const label = acceptCarrier ? 'raccess.resume.v1' : 'raccess.data.v2';
   const channel = pc.createDataChannel(label, {
     ordered: true,
@@ -83,6 +103,7 @@ export async function connectRTC({
       pc.close();
       return;
     }
+    void snapshot(progress.phase);
     done = true;
     cleanup();
     channel.close();
@@ -113,6 +134,7 @@ export async function connectRTC({
   let candidateChain = Promise.resolve();
   let candidateCount = 0;
   const candidateUnsubscribe = signaling.onCandidate((candidate) => {
+    if (candidate) progress.remote++;
     if (candidate?.candidate?.length > 4096 || ++candidateCount > 64) {
       fail(new RangeError('ICE candidate limit exceeded'));
       return;
@@ -133,6 +155,7 @@ export async function connectRTC({
     () => {
       void (async () => {
         if (done) return;
+        void snapshot('connected');
         if (acceptCarrier) {
           channel.addEventListener('close', closePeer, { once: true });
           await acceptCarrier(channel, selectedPair);
@@ -221,6 +244,7 @@ export async function connectRTC({
         change();
       });
     if (done) return;
+    progress.phase = 'answer-wait';
     const answering = signaling.exchangeOffer(trickle ? offer : pc.localDescription);
     // The offer is sent synchronously by the signaling adapter before candidates.
     offerSent = true;
@@ -235,6 +259,8 @@ export async function connectRTC({
     const answer = await answering;
     if (done) return;
     await pc.setRemoteDescription(answer);
+    progress.phase = 'checking';
+    void snapshot('answer');
     for (const candidate of pending.splice(0)) {
       candidateChain = candidateChain.then(() => pc.addIceCandidate(candidate));
     }

@@ -23,6 +23,7 @@ export async function connectResumableSession({ context, grant, prepareCarrier, 
   const outerSignal = signal ? AbortSignal.any([lifetime.signal, signal]) : lifetime.signal;
   let activePath;
   const attempts = [];
+  const probes = [];
   let pending;
   let recovering;
   let bound = false;
@@ -64,6 +65,10 @@ export async function connectResumableSession({ context, grant, prepareCarrier, 
         throw new ConnectivityError('replacement TURN credentials not yet available');
       return dial({
         ...approved,
+        onDiagnostic(report) {
+          probes.push(report);
+          if (probes.length > 8) probes.shift();
+        },
         signal,
         context,
         timeoutMs: path === 'mixed' ? 35000 : undefined,
@@ -171,7 +176,11 @@ export async function connectResumableSession({ context, grant, prepareCarrier, 
     http,
     background,
     switchTo,
-    selectedPair: () => active.selectedPair(),
+    async selectedPair() {
+      const pair = await active.selectedPair();
+      return { ...pair, diagnostics: { pairs: [], dataSent: 0, dataReceived: 0,
+        ...pair.diagnostics, probes: probes.map(p => ({ ...p })) } };
+    },
     openSocket: (url, protocols) => new RemoteSocket(http, url, protocols),
     close: session.close,
   };
