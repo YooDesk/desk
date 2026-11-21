@@ -1,0 +1,32 @@
+{
+  "version": "1.99.0",
+  "source_commit": "a4d5d3f0ef546687c1cf33f518c87086cab05629",
+  "date": "2026-10-09",
+  "abi": "1.0",
+  "files": [
+    {
+      "component": "rustc",
+      "target": "x86_64-unknown-linux-gnu",
+      "url": "https://rust-lang.loongnix.cn/dist/1.99.0/2026-10-09/rustc-1.99.0-x86_64-unknown-linux-gnu.tar.xz",
+      "sha256": "6b284c70b8cc3e8514bf6ebd228742a7e9fcdcdc44899e9983f1ec8de2ae78bb"
+    },
+    {
+      "component": "cargo",
+      "target": "x86_64-unknown-linux-gnu",
+      "url": "https://rust-lang.loongnix.cn/dist/1.99.0/2026-10-09/cargo-1.99.0-x86_64-unknown-linux-gnu.tar.xz",
+      "sha256": "2fff36783eebf27893b18390faee1fc5610bea011a9957513f379e97574a5c34"
+    },
+    {
+      "component": "rust-std",
+      "target": "x86_64-unknown-linux-gnu",
+      "url": "https://rust-lang.loongnix.cn/dist/1.99.0/2026-10-09/rust-std-1.99.0-x86_64-unknown-linux-gnu.tar.xz",
+      "sha256": "daedb875f51529e0901959cfc54ea47ab6e98f919fa7e01c6ff25277d0c23c54"
+    },
+    {
+      "component": "rust-std",
+      "target": "loongarch64-unknown-linux-gnu",
+      "url": "https://rust-lang.loongnix.cn/dist/1.99.0/2026-10-09/rust-std-1.99.0-loongarch64-unknown-linux-gnu.tar.xz",
+      "sha256": "d08d6c7bec1678d6e3a9fa3f0f8bfffb748142c910282be82f9bd888b9ade820"
+    }
+  ]
+}

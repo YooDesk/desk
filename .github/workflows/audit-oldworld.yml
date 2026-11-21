@@ -12,13 +12,13 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: .ci-cache/oldworld/
-          key: oldworld-rust199-glibc228-61698744-v1
+          key: oldworld-rust199-glibc228-61698744-v2
       - name: Compile and execute ABI 1.0 C and Rust programs
         shell: bash
         run: |
           source ci/oldworld-toolchain.sh
           "$YOODESK_OLDWORLD_COMPILER" --version
-          "$YOODESK_OLDWORLD_QEMU" "$YOODESK_OLDWORLD_RUSTC" -vV
+          "$YOODESK_OLDWORLD_RUSTC" -vV
           mkdir -p artifacts/oldworld
           printf '#include <stdio.h>\nint main(void) { puts("old-world C runtime OK"); return 0; }\n' > artifacts/oldworld/probe.c
           "$YOODESK_OLDWORLD_COMPILER" artifacts/oldworld/probe.c -o artifacts/oldworld/probe-c
@@ -33,7 +33,7 @@ jobs:
               println!("old-world Rust runtime OK");
           }
           RS
-          "$YOODESK_OLDWORLD_QEMU" "$YOODESK_OLDWORLD_RUSTC" artifacts/oldworld/probe.rs \
+          "$YOODESK_OLDWORLD_RUSTC" artifacts/oldworld/probe.rs --target loongarch64-unknown-linux-gnu \
             -C linker="$YOODESK_OLDWORLD_COMPILER" -o artifacts/oldworld/probe-rust
           "$YOODESK_OLDWORLD_QEMU" artifacts/oldworld/probe-rust
           for binary in artifacts/oldworld/probe-c artifacts/oldworld/probe-rust; do

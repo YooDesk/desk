@@ -20,15 +20,23 @@ if [[ ! -f "$oldworld_tools/toolchain/toolchain.json" ]]; then
     mkdir -p "$oldworld_tools/toolchain"
     tar -xJf "$oldworld_tools/toolchain.tar.xz" -C "$oldworld_tools/toolchain"
 fi
-oldworld_fetch \
-    'https://ftp.loongnix.cn/toolchain/rust/rust-1.99/2026-10-09/abi1.0/rust-1.99.0-loongarch64-unknown-linux-gnu.tar.xz' \
-    '127a4130c0462e524659590b32ba79e705133b23c9dc978ae91276f653eb9dcc' \
-    "$oldworld_tools/rust.tar.xz"
-if [[ ! -x "$oldworld_tools/rust/bin/rustc" ]]; then
-    tar -xJf "$oldworld_tools/rust.tar.xz" -C "$oldworld_tools"
-    bash "$oldworld_tools/rust-1.99.0-loongarch64-unknown-linux-gnu/install.sh" \
-        --prefix="$oldworld_tools/rust" --components=rustc,rust-std-loongarch64-unknown-linux-gnu --disable-ldconfig
-fi
+# The vendor also publishes an x64 host compiler with the legacy LLVM backend.
+# Its target standard library must come from the same vendor build.
+while read -r url sha; do
+    archive="${url##*/}"
+    oldworld_fetch "$url" "$sha" "$oldworld_tools/$archive"
+    if [[ ! -f "$oldworld_tools/.installed-$sha" ]]; then
+        tar -xJf "$oldworld_tools/$archive" -C "$oldworld_tools"
+        bash "$oldworld_tools/${archive%.tar.xz}/install.sh" \
+            --prefix="$oldworld_tools/rust" --disable-ldconfig
+        touch "$oldworld_tools/.installed-$sha"
+    fi
+done < <(python3 - "$(dirname "${BASH_SOURCE[0]}")/oldworld-rust.lock.json" <<'PY'
+import json, sys
+for entry in json.load(open(sys.argv[1]))['files']:
+    print(entry['url'], entry['sha256'])
+PY
+)
 export QEMU_LD_PREFIX="$oldworld_tools/toolchain/sysroot"
 export YOODESK_OLDWORLD_ROOT="$QEMU_LD_PREFIX"
 export YOODESK_OLDWORLD_COMPILER="$oldworld_tools/toolchain/bin/clang"
