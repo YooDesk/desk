@@ -1,0 +1,59 @@
+name: Audit LoongArch old-world toolchain
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  toolchain:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: .ci-cache/oldworld/
+          key: oldworld-rust199-glibc228-61698744-v1
+      - name: Compile and execute ABI 1.0 C and Rust programs
+        shell: bash
+        run: |
+          source ci/oldworld-toolchain.sh
+          "$YOODESK_OLDWORLD_COMPILER" --version
+          "$YOODESK_OLDWORLD_QEMU" "$YOODESK_OLDWORLD_RUSTC" -vV
+          mkdir -p artifacts/oldworld
+          printf '#include <stdio.h>\nint main(void) { puts("old-world C runtime OK"); return 0; }\n' > artifacts/oldworld/probe.c
+          "$YOODESK_OLDWORLD_COMPILER" artifacts/oldworld/probe.c -o artifacts/oldworld/probe-c
+          "$YOODESK_OLDWORLD_QEMU" artifacts/oldworld/probe-c
+          cat > artifacts/oldworld/probe.rs <<'RS'
+          use std::{fs, net::TcpListener, thread};
+          fn main() {
+              let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+              assert_ne!(listener.local_addr().unwrap().port(), 0);
+              assert!(fs::metadata("Cargo.toml").unwrap().is_file());
+              assert_eq!(thread::spawn(|| 42).join().unwrap(), 42);
+              println!("old-world Rust runtime OK");
+          }
+          RS
+          "$YOODESK_OLDWORLD_QEMU" "$YOODESK_OLDWORLD_RUSTC" artifacts/oldworld/probe.rs \
+            -C linker="$YOODESK_OLDWORLD_COMPILER" -o artifacts/oldworld/probe-rust
+          "$YOODESK_OLDWORLD_QEMU" artifacts/oldworld/probe-rust
+          for binary in artifacts/oldworld/probe-c artifacts/oldworld/probe-rust; do
+            readelf -h -l -V "$binary"
+            python3 - "$binary" <<'PY'
+          import re, struct, subprocess, sys
+          from pathlib import Path
+          path = Path(sys.argv[1])
+          data = path.read_bytes()
+          assert data[:6] == b'\x7fELF\x02\x01'
+          assert struct.unpack_from('<H', data, 18)[0] == 258
+          assert struct.unpack_from('<I', data, 48)[0] == 3
+          headers = subprocess.check_output(['readelf', '-l', str(path)], text=True)
+          assert '/lib64/ld.so.1' in headers
+          versions = subprocess.check_output(['readelf', '-V', str(path)], text=True)
+          assert all(tuple(map(int, v.split('.'))) <= (2, 28) for v in re.findall(r'GLIBC_(\d+\.\d+)', versions))
+          PY
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: oldworld-toolchain-probes
+          path: artifacts/oldworld/
