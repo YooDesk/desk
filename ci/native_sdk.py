@@ -1,6 +1,7 @@
 """Package and verify immutable, reusable cross-platform native library SDKs."""
 import hashlib
 import json
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -9,6 +10,7 @@ import tarfile
 
 ROOT = Path(__file__).resolve().parents[1]
 TARGETS = {"linux-loong64": "loongarch64-unknown-linux-gnu",
+           "linux-loong64-oldworld": "loongarch64-unknown-linux-gnu",
            "linux-mips64el": "mips64el-unknown-linux-gnuabi64"}
 VERSION = "v1"
 OPENH264_SHA = "414f5bd53da84e126dc9449eb6f0003bb6994b2de63c48119b0c9b7a8b28086a"
@@ -58,6 +60,8 @@ def verify(root, platform):
 def package(platform):
     target = TARGETS[platform]
     root = Path("/opt/yoodesk-tools") / ("sysroot-" + platform.removeprefix("linux-"))
+    if platform == "linux-loong64-oldworld":
+        root = Path(os.environ["YOODESK_NATIVE_SDK_ROOT"])
     lock = json.loads((ROOT / "ci/native-sdk.lock.json").read_text(encoding="utf-8"))
     if platform in lock["platforms"]:
         verify(root, platform)

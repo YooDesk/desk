@@ -9,7 +9,7 @@ on:
         description: Build one platform for diagnosis, or all platforms for release
         type: choice
         default: all
-        options: [all, windows-x86, windows-x64, windows-arm64, linux-x64, linux-arm64, linux-loong64, linux-mips64el, macos-arm64, macos-x64]
+        options: [all, windows-x86, windows-x64, windows-arm64, linux-x64, linux-arm64, linux-loong64, linux-loong64-oldworld, linux-mips64el, macos-arm64, macos-x64]
       audit_only:
         description: Audit the selected cross sysroot without compiling the engine
         type: boolean
@@ -272,7 +272,7 @@ jobs:
             -v "$PWD:/workspace" -v "$PWD/.ci-cache/tools:/opt/yoodesk-tools" \
             ubuntu:18.04 bash /workspace/ci/linux-build.sh desk '${{ matrix.platform }}' '${{ matrix.target }}' '${{ matrix.triplet }}'
       - name: Cross-compile loong64/mips64el desk plugin with the RustDesk engine and verify under QEMU
-        if: matrix.cross
+        if: matrix.cross && !matrix.oldworld
         timeout-minutes: 360
         shell: bash
         env:
@@ -286,8 +286,33 @@ jobs:
             -e GITHUB_SHA -e RELEASE_VERSION -e YOODESK_SYSROOT_AUDIT_ONLY -e RUST_VERSION='${{ env.RUST_VERSION }}' \
             -v "$PWD:/workspace" -v "$PWD/.ci-cache/tools:/opt/yoodesk-tools" \
             ubuntu:18.04 bash /workspace/ci/cross-engine-build.sh '${{ matrix.platform }}' '${{ matrix.target }}'
+      - uses: actions/cache/restore@v4
+        if: matrix.oldworld
+        id: oldworld-inputs
+        with:
+          path: |
+            .ci-cache/oldworld-toolchain.tar.xz
+            .ci-cache/oldworld-debs/
+            .ci-cache/cargo-oldworld/
+          key: oldworld-inputs-v1-${{ hashFiles('ci/oldworld-tools.lock.json', 'ci/oldworld-sysroot.lock.json') }}
+      - name: Build and test the LoongArch old-world ABI 1.0 Desk plugin
+        if: matrix.oldworld
+        shell: bash
+        env:
+          YOODESK_SYSROOT_AUDIT_ONLY: ${{ inputs.audit_only && '1' || '0' }}
+        run: |
+          export GITHUB_SHA="$YOODESK_SOURCE_SHA"
+          bash ci/oldworld-build.sh desk
+      - uses: actions/cache/save@v4
+        if: always() && matrix.oldworld && steps.oldworld-inputs.outputs.cache-hit != 'true'
+        with:
+          path: |
+            .ci-cache/oldworld-toolchain.tar.xz
+            .ci-cache/oldworld-debs/
+            .ci-cache/cargo-oldworld/
+          key: ${{ steps.oldworld-inputs.outputs.cache-primary-key }}
       - name: Upload the complete cross sysroot audit report
-        if: always() && matrix.cross && inputs.audit_only
+        if: always() && matrix.cross && (inputs.audit_only || matrix.oldworld)
         uses: actions/upload-artifact@v4
         with:
           name: sysroot-audit-${{ matrix.platform }}
@@ -362,9 +387,9 @@ jobs:
           pattern: native-*
           path: dist/
           merge-multiple: true
-      - name: Require all four platform archives before publishing
+      - name: Require every platform archive before publishing
         run: |
-          for platform in windows-x86 windows-x64 windows-arm64 linux-x64 linux-arm64 linux-loong64 linux-mips64el macos-arm64 macos-x64; do
+          for platform in windows-x86 windows-x64 windows-arm64 linux-x64 linux-arm64 linux-loong64 linux-loong64-oldworld linux-mips64el macos-arm64 macos-x64; do
             test -s "dist/yoodesk-desk-$platform.zip"
             (cd dist && sha256sum -c "yoodesk-desk-$platform.zip.sha256")
           done
@@ -375,7 +400,7 @@ jobs:
           python3 - <<'PY'
           import glob, hashlib, json, os, zipfile
           archives = glob.glob('dist/*.zip')
-          assert len(archives) == 9
+          assert len(archives) == 10
           for archive in archives:
               with zipfile.ZipFile(archive) as bundle:
                   metadata = json.loads(bundle.read('plugin.json'))

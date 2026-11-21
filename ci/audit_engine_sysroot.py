@@ -80,6 +80,7 @@ def elf_metadata(data):
         "machine": machine,
         "elf_class": 2,
         "endian": 1,
+        "elf_flags": struct.unpack_from("<I", data, 48)[0],
         "soname": next((name(value) for tag, value in tags if tag == 14), None),
         "needed": [name(value) for tag, value in tags if tag == 1],
     }
@@ -162,7 +163,7 @@ def inventory_root(root):
 
 
 def audit(inventory, platform):
-    expected = {"linux-loong64": 258, "linux-mips64el": 8}[platform]
+    expected = {"linux-loong64": 258, "linux-loong64-oldworld": 258, "linux-mips64el": 8}[platform]
     missing_packages = set()
     visited_packages = set()
     queue = deque(PACKAGES)
@@ -201,6 +202,8 @@ def audit(inventory, platform):
         visited_runtime.add(library["path"])
         if library["machine"] != expected or library["elf_class"] != 2 or library["endian"] != 1:
             wrong_architecture.add(library["path"])
+        if platform == "linux-loong64-oldworld" and library.get("elf_flags") != 3:
+            wrong_architecture.add(library["path"])
         for needed in library["needed"]:
             dependency = inventory.libraries.get(needed)
             if dependency is None:
@@ -227,7 +230,7 @@ def main():
     source = parser.add_mutually_exclusive_group(required=True)
     source.add_argument("--archive", type=Path)
     source.add_argument("--root", type=Path)
-    parser.add_argument("--platform", choices=("linux-loong64", "linux-mips64el"), required=True)
+    parser.add_argument("--platform", choices=("linux-loong64", "linux-loong64-oldworld", "linux-mips64el"), required=True)
     parser.add_argument("--report", type=Path)
     parser.add_argument("--check-headers", action="store_true")
     args = parser.parse_args()
@@ -248,7 +251,7 @@ def main():
         clang_args = shlex.split(os.environ.get("BINDGEN_EXTRA_CLANG_ARGS", ""))
         for header in ("linux/videodev2.h", "linux/input.h", "linux/uinput.h"):
             result = subprocess.run(
-                ["clang-10", *clang_args, *shlex.split(flags), "-fsyntax-only", "-x", "c", "-"],
+                [os.environ.get("YOODESK_BINDGEN_CLANG", "clang-10"), *clang_args, *shlex.split(flags), "-fsyntax-only", "-x", "c", "-"],
                 input=f"#include <{header}>\n", text=True, capture_output=True, timeout=60,
             )
             if result.returncode:

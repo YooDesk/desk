@@ -24,6 +24,12 @@ def _binutils(tool, platform):
     the cross toolchain's tools are used when the target differs from the
     build host.
     """
+    if platform == 'linux-loong64-oldworld':
+        base = Path(os.environ['YOODESK_OLDWORLD_TOOLS'])
+        candidate = base / 'toolchain/llvm/bin' / ('llvm-' + tool)
+        if not candidate.is_file():
+            raise ValueError('Missing old-world binutils: ' + str(candidate))
+        return str(candidate)
     prefixes = {
         'linux-loong64': 'loongarch64-unknown-linux-gnu-',
         'linux-mips64el': 'mips64el-linux-gnuabi64-',
@@ -55,6 +61,7 @@ PLATFORMS = {
     "linux-x64": ("x86_64-unknown-linux-gnu", 62),
     "linux-arm64": ("aarch64-unknown-linux-gnu", 183),
     "linux-loong64": ("loongarch64-unknown-linux-gnu", 258),
+    "linux-loong64-oldworld": ("loongarch64-unknown-linux-gnu", 258),
     "linux-mips64el": ("mips64el-unknown-linux-gnuabi64", 8),
     "macos-arm64": ("aarch64-apple-darwin", None),
     "macos-x64": ("x86_64-apple-darwin", None),
@@ -62,6 +69,7 @@ PLATFORMS = {
 # glibc ceiling per Linux platform; cross ports use their pinned sysroot.
 GLIBC_BASELINE = {
     "linux-x64": (2, 27), "linux-arm64": (2, 27),
+    "linux-loong64-oldworld": (2, 28),
     "linux-loong64": (2, 43), "linux-mips64el": (2, 28),
 }
 QEMU_INTERPRETERS = {
@@ -91,6 +99,8 @@ def verify_binary(path, platform):
     else:
         if data[:4] != b"\x7fELF" or data[4:6] != b"\x02\x01": raise ValueError(f"Not a 64-bit little-endian ELF: {path}")
         machine = struct.unpack_from("<H", data, 18)[0]
+        if platform == 'linux-loong64-oldworld' and struct.unpack_from('<I', data, 48)[0] != 3:
+            raise ValueError(f'{path}: expected LoongArch old-world ABI 1.0 (ELF flags 0x3)')
         output = subprocess.check_output(["readelf", "--version-info", str(path)], text=True)
         baseline = GLIBC_BASELINE[platform]
         versions = [tuple(map(int, value.split("."))) for value in re.findall(r"GLIBC_(\d+\.\d+)", output)]
@@ -136,7 +146,7 @@ def plugin(root, platform, kind, output):
         if kind == "rdp":
             wasm = browser / "ironrdp" if (browser / "ironrdp").is_dir() else root / "assets/ironrdp"
             shutil.copytree(wasm, stage / "assets/rdp/ironrdp", dirs_exist_ok=True)
-        if kind == "desk" and platform.startswith("linux") and platform != "linux-mips64el" and os.environ.get("YOODESK_DESK_ENGINE", "1") == "1":
+        if kind == "desk" and platform.startswith("linux") and platform not in ("linux-mips64el", "linux-loong64-oldworld") and os.environ.get("YOODESK_DESK_ENGINE", "1") == "1":
             for name in ["libdrmtap.so.0", "libdrmtap.manifest.json", "LICENSE.libdrmtap"]:
                 source = root / "target/release" / name
                 if not source.is_file(): raise ValueError(f"Missing desktop runtime attachment: {source}")
@@ -144,6 +154,8 @@ def plugin(root, platform, kind, output):
             verify_binary(stage / "libdrmtap.so.0", platform)
         if kind == "desk" and (root / "target/release/LICENSE.static-aom").is_file():
             shutil.copy2(root / "target/release/LICENSE.static-aom", stage / "LICENSE.static-aom")
+        if kind == "desk" and (root / "target/release/LICENSE.static-yuv").is_file():
+            shutil.copy2(root / "target/release/LICENSE.static-yuv", stage / "LICENSE.static-yuv")
         for name in ["LICENSE", "SOURCE.json"]:
             if (root / name).is_file(): shutil.copy2(root / name, stage / name)
         metadata = {"schema_version":1, "abi_version":1, "id":kind, "platform":platform, "library":filename, "sha256":digest(library), "source_commit":os.environ.get("GITHUB_SHA", "local")}
