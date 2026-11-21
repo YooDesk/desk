@@ -103,7 +103,7 @@ jobs:
           }
           RS
           "$YOODESK_OLDWORLD_COMPILER" artifacts/oldworld/libc-layout.c -o artifacts/oldworld/libc-layout-c
-          "$oldworld_tools/rust/bin/cargo" build --manifest-path artifacts/oldworld/libc-probe/Cargo.toml \
+          "$oldworld_tools/upstream-cargo/bin/cargo" build --manifest-path artifacts/oldworld/libc-probe/Cargo.toml \
             --target loongarch64-unknown-linux-gnu
           run_guest artifacts/oldworld/libc-layout-c > artifacts/oldworld/layout-c.txt
           run_guest artifacts/oldworld/libc-probe/target/loongarch64-unknown-linux-gnu/debug/oldworld-libc-layout \

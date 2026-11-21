@@ -28,11 +28,12 @@ if [[ ! -f "$archive" ]] || ! echo "$sdk_sha  $archive" | sha256sum -c - >/dev/n
     echo "$sdk_sha  $archive" | sha256sum -c -
 fi
 tar -xJf "$archive" -C "$tools"
+bash ci/oldworld-cargo.sh "$tools" "$workspace/.ci-cache/oldworld-upstream-cargo.tar.xz"
 export YOODESK_OLDWORLD_TOOLS="$tools"
 export YOODESK_OLDWORLD_ROOT="$tools/toolchain/sysroot"
 root="$YOODESK_OLDWORLD_ROOT"
 python3 ci/oldworld-sysroot.py "$root" "$workspace/.ci-cache/oldworld-debs"
-export PATH="$tools/rust/bin:$tools/toolchain/bin:$tools/toolchain/llvm/bin:$PATH"
+export PATH="$tools/upstream-cargo/bin:$tools/rust/bin:$tools/toolchain/bin:$tools/toolchain/llvm/bin:$PATH"
 export RUSTC="$tools/rust/bin/rustc" RUSTDOC="$tools/rust/bin/rustdoc"
 export CARGO_HOME="$workspace/.ci-cache/cargo-oldworld"
 export CARGO_BUILD_TARGET="$target"
@@ -63,6 +64,7 @@ sudo chmod 1777 "$root/tmp"
 sudo cp "$tools/qemu-oldworld/bin/qemu-loongarch64" "$root/tmp/yoodesk-qemu"
 mounts=()
 cleanup() {
+    python3 "$workspace/ci/oldworld-binfmt.py" remove || true
     for ((i=${#mounts[@]}-1; i>=0; i--)); do
         sudo umount "${mounts[i]}" || true
     done
@@ -108,6 +110,7 @@ if [[ "$kind" == desk ]]; then
     cp "$root/usr/share/doc/yoodesk-codecs/"LICENSE.static-* target/release/
 fi
 cargo build --locked --release --lib
+python3 ci/oldworld-binfmt.py "$tools/qemu-oldworld/bin/qemu-loongarch64"
 for entry in "$workspace" /proc /dev; do
     sudo mount --bind "$entry" "$root$entry"
     mounts+=("$root$entry")

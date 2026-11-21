@@ -293,6 +293,7 @@ jobs:
           path: |
             .ci-cache/oldworld-toolchain.tar.xz
             .ci-cache/oldworld-sysroot-inputs.tar
+            .ci-cache/oldworld-upstream-cargo.tar.xz
             .ci-cache/oldworld-debs/
             .ci-cache/cargo-oldworld/
           key: oldworld-inputs-v2-${{ hashFiles('ci/oldworld-tools.lock.json', 'ci/oldworld-sysroot.lock.json', 'ci/oldworld-sysroot-download.lock.json') }}
@@ -311,6 +312,7 @@ jobs:
           path: |
             .ci-cache/oldworld-toolchain.tar.xz
             .ci-cache/oldworld-sysroot-inputs.tar
+            .ci-cache/oldworld-upstream-cargo.tar.xz
             .ci-cache/oldworld-debs/
             .ci-cache/cargo-oldworld/
           key: ${{ steps.oldworld-inputs.outputs.cache-primary-key }}
