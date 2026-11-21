@@ -197,7 +197,7 @@
   function scheduleToolbarReveal() {
     cancelToolbarReveal();
     if (el('toolbar').classList.contains('auto-hidden')) {
-      toolbarRevealTimer = setTimeout(revealToolbar, 1000);
+      toolbarRevealTimer = setTimeout(revealToolbar, 500);
     }
   }
   function revealToolbar() {
@@ -209,7 +209,7 @@
           !(el('toolbar').contains(document.activeElement) && document.activeElement.matches(':focus-visible'))) {
         el('toolbar').classList.add('auto-hidden');
       }
-    }, 1500);
+    }, 5000);
   }
   el('toolbar-reveal').addEventListener('pointerenter', scheduleToolbarReveal);
   el('toolbar-reveal').addEventListener('pointermove', scheduleToolbarReveal);
