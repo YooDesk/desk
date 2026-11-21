@@ -292,9 +292,11 @@ jobs:
         with:
           path: |
             .ci-cache/oldworld-toolchain.tar.xz
+            .ci-cache/oldworld-sysroot-inputs.tar
             .ci-cache/oldworld-debs/
             .ci-cache/cargo-oldworld/
-          key: oldworld-inputs-v1-${{ hashFiles('ci/oldworld-tools.lock.json', 'ci/oldworld-sysroot.lock.json') }}
+          key: oldworld-inputs-v2-${{ hashFiles('ci/oldworld-tools.lock.json', 'ci/oldworld-sysroot.lock.json', 'ci/oldworld-sysroot-download.lock.json') }}
+          restore-keys: oldworld-inputs-v1-
       - name: Build and test the LoongArch old-world ABI 1.0 Desk plugin
         if: matrix.oldworld
         shell: bash
@@ -308,6 +310,7 @@ jobs:
         with:
           path: |
             .ci-cache/oldworld-toolchain.tar.xz
+            .ci-cache/oldworld-sysroot-inputs.tar
             .ci-cache/oldworld-debs/
             .ci-cache/cargo-oldworld/
           key: ${{ steps.oldworld-inputs.outputs.cache-primary-key }}

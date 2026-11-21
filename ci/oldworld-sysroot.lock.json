@@ -2,7 +2,7 @@
   "schema_version": 1,
   "platform": "linux-loong64-oldworld",
   "glibc": "2.28",
-  "base_url": "https://pkg.loongnix.cn/loongnix/20/",
+  "base_url": "https://mirrors.nju.edu.cn/loongnix/20/",
   "index_url": "https://pkg.loongnix.cn/loongnix/20/dists/DaoXiangHu-stable/main/binary-loongarch64/Packages.gz",
   "index_sha256": "f1511d007d4d45a80de3b18be55b79b7aea211c396d9d8ccb71362eb22682383",
   "roots": [
@@ -2583,5 +2583,6 @@
       "filename": "pool/main/z/zlib/zlib1g-dev_1.2.11.dfsg-1.lnd.4_loongarch64.deb",
       "sha256": "e1bb8a4f8b22abc6e40dd51d29e6382f816858696bdb49ed965c5f207e55550a"
     }
-  ]
+  ],
+  "upstream_base_url": "https://pkg.loongnix.cn/loongnix/20/"
 }

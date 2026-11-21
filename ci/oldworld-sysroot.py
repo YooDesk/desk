@@ -6,11 +6,15 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+import tarfile
 import time
 import urllib.request
 
 lock_path = Path(__file__).with_name('oldworld-sysroot.lock.json')
 lock = json.loads(lock_path.read_text(encoding='utf-8'))
+download_only = '--download-only' in sys.argv
+if download_only:
+    sys.argv.remove('--download-only')
 root = Path(sys.argv[1]).absolute()
 cache = Path(sys.argv[2]).absolute()
 cache.mkdir(parents=True, exist_ok=True)
@@ -46,8 +50,34 @@ def fetch(entry):
             time.sleep(2 * (attempt + 1))
 
 
+mirror_lock = lock_path.with_name('oldworld-sysroot-download.lock.json')
+if mirror_lock.is_file() and not download_only:
+    mirror = json.loads(mirror_lock.read_text(encoding='utf-8'))
+    if digest(lock_path) != mirror['package_lock_sha256']:
+        raise ValueError('Released package bundle does not match the sysroot lock')
+    bundle_path = cache.parent / 'oldworld-sysroot-inputs.tar'
+    if not bundle_path.is_file() or digest(bundle_path) != mirror['sha256']:
+        subprocess.run(['curl', '-fL', '--retry', '3', '--connect-timeout', '30',
+                        mirror['url'], '-o', str(bundle_path)], check=True)
+        if digest(bundle_path) != mirror['sha256']:
+            raise ValueError('Released package bundle checksum mismatch')
+    expected = {Path(entry['filename']).name for entry in lock['files']}
+    with tarfile.open(bundle_path) as bundle:
+        entries = bundle.getmembers()
+        if {entry.name for entry in entries} != expected or any(not entry.isfile() for entry in entries):
+            raise ValueError('Unexpected entries in released package bundle')
+        bundle.extractall(cache, filter='data')
+
+
 with ThreadPoolExecutor(max_workers=6) as pool:
-    archives = list(pool.map(fetch, lock['files']))
+    archives = []
+    for index, path in enumerate(pool.map(fetch, lock['files']), 1):
+        archives.append(path)
+        if index % 40 == 0:
+            print('Verified', index, 'old-world packages', flush=True)
+if download_only:
+    print('All', len(archives), 'package downloads verified', flush=True)
+    sys.exit(0)
 for archive in archives:
     subprocess.run(['dpkg-deb', '-x', str(archive), str(root)], check=True)
 
