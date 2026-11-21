@@ -46,3 +46,9 @@ Single-platform workflow dispatches are diagnostic builds. The normal release
 requires all ten platform archives and their checksums, with matching source
 commit metadata. Native SDKs and toolchains have separate immutable release
 tags, leaving the latest complete plugin release available to downstream jobs.
+
+For a historical `source_ref`, supply a prepared draft `release_id`. The
+workflow verifies and uploads all archives by ID, preserving the release's
+target and publication state. The release operator publishes it after upload
+verification. This avoids GitHub's restriction on workflow tokens creating
+releases for historical workflow revisions. Normal builds publish directly.
