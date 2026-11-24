@@ -114,14 +114,15 @@ test('stalls at the window limit and wakes after acknowledgment', () => {
   let wakeups = 0;
   const sender = new ResumableCarrier(() => {}, () => wakeups++);
   const frame = new Uint8Array(262144);
-  assert.equal(sender.write(frame), true);
+  for (let index=0; index<16; index++) assert.equal(sender.write(frame), true);
   assert.equal(sender.write(Uint8Array.of(1)), false);
   const link = sender.attach(() => true);
   link.flush();
   const ack = new Uint8Array(11);
   ack[0] = 1;
-  new DataView(ack.buffer).setBigUint64(1, BigInt(frame.length));
+  new DataView(ack.buffer).setBigUint64(1, BigInt(frame.length * 16));
   link.receive(ack);
   assert.equal(wakeups, 1);
   assert.equal(sender.write(Uint8Array.of(1)), true);
+  sender.close();
 });

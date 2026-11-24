@@ -1,6 +1,8 @@
 const headerSize = 11;
 const payloadLimit = 16384 - headerSize;
 const windowSize = 262144;
+const maxWindowSize = 4 * 1024 * 1024;
+let spareWindow = 32 * 1024 * 1024;
 
 function encode(type, offset, payload) {
   const frame = new Uint8Array(headerSize + (payload?.length ?? 0));
@@ -44,6 +46,7 @@ export class ResumableCarrier {
   #acked = 0;
   #received = 0;
   #closed = false;
+  #borrowed = 0;
 
   constructor(deliver, writable) {
     this.deliver = deliver;
@@ -65,7 +68,13 @@ export class ResumableCarrier {
 
   write(bytes, reserve = 0) {
     const end = this.#written + bytes.length;
-    if (this.#closed || end - this.#acked > windowSize - reserve) return false;
+    if (this.#closed) return false;
+    if (this.#written - this.#acked >= windowSize / 2) {
+      const growth = Math.min(spareWindow, maxWindowSize - windowSize - this.#borrowed);
+      this.#borrowed += growth;
+      spareWindow -= growth;
+    }
+    if (end - this.#acked > windowSize + this.#borrowed - reserve) return false;
     if (!Number.isSafeInteger(end)) throw new RangeError('carrier offset exhausted');
     for (let start = 0; start < bytes.length; start += payloadLimit) {
       const payload = bytes.slice(start, start + payloadLimit);
@@ -80,6 +89,12 @@ export class ResumableCarrier {
     this.#closed = true;
     this.#carrier = undefined;
     this.#pending = [];
+    this.#releaseWindow();
+  }
+
+  #releaseWindow() {
+    spareWindow += this.#borrowed;
+    this.#borrowed = 0;
   }
 
   #flush(carrier) {
@@ -114,6 +129,7 @@ export class ResumableCarrier {
       this.#acked = offset;
       const remaining = this.#pending.findIndex(({ offset, payload }) => offset + payload.length > this.#acked);
       this.#pending = remaining < 0 ? [] : this.#pending.slice(remaining);
+      if (!this.#pending.length) this.#releaseWindow();
       this.#flush(carrier);
       this.writable();
       return;

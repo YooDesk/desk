@@ -9,3 +9,5 @@ Android capture, input, consent deadlines and frame ownership live in this plugi
 Read-only migration source: `E:/YooDesk`, commit `bdd69273495ec7cfe9b6b2750416959c7777ec39`.
 
 Migrated binary streaming upload/download, file block engine RPC, five-session default and plugin-owned browser assets. The browser enables streaming explicitly. Host authentication callbacks and the versioned plugin ABI remain authoritative.
+
+2026-11-25 shared transport sync: bounded browser receive/resumable windows and current API descriptions synchronized; bundled shared SFTP source aligned. Desk business streaming unchanged. 42 browser tests passed, including real JS/Rust resume replay. No release.

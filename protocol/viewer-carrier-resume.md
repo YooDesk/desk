@@ -36,9 +36,12 @@ split or coalesced by the transport. Type 0 carries 1 to 16373 bytes beginning a
 offset. Type 1 has no payload and acknowledges receipt of all bytes before the
 offset in the opposite direction. Each direction starts at offset zero.
 
-Use reliable ordered carriers. The sender retains at most 256 KiB of
-unacknowledged bytes per direction and retransmits them in order on carrier
-replacement. The receiver discards duplicates, rejects gaps, and acknowledges
+Use reliable ordered carriers. Each sender starts with 256 KiB of unacknowledged-byte retention. Active
+senders may borrow up to a 4 MiB total window from a shared 32 MiB spare
+budget (per Connector process or browser module realm). ACK of all pending
+bytes or logical-stream close returns the borrowed credit. The sender
+retransmits retained bytes in order on carrier replacement. These are local
+resource limits, with no wire-format change. The receiver discards duplicates, rejects gaps, and acknowledges
 only delivered bytes. Old-carrier callbacks cannot affect the resumed stream.
 Exhausting the window applies backpressure; closing the logical stream discards
 all state. Never resume across a viewer session boundary.
