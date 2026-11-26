@@ -875,3 +875,6 @@ pub mod rust_api {
         "rustdesk-engine/1.5.1"
     }
 }
+#[cfg(test)]
+#[path = "../../scripts/frame_wait.rs"]
+mod frame_wait_tests;

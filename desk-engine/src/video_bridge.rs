@@ -265,10 +265,17 @@ pub fn ack(conn: i32, pts: i64) -> i32 {
     let delay = at.elapsed().as_millis().min(u32::MAX as u128) as u32;
     drop(c);
     librustdesk::video_service::notify_video_frame_fetched(display as usize, conn, None);
-    librustdesk::video_service::VIDEO_QOS
-        .lock()
-        .unwrap()
-        .user_network_delay(conn, delay);
+    let mut qos = librustdesk::video_service::VIDEO_QOS.lock().unwrap();
+    qos.user_network_delay(conn, delay);
+    let fps = qos.fps();
+    drop(qos);
+    if std::env::var_os("YOODESK_VIDEO_QOS_DIAGNOSTICS").is_some() {
+        let at = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis();
+        eprintln!("Desk video QoS: at_ms={at} fps={fps} ack_delay_ms={delay}");
+    }
     YD_OK
 }
 

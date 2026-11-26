@@ -44,7 +44,32 @@ async fn desktop_file<T: Send + 'static>(
     operation: impl FnOnce() -> Result<T, ApiError> + Send + 'static,
 ) -> Result<T, ApiError> {
     static SLOTS: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(8);
-    bounded_desktop_call(&SLOTS, operation).await
+    static WAITING: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(32);
+    queued_desktop_call(&SLOTS, &WAITING, operation).await
+}
+
+// Queue ordinary file bursts without allocating blocking threads for waiters.
+// Keep both admission and execution bounded; dropping a waiting HTTP request
+// releases its admission permit and never starts the operation.
+async fn queued_desktop_call<T: Send + 'static>(
+    slots: &'static tokio::sync::Semaphore,
+    waiting: &'static tokio::sync::Semaphore,
+    operation: impl FnOnce() -> Result<T, ApiError> + Send + 'static,
+) -> Result<T, ApiError> {
+    let waiting = waiting.try_acquire().map_err(|_| {
+        ApiError::new(503, codes::DESK_ENGINE, "desktop file queue busy").retryable(true)
+    })?;
+    let slot = slots
+        .acquire()
+        .await
+        .expect("static file slots are never closed");
+    drop(waiting);
+    tokio::task::spawn_blocking(move || {
+        let _slot = slot;
+        operation()
+    })
+    .await
+    .map_err(|_| ApiError::new(503, codes::DESK_ENGINE, "desktop operation failed"))?
 }
 
 async fn desktop_media(
@@ -1491,6 +1516,49 @@ mod tests {
             503
         );
         super::desktop_cleanup(|| Ok(())).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn file_bursts_wait_with_bounded_admission_and_recover_after_overload() {
+        static SLOTS: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(1);
+        static WAITING: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(2);
+        let held = SLOTS.acquire().await.unwrap();
+        let first = tokio::spawn(super::queued_desktop_call(&SLOTS, &WAITING, || Ok(1)));
+        let second = tokio::spawn(super::queued_desktop_call(&SLOTS, &WAITING, || Ok(2)));
+        tokio::task::yield_now().await;
+        assert!(!first.is_finished());
+        assert!(!second.is_finished());
+        assert_eq!(WAITING.available_permits(), 0);
+        assert_eq!(
+            super::queued_desktop_call(&SLOTS, &WAITING, || Ok(3)).await.unwrap_err().status,
+            503
+        );
+        drop(held);
+        assert_eq!(first.await.unwrap().unwrap(), 1);
+        assert_eq!(second.await.unwrap().unwrap(), 2);
+        assert_eq!(WAITING.available_permits(), 2);
+        assert_eq!(super::queued_desktop_call(&SLOTS, &WAITING, || Ok(4)).await.unwrap(), 4);
+    }
+
+    #[tokio::test]
+    async fn canceled_file_waiter_releases_admission_without_starting_io() {
+        static SLOTS: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(1);
+        static WAITING: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(1);
+        let held = SLOTS.acquire().await.unwrap();
+        let started = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let observed = started.clone();
+        let task = tokio::spawn(super::queued_desktop_call(&SLOTS, &WAITING, move || {
+            observed.store(true, std::sync::atomic::Ordering::SeqCst);
+            Ok(())
+        }));
+        tokio::task::yield_now().await;
+        assert_eq!(WAITING.available_permits(), 0);
+        task.abort();
+        assert!(task.await.unwrap_err().is_cancelled());
+        assert_eq!(WAITING.available_permits(), 1);
+        assert!(!started.load(std::sync::atomic::Ordering::SeqCst));
+        drop(held);
+        super::queued_desktop_call(&SLOTS, &WAITING, || Ok(())).await.unwrap();
     }
 
     #[tokio::test(flavor = "current_thread")]

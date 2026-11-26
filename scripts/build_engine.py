@@ -77,6 +77,8 @@ def main() -> int:
             subprocess.run(["git", "-C", str(tree), "apply", "--ignore-space-change", str(overlay)], check=True)
     from patch_engine_lifecycle import patch as patch_engine_lifecycle
     patch_engine_lifecycle(tree)
+    from patch_video_frame_wait import patch as patch_video_frame_wait
+    patch_video_frame_wait(tree)
 
     if sys.platform == "linux":
         from patch_portal_api import patch as patch_portal_api

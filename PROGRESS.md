@@ -60,3 +60,6 @@ WebService dynamic-plugin acceptance exposed startup failure in released MIPS pl
 2026-11-25 shared transport sync: bounded browser receive/resumable windows and current API descriptions synchronized; bundled shared SFTP source aligned. Desk business streaming unchanged. 42 browser tests passed, including real JS/Rust resume replay. No release.
 
 QEMU release acceptance (2026-11-25, explicit user decision): cross-compile, inspect target ABI/static or shared-library dependencies, and perform bounded startup/config/plugin-load smoke checks. Do not run full Rust/Go test suites or throughput gates under emulation. Existing native-runner regression policy is unchanged. Full-suite results and physical throughput must be established on native hardware.
+## 2026-11-27 真实五路持续负载通过
+
+12 项桌面端点/文件队列检查、2 项共享帧等待检查及真实旧引擎拒绝检查通过。恢复匹配版本原生 SDK 并重建当前引擎和静态 CRT 插件后，真实五路分别持续 1801.46–1860.66 秒，5/5 通过；累计双向核对 311.77 GiB，解码与文件块错误为 0，最大实际帧间隔 798 ms。包含隐私失败优先、缺失确认不伪造及未知确认不计数的负向检查。证据和阶段构建边界见 `../gateway/docs/stress-30m-20261126.md`。

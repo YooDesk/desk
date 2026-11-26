@@ -61,6 +61,26 @@ fn link_engine() {
         "desk-engine 静态库不存在：{}\n先运行：python -I scripts/build_engine.py",
         library.display()
     );
+    // The staged RustDesk patches can change without a Desk crate revision.
+    // Refuse an older engine instead of silently relinking stale capture QoS.
+    let built_at = std::fs::metadata(&library).unwrap().modified().unwrap();
+    for relative in [
+        "desk-engine/src/video_bridge.rs",
+        "scripts/frame_wait.rs",
+        "artifacts/rustdesk-engine-src/yoodesk_frame_wait.rs",
+        "artifacts/rustdesk-engine-src/src/server/video_qos.rs",
+        "artifacts/rustdesk-engine-src/src/server/video_service.rs",
+    ] {
+        let source = manifest.join(relative);
+        println!("cargo:rerun-if-changed={}", source.display());
+        if let Ok(metadata) = std::fs::metadata(&source) {
+            assert!(
+                metadata.modified().unwrap() <= built_at,
+                "desk-engine is older than {}; rebuild with python -I scripts/build_engine.py",
+                source.display()
+            );
+        }
+    }
     println!("cargo:rustc-link-search=native={}", lib_dir.display());
     println!("cargo:rustc-link-lib=static=yoodesk_desk_engine");
     println!("cargo:rerun-if-changed={}", library.display());
