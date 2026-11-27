@@ -978,15 +978,9 @@ impl DeskSessionManager {
                 let _ = done.send(());
                 return;
             }
-            let mut encoder = match H264Encoder::new(encoder_settings) {
-                Ok(encoder) => encoder,
-                Err(err) => {
-                    tracing::error!(session = %session.id, %err, "创建编码器失败");
-                    session.fail("encode_unavailable");
-                    let _ = done.send(());
-                    return;
-                }
-            };
+            // A platform Surface encoder must not depend on creating a CPU
+            // encoder. Allocate software fallback only when raw pixels arrive.
+            let mut encoder = None;
             // 光标来源与采集器同线程创建：两者都依赖平台桌面会话状态。
             let mut cursor = backend.cursor_source();
             let mut first_frame = true;
@@ -1034,7 +1028,7 @@ impl DeskSessionManager {
                 // 新观众加入：编码一次当前画面并标记为关键帧。
                 while keyframe_requests.try_recv().is_ok() {
                     if capturer.request_encoded_keyframe() { continue; }
-                    match capture_snapshot(&mut capturer, &mut encoder, &session, media_epoch, &mut last_output_pts) {
+                    match capture_snapshot(&mut capturer, &mut encoder, encoder_settings, &session, media_epoch, &mut last_output_pts) {
                         Ok(true) => first_frame = false,
                         Ok(false) => {}
                         Err(err) => {
@@ -1102,6 +1096,14 @@ impl DeskSessionManager {
                 }
                 match capturer.next_frame(CAPTURE_TIMEOUT) {
                     Ok(frame) => {
+                        let encoder = match software_encoder(&mut encoder, encoder_settings) {
+                            Ok(encoder) => encoder,
+                            Err(err) => {
+                                tracing::error!(session = %session.id, %err, "software fallback initialization failed");
+                                session.fail("encode_unavailable");
+                                break;
+                            }
+                        };
                         match encoder.encode(frame.width, frame.height, &frame.data) {
                             Ok(mut encoded) => {
                                 stamp_encoded(&mut encoded, media_epoch, &mut last_output_pts);
@@ -1513,7 +1515,8 @@ fn run_engine_loop(
 /// 返回 `Ok(true)` 表示确实编码并发送了帧；`Ok(false)` 表示编码器没有产出可发送内容。
 fn capture_snapshot(
     capturer: &mut Box<dyn crate::desk::Capturer>,
-    encoder: &mut H264Encoder,
+    encoder: &mut Option<H264Encoder>,
+    settings: EncoderSettings,
     session: &DeskSession,
     media_epoch: std::time::Instant,
     last_output_pts: &mut i64,
@@ -1521,6 +1524,7 @@ fn capture_snapshot(
     let frame = capturer
         .snapshot()
         .map_err(|err| ApiError::new(502, codes::DESK_ENGINE, err.to_string()))?;
+    let encoder = software_encoder(encoder, settings)?;
     encoder.request_keyframe();
     let mut encoded = encoder.encode(frame.width, frame.height, &frame.data)?;
     stamp_encoded(&mut encoded, media_epoch, last_output_pts);
@@ -1529,6 +1533,11 @@ fn capture_snapshot(
         return Ok(true);
     }
     Ok(false)
+}
+
+fn software_encoder(slot: &mut Option<H264Encoder>, settings: EncoderSettings) -> Result<&mut H264Encoder, ApiError> {
+    if slot.is_none() { *slot = Some(H264Encoder::new(settings)?); }
+    Ok(slot.as_mut().expect("software encoder initialized"))
 }
 
 fn stamp_encoded(encoded: &mut EncodedFrame, epoch: std::time::Instant, previous: &mut i64) {

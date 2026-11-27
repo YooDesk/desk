@@ -235,6 +235,7 @@ jobs:
             --x-manifest-root=artifacts/rustdesk-engine-src --x-install-root="$VCPKG_INSTALLED_ROOT"
           python3 scripts/build_engine.py
           python3 scripts/check_video_native.py "$VCPKG_INSTALLED_ROOT/${{ matrix.triplet }}/lib/libavcodec.a" '${{ matrix.platform }}'
+          cargo test --manifest-path desk-engine/Cargo.toml --locked --release --lib video_ -- --test-threads=1
           export YOODESK_DESK_ENGINE_LIB_DIR="$PWD/desk-engine/target/${{ matrix.target }}/release"
           cargo build --locked --release --lib --target '${{ matrix.target }}'
           # 两个架构都在原生 runner 上，测试与打包都能执行。
@@ -258,6 +259,8 @@ jobs:
             $env:SODIUM_LIB_DIR="$env:VCPKG_ROOT/installed/${{ matrix.triplet }}/lib"
           }
           python scripts/build_engine.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo test --manifest-path desk-engine/Cargo.toml --locked --release --lib video_ -- --test-threads=1
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python scripts/test_windows_bitmap.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

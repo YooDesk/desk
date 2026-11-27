@@ -94,8 +94,9 @@ pub fn subscribe(display: i32, conn: i32, fps: u32, bitrate: u32) -> i32 {
         };
         (geometry.width(), geometry.height())
     };
-    // 上游 FFmpeg 上下文按 30fps 分配每帧码率；按实际采集频率换算，才能兑现配置值。
-    let target = bitrate as f32 / 1000.0 * 30.0 / fps as f32;
+    // The codec context now receives the configured FPS, including its H.264
+    // timing/level and per-frame rate-control budget. No nominal-30fps correction.
+    let target = bitrate as f32 / 1000.0;
     let (mut low, mut high) = (0.2f32, 40.0f32);
     for _ in 0..16 {
         let mid = (low + high) * 0.5;

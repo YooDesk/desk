@@ -68,6 +68,7 @@ fn link_engine() {
         "desk-engine/src/video_bridge.rs",
         "desk-engine/src/video_codec.rs",
         "scripts/video_pipeline_metrics.rs",
+        "scripts/video_pipeline_pacing.rs",
         "scripts/frame_wait.rs",
         "artifacts/rustdesk-engine-src/yoodesk_frame_wait.rs",
         "artifacts/rustdesk-engine-src/src/server/video_qos.rs",

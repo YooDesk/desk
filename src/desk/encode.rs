@@ -206,6 +206,14 @@ mod tests {
     }
 
     #[test]
+    fn software_fallback_accepts_a_144_fps_target() {
+        let mut encoder = H264Encoder::new(EncoderSettings { fps: 144, ..Default::default() }).unwrap();
+        let encoded = encoder.encode(64, 64, &solid_bgra(64, 64, 20, 30, 40)).unwrap();
+        assert!(encoded.key);
+        assert!(contains_idr(&encoded.data));
+    }
+
+    #[test]
     fn encodes_real_frame_with_idr_first() {
         let mut encoder = H264Encoder::new(EncoderSettings::default()).unwrap();
         let frame = solid_bgra(320, 240, 20, 30, 40);

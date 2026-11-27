@@ -155,6 +155,7 @@ Libs: -L\${libdir} -lyuv
 Cflags: -I\${includedir}
 EOF
     python3.13 scripts/build_engine.py
+    cargo test --manifest-path desk-engine/Cargo.toml --locked --release --lib video_ -- --test-threads=1
     export YOODESK_DESK_ENGINE_LIB_DIR="/workspace/desk-engine/target/$target/release"
 fi
 if [[ "$kind" == webservice ]]; then
