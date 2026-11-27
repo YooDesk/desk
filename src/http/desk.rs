@@ -471,7 +471,7 @@ pub async fn input(
 
 /// `GET sessions/{id}/clipboard/` 与 `POST sessions/{id}/clipboard/`。
 ///
-/// 文本直接放在 JSON 里；图像用 base64 传输（`mime: "image/rgba"`，`width/height` 必填），
+/// Clipboard contents use bounded binary frames.
 /// 避免为单一能力引入多段上传。图像上限由 `MAX_CLIPBOARD_IMAGE_BYTES` 约束。
 pub async fn clipboard(
     State(state): State<Arc<AppState>>,
@@ -514,12 +514,9 @@ pub async fn clipboard(
         return failure(&err, &request_id).into_response();
     }
     if method == axum::http::Method::POST {
-        let value = match crate::json::parse_json_strict(&body) {
-            Ok(value) => value,
-            Err(err) => return failure(&err, &request_id).into_response(),
-        };
-        let content = match clipboard_from_json(&value) {
-            Ok(content) => content,
+        let content = match clipboard_from_binary(&body) {
+            Ok(Some(content)) => content,
+            Ok(None) => return failure(&ApiError::new(400, codes::INVALID_REQUEST, "clipboard content required"), &request_id).into_response(),
             Err(err) => return failure(&err, &request_id).into_response(),
         };
         return match desktop_call(move || session.clipboard_write(&content)).await {
@@ -531,8 +528,10 @@ pub async fn clipboard(
         };
     }
     match desktop_call(move || session.clipboard_read()).await {
-        Ok(Some(content)) => success(clipboard_to_json(&content), &request_id).into_response(),
-        Ok(None) => success(json!({"changed": false}), &request_id).into_response(),
+        Ok(content) => match clipboard_to_binary(content.as_ref()) {
+            Ok(bytes) => ([(header::CONTENT_TYPE, "application/octet-stream"), (header::CACHE_CONTROL, "no-store")], bytes).into_response(),
+            Err(err) => failure(&err, &request_id).into_response(),
+        },
         Err(err) => failure(&err, &request_id).into_response(),
     }
 }
@@ -682,30 +681,16 @@ pub async fn endpoint(
             move |cursor| async move {
                 let (session, offset) = cursor?;
                 let worker = session.clone();
-                #[cfg(all(windows, feature = "desk-engine"))]
+                #[cfg(feature = "desk-engine")]
                 let block = desktop_file(move || worker.read_file_block(transfer_id, offset))
                     .await
                     .map(|(bytes, done)| (Bytes::from(bytes), done));
-                #[cfg(not(all(windows, feature = "desk-engine")))]
-                let result = desktop_file(move || {
-                    worker.endpoint(&json!({
-                        "action": "files.read", "transfer_id": transfer_id, "offset": offset
-                    }))
-                })
-                .await;
-                #[cfg(not(all(windows, feature = "desk-engine")))]
-                let block = result.and_then(|block| {
-                    let invalid = || ApiError::new(500, codes::DESK_ENGINE, "invalid file block");
-                    let bytes = base64_decode(block["data"].as_str().ok_or_else(invalid)?)?;
-                    let next = block["offset"].as_u64().ok_or_else(invalid)?;
-                    let done = block["done"].as_bool().ok_or_else(invalid)?;
-                    if offset.checked_add(bytes.len() as u64) != Some(next)
-                        || (bytes.is_empty() && !done)
-                    {
-                        return Err(invalid());
-                    }
-                    Ok((Bytes::from(bytes), done))
-                });
+                #[cfg(not(feature = "desk-engine"))]
+                let block: Result<(Bytes, bool), ApiError> = Err(ApiError::new(
+                    501,
+                    codes::DESK_ENGINE,
+                    "file transfer requires desk-engine",
+                ));
                 Some(match block {
                     Ok((bytes, done)) => {
                         let next = offset + bytes.len() as u64;
@@ -765,18 +750,14 @@ async fn write_file_stream(
                 let length = pending.len() as u64;
                 let worker = session.clone();
                 pending = desktop_file(move || {
-                    #[cfg(all(windows, feature = "desk-engine"))]
+                    #[cfg(feature = "desk-engine")]
                     worker.write_file_block(transfer_id, offset, &pending)?;
-                    #[cfg(not(all(windows, feature = "desk-engine")))]
-                    {
-                        let reply = worker.endpoint(&json!({
-                            "action": "files.write", "transfer_id": transfer_id,
-                            "offset": offset, "data": base64_encode(&pending),
-                        }))?;
-                        if reply["offset"].as_u64() != Some(offset + length) {
-                            return Err(ApiError::new(500, codes::DESK_ENGINE, "invalid upload cursor"));
-                        }
-                    }
+                    #[cfg(not(feature = "desk-engine"))]
+                    return Err(ApiError::new(
+                        501,
+                        codes::DESK_ENGINE,
+                        "file transfer requires desk-engine",
+                    ));
                     pending.clear();
                     Ok(pending)
                 }).await?;
@@ -792,111 +773,25 @@ async fn write_file_stream(
 /// 图像数据的硬上限（未压缩 RGBA 字节数）。
 pub const MAX_CLIPBOARD_IMAGE_BYTES: usize = 16 << 20;
 
-pub(crate) fn clipboard_from_json(
-    value: &Value,
-) -> Result<crate::desk::ClipboardContent, ApiError> {
-    let object = value.as_object().ok_or_else(|| {
-        ApiError::new(
-            400,
-            codes::INVALID_REQUEST,
-            "clipboard body must be an object",
-        )
-    })?;
-    match object.get("kind").and_then(Value::as_str) {
-        Some("text") => {
-            let text = object
-                .get("text")
-                .and_then(Value::as_str)
-                .ok_or_else(|| ApiError::new(400, codes::INVALID_REQUEST, "text required"))?;
-            if text.len() > MAX_CLIPBOARD_IMAGE_BYTES {
-                return Err(ApiError::new(
-                    413,
-                    codes::PAYLOAD_TOO_LARGE,
-                    "clipboard text too large",
-                ));
-            }
-            Ok(crate::desk::ClipboardContent::Text(text.to_string()))
-        }
-        Some("image") => {
-            let width = object
-                .get("width")
-                .and_then(Value::as_u64)
-                .ok_or_else(|| ApiError::new(400, codes::INVALID_REQUEST, "width required"))?;
-            let height = object
-                .get("height")
-                .and_then(Value::as_u64)
-                .ok_or_else(|| ApiError::new(400, codes::INVALID_REQUEST, "height required"))?;
-            let encoded = object
-                .get("data")
-                .and_then(Value::as_str)
-                .ok_or_else(|| ApiError::new(400, codes::INVALID_REQUEST, "data required"))?;
-            if width == 0 || height == 0 || width > 8192 || height > 8192 {
-                return Err(ApiError::new(
-                    400,
-                    codes::INVALID_REQUEST,
-                    "invalid image dimensions",
-                ));
-            }
-            let expected = (width as usize)
-                .saturating_mul(height as usize)
-                .saturating_mul(4);
-            if expected > MAX_CLIPBOARD_IMAGE_BYTES {
-                return Err(ApiError::new(
-                    413,
-                    codes::PAYLOAD_TOO_LARGE,
-                    "clipboard image too large",
-                ));
-            }
-            let data = base64_decode(encoded)?;
-            if data.len() != expected {
-                return Err(ApiError::new(
-                    400,
-                    codes::INVALID_REQUEST,
-                    "image data does not match width/height",
-                ));
-            }
-            Ok(crate::desk::ClipboardContent::ImageRgba {
-                width: width as u32,
-                height: height as u32,
-                data,
-            })
-        }
-        _ => Err(ApiError::new(
-            400,
-            codes::INVALID_REQUEST,
-            "clipboard kind must be text or image",
-        )),
-    }
+pub(crate) fn clipboard_from_binary(bytes: &[u8]) -> Result<Option<crate::desk::ClipboardContent>, ApiError> {
+    use crate::clipboard_wire::{decode, Content};
+    let value = decode(bytes).map_err(|message| ApiError::new(400, codes::INVALID_REQUEST, message))?;
+    Ok(match value {
+        Content::Empty => None,
+        Content::Text(text) => Some(crate::desk::ClipboardContent::Text(text.to_owned())),
+        Content::Image { width, height, bytes } => Some(crate::desk::ClipboardContent::ImageRgba { width, height, data: bytes.to_vec() }),
+    })
 }
 
-pub(crate) fn clipboard_to_json(content: &crate::desk::ClipboardContent) -> Value {
-    match content {
-        crate::desk::ClipboardContent::Text(text) => json!({"kind": "text", "text": text}),
-        crate::desk::ClipboardContent::ImageRgba {
-            width,
-            height,
-            data,
-        } => json!({
-            "kind": "image",
-            "mime": "image/rgba",
-            "width": width,
-            "height": height,
-            "data": base64_encode(data),
-        }),
-    }
+pub(crate) fn clipboard_to_binary(content: Option<&crate::desk::ClipboardContent>) -> Result<Vec<u8>, ApiError> {
+    use crate::clipboard_wire::{encode, Content};
+    encode(match content {
+        None => Content::Empty,
+        Some(crate::desk::ClipboardContent::Text(text)) => Content::Text(text),
+        Some(crate::desk::ClipboardContent::ImageRgba { width, height, data }) => Content::Image { width: *width, height: *height, bytes: data },
+    }).map_err(|message| ApiError::new(400, codes::INVALID_REQUEST, message))
 }
 
-fn base64_encode(data: &[u8]) -> String {
-    use base64::Engine as _;
-    base64::engine::general_purpose::STANDARD.encode(data)
-}
-
-fn base64_decode(text: &str) -> Result<Vec<u8>, ApiError> {
-    use base64::Engine as _;
-    base64::engine::general_purpose::STANDARD
-        .decode(text)
-        .map_err(|_| ApiError::new(400, codes::INVALID_REQUEST, "invalid base64 image data"))
-}
 
 enum DeskInputEvent {
     Mouse(MouseInput),
@@ -1685,38 +1580,6 @@ mod tests {
         }
     }
 
-    #[test]
-    fn clipboard_json_round_trips_text_and_image() {
-        let empty = clipboard_from_json(&json!({"kind":"text","text":""}))
-            .expect("empty text clears clipboard");
-        assert_eq!(clipboard_to_json(&empty), json!({"kind":"text","text":""}));
-        let text =
-            clipboard_from_json(&json!({"kind": "text", "text": "你好"})).expect("text accepted");
-        assert_eq!(text, crate::desk::ClipboardContent::Text("你好".into()));
-        assert_eq!(
-            clipboard_to_json(&text),
-            json!({"kind": "text", "text": "你好"})
-        );
-
-        // 2x2 RGBA：白、红、绿、蓝。
-        let rgba = vec![
-            255, 255, 255, 255, 255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255,
-        ];
-        let encoded = base64_encode(&rgba);
-        let image = clipboard_from_json(&json!({
-            "kind": "image", "width": 2, "height": 2, "data": encoded
-        }))
-        .expect("image accepted");
-        let json_value = clipboard_to_json(&image);
-        assert_eq!(json_value["mime"], "image/rgba");
-        assert_eq!(json_value["data"], encoded);
-        // 尺寸与数据长度不符必须拒绝。
-        assert!(clipboard_from_json(&json!({
-            "kind": "image", "width": 3, "height": 2, "data": encoded
-        }))
-        .is_err());
-        assert!(clipboard_from_json(&json!({"kind": "audio"})).is_err());
-    }
 
     #[test]
     fn input_parsing_maps_protocol_masks() {

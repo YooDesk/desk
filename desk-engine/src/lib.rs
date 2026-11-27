@@ -878,3 +878,7 @@ pub mod rust_api {
 #[cfg(test)]
 #[path = "../../scripts/frame_wait.rs"]
 mod frame_wait_tests;
+
+#[cfg(all(test, target_os = "linux"))]
+#[path = "../../engine-patches/uinput-event-open.rs"]
+mod uinput_event_open_tests;

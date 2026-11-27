@@ -357,6 +357,44 @@
     }
     return rawRequest(method, url, body, signal, undefined, undefined, binaryResponse, uploadId);
   }
+  // Chromium's Fetch file upload path is substantially slower than XHR on
+  // the measured LAN. Keep the same binary HTTP request and response parser;
+  // Connector viewers must continue through the SDK's fetch adapter.
+  function uploadLocalFile(url, init) {
+    return new Promise(function (resolve, reject) {
+      var signal = init.signal;
+      if (signal && signal.aborted) { reject(signal.reason || new DOMException('Aborted', 'AbortError')); return; }
+      var xhr = new XMLHttpRequest();
+      var settled = false;
+      function finish(error, response) {
+        if (settled) { return; }
+        settled = true;
+        if (signal) { signal.removeEventListener('abort', abort); }
+        if (error) { reject(error); } else { resolve(response); }
+      }
+      function abort() {
+        xhr.abort();
+        finish(signal.reason || new DOMException('Aborted', 'AbortError'));
+      }
+      xhr.open(init.method, url);
+      xhr.withCredentials = true;
+      Object.keys(init.headers).forEach(function (name) { xhr.setRequestHeader(name, init.headers[name]); });
+      xhr.onload = function () {
+        try {
+          var responseHeaders = new Headers();
+          xhr.getAllResponseHeaders().trim().split(/[\r\n]+/).forEach(function (line) {
+            var colon = line.indexOf(':');
+            if (colon > 0) { responseHeaders.append(line.slice(0, colon), line.slice(colon + 1).trim()); }
+          });
+          finish(null, new Response(xhr.status === 204 ? null : xhr.responseText, {status: xhr.status, headers: responseHeaders}));
+        } catch (error) { finish(error); }
+      };
+      xhr.onerror = function () { finish(new TypeError('File upload network failure')); };
+      xhr.onabort = function () { finish(signal && signal.reason || new DOMException('Aborted', 'AbortError')); };
+      if (signal) { signal.addEventListener('abort', abort, {once: true}); }
+      try { xhr.send(init.body); } catch (error) { finish(error); }
+    });
+  }
   function rawRequest(method, url, body, signal, id, instance, binaryResponse, uploadId) {
     var init = { method: method, headers: headers(), credentials: 'same-origin' };
     if (binaryResponse) { init.headers.Accept = 'application/octet-stream'; }
@@ -371,11 +409,15 @@
       init.headers['Content-Type'] = 'application/octet-stream';
       init.headers['X-Desk-Transfer-ID'] = String(uploadId);
       init.body = body;
+    } else if (body instanceof Uint8Array) {
+      init.headers['Content-Type'] = 'application/octet-stream';
+      init.body = body;
     } else if (body !== undefined) {
       init.headers['Content-Type'] = 'application/json';
       init.body = JSON.stringify(body);
     }
-    return fetch(url, init).then(function (response) {
+    var response = uploadId !== undefined && !connectorAccess ? uploadLocalFile(url, init) : fetch(url, init);
+    return response.then(function (response) {
       var type = response.headers.get('Content-Type') || '';
       if (binaryResponse && response.ok) {
         if (type !== 'application/octet-stream' || !response.body) {

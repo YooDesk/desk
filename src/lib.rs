@@ -37,3 +37,6 @@ mod plugin_runtime;
 mod remote_access;
 #[cfg(all(windows, feature = "desk-engine"))]
 mod windows_worker_host;
+
+#[path = "../protocol/rust/clipboard_wire.rs"]
+mod clipboard_wire;

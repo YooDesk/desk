@@ -15,6 +15,25 @@ fn invalid(message: &str) -> io::Error {
 fn engine_error() -> ApiError {
     ApiError::new(503, codes::DESK_ENGINE, "desktop worker operation failed")
 }
+fn file_cursor(args: &Value) -> Result<(i32, i32, u64), ApiError> {
+    let invalid = || ApiError::new(400, codes::INVALID_REQUEST, "invalid file cursor");
+    let object = args.as_object().ok_or_else(invalid)?;
+    if object.len() != 3 {
+        return Err(invalid());
+    }
+    let integer = |key: &str| {
+        args[key]
+            .as_i64()
+            .and_then(|value| i32::try_from(value).ok())
+            .filter(|value| *value > 0)
+            .ok_or_else(invalid)
+    };
+    let offset = args["offset"]
+        .as_u64()
+        .filter(|value| *value <= 1 << 30)
+        .ok_or_else(invalid)?;
+    Ok((integer("conn")?, integer("transfer_id")?, offset))
+}
 pub(crate) fn write_frame<S: Read + Write>(
     file: &mut S,
     metadata: &Value,
@@ -70,8 +89,20 @@ fn serve_with_policy<S: Read + Write>(file: &mut S, login_window: bool) -> io::R
             return Err(invalid("IPC sequence"));
         }
         previous = id;
-        let args: Value = serde_json::from_slice(&bytes).map_err(|_| invalid("IPC args"))?;
         let op = request["op"].as_str().unwrap_or("");
+        let binary = request["binary"] == true;
+        let args: Value = if binary {
+            let valid = match op {
+                "file.write" => cfg!(any(target_os = "linux", target_os = "macos")) && !bytes.is_empty() && bytes.len() <= 128 * 1024,
+                "clipboard.write" => crate::clipboard_wire::decode(&bytes).is_ok()
+                    && !matches!(crate::clipboard_wire::decode(&bytes), Ok(crate::clipboard_wire::Content::Empty)),
+                _ => false,
+            };
+            if !valid { return Err(invalid("IPC binary payload")); }
+            request["args"].clone()
+        } else {
+            serde_json::from_slice(&bytes).map_err(|_| invalid("IPC args"))?
+        };
         // 登录窗口 worker 属于 root；只允许画面和登录输入，不开放系统用户数据。
         let response = if login_window && op == "capabilities" {
             let mut caps = engine.capabilities();
@@ -116,6 +147,17 @@ fn serve_with_policy<S: Read + Write>(file: &mut S, login_window: bool) -> io::R
                 codes::FORBIDDEN,
                 "unavailable at the login window",
             ))
+        } else if binary && op == "clipboard.write" {
+            super::clipboard_packet_native(&bytes).map(|_| Reply { value: Value::Null, bytes: Vec::new() })
+        } else if binary {
+            file_cursor(&args)
+                .and_then(|(conn, transfer, offset)| {
+                    super::rpc::write_file_block_native(conn, transfer, offset, &bytes)
+                })
+                .map(|()| Reply {
+                    value: Value::Null,
+                    bytes: Vec::new(),
+                })
         } else {
             dispatch(&engine, op, args, &mut inputs, &mut next_input)
         };
@@ -155,6 +197,17 @@ fn dispatch(
     let mut value = Value::Null;
     let mut bytes = Vec::new();
     match op {
+        "clipboard.read" => {
+            let input = crate::http::clipboard_to_binary(None)?;
+            bytes = super::clipboard_packet_native(&input)?;
+        }
+        #[cfg(any(target_os = "linux", target_os = "macos"))]
+        "file.read" => {
+            let (conn, transfer, offset) = file_cursor(&args)?;
+            let (data, done) = super::rpc::read_file_block_native(conn, transfer, offset)?;
+            bytes = data;
+            value = json!({"done":done});
+        }
         "displays" => {
             value = serde_json::to_value(engine.displays()?).map_err(|_| engine_error())?
         }
@@ -263,6 +316,24 @@ fn dispatch(
 mod tests {
     use super::*;
     use std::sync::{Arc, Mutex};
+    #[test]
+    fn file_cursor_rejects_missing_extra_overflow_and_non_integral_fields() {
+        assert_eq!(
+            file_cursor(&json!({"conn":1,"transfer_id":2,"offset":1 << 30})).unwrap(),
+            (1, 2, 1 << 30)
+        );
+        for value in [
+            json!({"conn":0,"transfer_id":2,"offset":0}),
+            json!({"conn":1,"transfer_id":-2,"offset":0}),
+            json!({"conn":2147483648_u64,"transfer_id":2,"offset":0}),
+            json!({"conn":1,"transfer_id":2,"offset":(1_u64 << 30)+1}),
+            json!({"conn":1,"transfer_id":2,"offset":0.5}),
+            json!({"conn":1,"transfer_id":2}),
+            json!({"conn":1,"transfer_id":2,"offset":0,"path":"/etc/passwd"}),
+        ] {
+            assert_eq!(file_cursor(&value).unwrap_err().status, 400);
+        }
+    }
     struct ObservedInput(Arc<Mutex<Vec<&'static str>>>);
     impl InputSink for ObservedInput {
         fn mouse(&mut self, _: crate::desk::input::MouseInput) -> Result<(), ApiError> {

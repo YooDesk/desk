@@ -81,6 +81,8 @@ def main() -> int:
     patch_video_frame_wait(tree)
 
     if sys.platform == "linux":
+        from patch_uinput_keyboard import patch_keyboard
+        patch_keyboard(tree)
         from patch_portal_api import patch as patch_portal_api
         patch_portal_api(tree)
         from patch_uinput_mouse import patch_mouse
@@ -146,6 +148,7 @@ def main() -> int:
     # exist before cargo resolves the workspace, and adding it requires letting
     # cargo refresh the lock once.
     subprocess.run([sys.executable, str(ROOT / "scripts" / "prepare_nix.py")], env=env, check=True)
+    subprocess.run([sys.executable, str(ROOT / "scripts" / "prepare_evdev.py")], env=env, check=True)
     subprocess.run([sys.executable, str(ROOT / "scripts" / "prepare_ring.py")], env=env, check=True)
     subprocess.run([sys.executable, str(ROOT / "scripts" / "prepare_mozjpeg.py")], env=env, check=True)
     fetch = ["cargo", "fetch", "--locked"]

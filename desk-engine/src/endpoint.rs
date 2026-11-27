@@ -3,7 +3,8 @@ use base::{
     fs::{self, DataSource, JobType, TransferJob},
     message_proto::{message, misc},
 };
-use base64::{engine::general_purpose::STANDARD, Engine as _};
+#[path = "../../protocol/rust/clipboard_wire.rs"]
+mod clipboard_wire;
 use protobuf::Message as _;
 use serde_json::{json, Value};
 use std::{
@@ -112,10 +113,10 @@ pub extern "C" fn yd_engine_poll_audio(
 #[path = "clipboard_retry.rs"]
 mod clipboard_retry;
 
-fn clipboard(v: &Value) -> Result<Value, Fault> {
+fn clipboard(v: &Value, raw: &[u8]) -> Result<(Value, Vec<u8>), Fault> {
     #[cfg(target_os = "linux")]
     if crate::wayland_portal::enabled() {
-        return crate::wayland_portal::clipboard(v)
+        return crate::wayland_portal::clipboard(v, raw)
             .map_err(|(status, message)| fault(status, &message));
     }
     let mut guard = CLIPBOARD.lock().unwrap();
@@ -132,7 +133,7 @@ fn clipboard(v: &Value) -> Result<Value, Fault> {
             Some("image") => {
                 let width = number(content, "width")? as usize;
                 let height = number(content, "height")? as usize;
-                let bytes = STANDARD.decode(string(content, "data")?).map_err(invalid)?;
+                let bytes = raw.to_vec();
                 if width == 0
                     || height == 0
                     || width.checked_mul(height).and_then(|n| n.checked_mul(4)) != Some(bytes.len())
@@ -149,7 +150,7 @@ fn clipboard(v: &Value) -> Result<Value, Fault> {
             _ => return Err(fault(400, "invalid clipboard kind")),
         };
         board.set_formats(&[data]).map_err(engine_error)?;
-        return Ok(json!({"applied":true}));
+        return Ok((json!({"applied":true}), Vec::new()));
     }
     // 与 RustDesk clipboard_service 使用同一 arboard fork；读写去重留在会话层，
     // 不添加上游跨原生客户端的 owner marker，以免隐藏控制端刚写入的内容。
@@ -163,19 +164,19 @@ fn clipboard(v: &Value) -> Result<Value, Fault> {
         .map_err(engine_error)?;
     for content in data {
         match content {
-            arboard::ClipboardData::Text(text) => return Ok(json!({"kind":"text","text":text})),
+            arboard::ClipboardData::Text(text) => return Ok((json!({"kind":"text","text":text}), Vec::new())),
             arboard::ClipboardData::Image(arboard::ImageData::Rgba(image)) => {
                 if image.bytes.len() > 16 << 20 {
                     return Err(fault(413, "clipboard image too large"));
                 }
                 return Ok(
-                    json!({"kind":"image","mime":"image/rgba","width":image.width,"height":image.height,"data":STANDARD.encode(&image.bytes)}),
+                    (json!({"kind":"image","mime":"image/rgba","width":image.width,"height":image.height}), image.bytes.to_vec()),
                 );
             }
             _ => {}
         }
     }
-    Ok(Value::Null)
+    Ok((Value::Null, Vec::new()))
 }
 
 #[cfg(any(target_os = "linux", target_os = "macos"))]
@@ -1037,10 +1038,8 @@ fn files_with_context(
         return Ok(json!({"transfer_id":id,"size":size,"name":name}));
     }
     let id = i32::try_from(number(v, "transfer_id")?).map_err(invalid)?;
-    if action == "files.read" {
-        let offset = number(v, "offset")?;
-        let (bytes, done) = read_file_block(conn, id, offset, guard, rt)?;
-        return Ok(json!({"data":STANDARD.encode(&bytes),"offset":offset + bytes.len() as u64,"done":done}));
+    if matches!(action, "files.read" | "files.write") {
+        return Err(fault(400, "file payload requires the binary transfer interface"));
     }
     let job = guard
         .get_mut(&id)
@@ -1107,11 +1106,6 @@ fn files_with_context(
     }
     if number(v, "offset")? != job.offset {
         return Err(fault(409, "transfer offset mismatch"));
-    }
-    if action == "files.write" {
-        let bytes = STANDARD.decode(string(v, "data")?).map_err(invalid)?;
-        write_file_block(job, &bytes)?;
-        return Ok(json!({"offset":job.offset}));
     }
     Err(fault(400, "unknown file action"))
 }
@@ -1200,6 +1194,7 @@ fn privacy(conn: i32, v: &Value) -> Result<Value, Fault> {
     Ok(json!({"enabled":enabled}))
 }
 
+#[cfg_attr(test, derive(Debug))]
 struct Fault {
     status: u16,
     message: String,
@@ -1235,7 +1230,7 @@ fn dispatch(conn: i32, v: &Value) -> Result<Value, Fault> {
         return Ok(json!({"privacy_screen":privacy_supported(),"hdr":hdr}));
     }
     if action.starts_with("clipboard.") {
-        return clipboard(v);
+        return Err(fault(400, "clipboard requires the binary interface"));
     }
     if !AUX
         .lock()
@@ -1255,6 +1250,23 @@ fn dispatch(conn: i32, v: &Value) -> Result<Value, Fault> {
     }
 }
 
+fn clipboard_packet(input: &[u8]) -> Result<Vec<u8>, Fault> {
+    use clipboard_wire::{Content, decode, encode};
+    let content = decode(input).map_err(invalid)?;
+    let (value, raw) = match content {
+        Content::Empty => (json!({"action":"clipboard.read"}), &[][..]),
+        Content::Text(text) => (json!({"action":"clipboard.write","content":{"kind":"text","text":text}}), &[][..]),
+        Content::Image { width, height, bytes } => (json!({"action":"clipboard.write","content":{"kind":"image","width":width,"height":height}}), bytes),
+    };
+    let (value, bytes) = clipboard(&value, raw)?;
+    let content = match value["kind"].as_str() {
+        Some("text") => Content::Text(value["text"].as_str().ok_or_else(|| fault(503,"invalid clipboard text"))?),
+        Some("image") => Content::Image { width: number(&value,"width")? as u32, height: number(&value,"height")? as u32, bytes: &bytes },
+        _ => Content::Empty,
+    };
+    encode(content).map_err(invalid)
+}
+
 #[no_mangle]
 pub extern "C" fn yd_engine_endpoint(
     conn: c_int,
@@ -1265,6 +1277,16 @@ pub extern "C" fn yd_engine_endpoint(
 ) -> c_int {
     if input.is_null() || out.is_null() || len > 24 << 20 || cap < 24 << 20 {
         return -1;
+    }
+    let input_bytes = unsafe { std::slice::from_raw_parts(input, len) };
+    if input_bytes.starts_with(clipboard_wire::MAGIC) {
+        let bytes = match clipboard_packet(input_bytes) {
+            Ok(bytes) => bytes,
+            Err(error) => match serde_json::to_vec(&json!({"error":error.message,"status":error.status})) { Ok(bytes) => bytes, Err(_) => return -1 },
+        };
+        if bytes.len() > cap { return -1; }
+        unsafe { std::ptr::copy_nonoverlapping(bytes.as_ptr(), out, bytes.len()); }
+        return bytes.len() as c_int;
     }
     let parsed = serde_json::from_slice::<Value>(unsafe { std::slice::from_raw_parts(input, len) })
         .map_err(invalid);
@@ -1597,7 +1619,6 @@ pub extern "C" fn yd_engine_file_close(conn: c_int) -> c_int {
     0
 }
 
-#[cfg(windows)]
 #[no_mangle]
 pub extern "C" fn yd_engine_file_write(
     conn: c_int,
@@ -1623,7 +1644,6 @@ pub extern "C" fn yd_engine_file_write(
     }
 }
 
-#[cfg(windows)]
 #[no_mangle]
 pub extern "C" fn yd_engine_file_read(
     conn: c_int,

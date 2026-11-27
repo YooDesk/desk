@@ -82,7 +82,7 @@ pub(super) fn input_io() -> Option<std::sync::MutexGuard<'static, ()>> {
         .then(|| IO.lock().unwrap())
 }
 /// 已授权的Portal剪贴板保持与画面同一session；不读取上游随机目录中的token。
-pub(super) fn clipboard(value: &Value) -> Result<Value, (u16, String)> {
+pub(super) fn clipboard(value: &Value, raw: &[u8]) -> Result<(Value, Vec<u8>), (u16, String)> {
     if !ready() {
         return Err((
             403,
@@ -92,7 +92,7 @@ pub(super) fn clipboard(value: &Value) -> Result<Value, (u16, String)> {
     let session = SESSION
         .get()
         .ok_or((409, "Wayland sharing authorization is pending".into()))?;
-    super::portal_clipboard::endpoint(session, value)
+    super::portal_clipboard::endpoint(session, value, raw)
 }
 /// 在独立线程启动一次授权，保留标准三分钟人机交互期限而不扩大IPC超时。
 pub(super) fn start() {

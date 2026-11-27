@@ -332,18 +332,28 @@ impl Backend for EngineBackend {
 struct EngineClipboard;
 impl crate::desk::Clipboard for EngineClipboard {
     fn read(&mut self) -> Result<Option<crate::desk::ClipboardContent>, ApiError> {
-        let value = EngineBackend.endpoint(0, &json!({"action":"clipboard.read"}))?;
-        if value.is_null() {
-            return Ok(None);
-        }
-        crate::http::clipboard_from_json(&value).map(Some)
+        let input = crate::http::clipboard_to_binary(None)?;
+        crate::http::clipboard_from_binary(&clipboard_packet_native(&input)?)
     }
     fn write(&mut self, content: &crate::desk::ClipboardContent) -> Result<(), ApiError> {
-        EngineBackend.endpoint(
-            0,
-            &json!({"action":"clipboard.write", "content":crate::http::clipboard_to_json(content)}),
-        )?;
-        Ok(())
+        let input = crate::http::clipboard_to_binary(Some(content))?;
+        clipboard_packet_native(&input).map(|_| ())
+    }
+}
+
+pub(crate) fn clipboard_packet_native(input: &[u8]) -> Result<Vec<u8>, ApiError> {
+    crate::clipboard_wire::decode(input).map_err(|message| ApiError::new(400, codes::INVALID_REQUEST, message))?;
+    let mut output = vec![0u8; 24 << 20];
+    let rc = unsafe { yd_engine_endpoint(0, input.as_ptr(), input.len(), output.as_mut_ptr(), output.len()) };
+    if rc <= 0 || rc as usize > output.len() { return Err(ApiError::new(503, codes::DESK_ENGINE, "clipboard endpoint failed")); }
+    output.truncate(rc as usize);
+    if output.starts_with(crate::clipboard_wire::MAGIC) {
+        crate::clipboard_wire::decode(&output).map_err(|message| ApiError::new(503, codes::DESK_ENGINE, message))?;
+        Ok(output)
+    } else {
+        let value = serde_json::from_slice(&output).map_err(|_| ApiError::new(503, codes::DESK_ENGINE, "invalid clipboard reply"))?;
+        decode_endpoint(value)?;
+        Err(ApiError::new(503, codes::DESK_ENGINE, "invalid clipboard reply"))
     }
 }
 

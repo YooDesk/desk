@@ -1,11 +1,10 @@
 // 文件导航与有界传输队列。每项绑定选中文件时的目录、会话和输入代次。
-window.createDeskFiles = function ({ request, api, state, fileStreams }) {
+window.createDeskFiles = function ({ request, api, state }) {
   const el = (id) => document.getElementById(id);
   const diagnostic = () => (window.__yoodeskDesk ||= {});
   const MAX_PENDING = 32;
   const MAX_HISTORY = 40;
   const MAX_FILE = 1024 ** 3;
-  const CHUNK = 65536;
   const tasks = [];
   let active;
   let running = false;
@@ -569,14 +568,6 @@ window.createDeskFiles = function ({ request, api, state, fileStreams }) {
     const failed = results.find((result) => result.status === "rejected");
     if (failed) throw failed.reason;
   }
-  const encode = (bytes) => {
-    let binary = "";
-    for (let index = 0; index < bytes.length; index += 8192)
-      binary += String.fromCharCode(...bytes.subarray(index, index + 8192));
-    return btoa(binary);
-  };
-  const decode = (text) =>
-    Uint8Array.from(atob(text), (char) => char.charCodeAt(0));
   function reportProgress(task) {
     if (performance.now() - (task.lastRender || 0) >= 100) {
       task.lastRender = performance.now();
@@ -603,7 +594,7 @@ window.createDeskFiles = function ({ request, api, state, fileStreams }) {
     task.status = task.direction === "upload" ? "uploading" : "downloading";
     renderTasks();
     if (task.direction === "upload") {
-      if (fileStreams && task.size > 0) {
+      if (task.size > 0) {
         const controller = new AbortController();
         task.streamController = controller;
         try {
@@ -619,27 +610,6 @@ window.createDeskFiles = function ({ request, api, state, fileStreams }) {
           task.streamController = undefined;
         }
       }
-      while (task.offset < task.size) {
-        ensureCurrent(task);
-        const bytes = new Uint8Array(
-          await task.file.slice(task.offset, task.offset + CHUNK).arrayBuffer(),
-        );
-        ensureCurrent(task);
-        const response = await endpoint(
-          {
-            action: "files.write",
-            transfer_id: task.id,
-            offset: task.offset,
-            data: encode(bytes),
-          },
-          task.session,
-        );
-        ensureCurrent(task);
-        if (response.offset !== task.offset + bytes.length)
-          throw new Error("上传偏移不符");
-        task.offset = response.offset;
-        reportProgress(task);
-      }
       ensureCurrent(task);
       task.status = "committing";
       renderTasks();
@@ -654,7 +624,7 @@ window.createDeskFiles = function ({ request, api, state, fileStreams }) {
     } else {
       const blocks = [];
       let done = false;
-      if (fileStreams) {
+      {
         const controller = new AbortController();
         task.streamController = controller;
         let reader;
@@ -681,25 +651,6 @@ window.createDeskFiles = function ({ request, api, state, fileStreams }) {
           reader?.releaseLock();
           task.streamController = undefined;
         }
-      }
-      while (!done) {
-        ensureCurrent(task);
-        const response = await endpoint(
-          { action: "files.read", transfer_id: task.id, offset: task.offset },
-          task.session,
-        );
-        ensureCurrent(task);
-        const bytes = decode(response.data);
-        if (
-          response.offset !== task.offset + bytes.length ||
-          response.offset > task.size ||
-          (!bytes.length && !response.done)
-        )
-          throw new Error("下载偏移不符");
-        blocks.push(bytes);
-        task.offset = response.offset;
-        done = response.done;
-        reportProgress(task);
       }
       if (task.offset !== task.size) throw new Error("下载长度不符");
       task.released = true;

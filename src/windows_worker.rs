@@ -365,13 +365,29 @@ impl Transport for PipeTransport {
         self.watchdog.failed.store(true, Ordering::SeqCst);
     }
     fn request(&self, op: &str, args: Value) -> Result<Reply, ApiError> {
+        self.exchange(op, args, None)
+    }
+    fn request_binary(&self, op: &str, args: Value, bytes: &[u8]) -> Result<Reply, ApiError> {
+        self.exchange(op, args, Some(bytes))
+    }
+}
+impl PipeTransport {
+    fn exchange(&self, op: &str, args: Value, payload: Option<&[u8]>) -> Result<Reply, ApiError> {
         let mut guard = self.io.lock().unwrap_or_else(|e| e.into_inner());
         let file = guard.as_mut().ok_or_else(engine_error)?;
         self.watchdog.start().map_err(|_| engine_error())?;
         let result = (|| {
             let id = self.next.fetch_add(1, Ordering::SeqCst);
-            let bytes = serde_json::to_vec(&args).map_err(|_| invalid("IPC request"))?;
-            write_frame(file, &json!({"v":1,"id":id,"op":op}), &bytes)?;
+            if let Some(bytes) = payload {
+                if op != "clipboard.write" || crate::clipboard_wire::decode(bytes).is_err()
+                    || matches!(crate::clipboard_wire::decode(bytes), Ok(crate::clipboard_wire::Content::Empty)) {
+                    return Err(invalid("IPC clipboard frame"));
+                }
+                write_frame(file, &json!({"v":1,"id":id,"op":op,"binary":true,"args":args}), bytes)?;
+            } else {
+                let bytes = serde_json::to_vec(&args).map_err(|_| invalid("IPC request"))?;
+                write_frame(file, &json!({"v":1,"id":id,"op":op}), &bytes)?;
+            }
             let (metadata, bytes) = read_frame(file)?;
             if metadata["v"] != 1 || metadata["id"] != id {
                 return Err(invalid("IPC response binding"));

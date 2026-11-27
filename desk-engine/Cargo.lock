@@ -2211,7 +2211,6 @@ checksum = "a0474425d51df81997e2f90a21591180b38eccf27292d755f3e30750225c175b"
 [[package]]
 name = "evdev"
 version = "0.11.5"
-source = "git+https://github.com/rustdesk-org/evdev#cec616e37790293d2cd2aa54a96601ed6b1b35a9"
 dependencies = [
  "bitvec",
  "libc",

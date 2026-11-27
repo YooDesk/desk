@@ -64,3 +64,6 @@ path = "examples/smoke.rs"
 
 [patch."https://github.com/rustdesk-org/hwcodec"]
 hwcodec = { path = "../artifacts/hwcodec-patched" }
+
+[patch."https://github.com/rustdesk-org/evdev"]
+evdev = { path = "../artifacts/evdev-patched" }

@@ -303,6 +303,14 @@ impl Transport for UnixTransport {
         let _ = self.cancel.shutdown(Shutdown::Both);
     }
     fn request(&self, op: &str, args: Value) -> Result<Reply, ApiError> {
+        self.exchange(op, args, None)
+    }
+    fn request_binary(&self, op: &str, args: Value, bytes: &[u8]) -> Result<Reply, ApiError> {
+        self.exchange(op, args, Some(bytes))
+    }
+}
+impl UnixTransport {
+    fn exchange(&self, op: &str, args: Value, payload: Option<&[u8]>) -> Result<Reply, ApiError> {
         if !self.healthy() {
             return Err(engine_error());
         }
@@ -314,8 +322,24 @@ impl Transport for UnixTransport {
         let mut io = DeadlineIo::new(stream, Duration::from_secs(10));
         let result = (|| {
             let id = self.next.fetch_add(1, Ordering::SeqCst);
-            let bytes = serde_json::to_vec(&args).map_err(|_| invalid())?;
-            write_frame(&mut io, &json!({"v":1,"id":id,"op":op}), &bytes)?;
+            if let Some(bytes) = payload {
+                if !match op {
+                    "file.write" => !bytes.is_empty() && bytes.len() <= 128 * 1024,
+                    "clipboard.write" => crate::clipboard_wire::decode(bytes).is_ok()
+                        && !matches!(crate::clipboard_wire::decode(bytes), Ok(crate::clipboard_wire::Content::Empty)),
+                    _ => false,
+                } {
+                    return Err(invalid());
+                }
+                write_frame(
+                    &mut io,
+                    &json!({"v":1,"id":id,"op":op,"binary":true,"args":args}),
+                    bytes,
+                )?;
+            } else {
+                let bytes = serde_json::to_vec(&args).map_err(|_| invalid())?;
+                write_frame(&mut io, &json!({"v":1,"id":id,"op":op}), &bytes)?;
+            }
             let (metadata, bytes) = read_frame(&mut io)?;
             if metadata["v"] != 1 || metadata["id"] != id {
                 return Err(invalid());

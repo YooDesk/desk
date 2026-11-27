@@ -11,7 +11,7 @@ use axum::{
     routing::{any, get, post},
     Router,
 };
-pub(crate) use desk::{clipboard_from_json, clipboard_to_json};
+pub(crate) use desk::{clipboard_from_binary, clipboard_to_binary};
 pub use response::ApiResponse;
 use std::{net::SocketAddr, sync::Arc};
 /// 应用共享状态。
@@ -63,7 +63,7 @@ pub fn router(state: Arc<AppState>) -> Router {
             get(desk::clipboard)
                 .post(desk::clipboard)
                 .layer(axum::extract::DefaultBodyLimit::max(
-                    desk::MAX_CLIPBOARD_IMAGE_BYTES.div_ceil(3) * 4 + 4096,
+                    crate::clipboard_wire::MAX_BYTES + crate::clipboard_wire::HEADER,
                 )),
         );
 

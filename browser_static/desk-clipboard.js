@@ -37,18 +37,41 @@ window.createDeskClipboard = function ({
       say(`剪贴板同步失败：${error.message}`, true);
     lastError = error.message;
   }
-  function base64(bytes) {
-    let value = "";
-    for (let offset = 0; offset < bytes.length; offset += 16384) {
-      value += String.fromCharCode(...bytes.subarray(offset, offset + 16384));
-    }
-    return btoa(value);
+  function encodeContent(content) {
+    const data = content.kind === 'text' ? new TextEncoder().encode(content.text) : content.data;
+    if (data.byteLength > maxBytes) throw new Error('Clipboard payload too large');
+    const frame = new Uint8Array(16 + data.byteLength);
+    frame.set([89, 68, 67, 49]);
+    const header = new DataView(frame.buffer);
+    header.setUint32(4, content.kind === 'text' ? 1 : 2, true);
+    header.setUint32(8, content.width || 0, true);
+    header.setUint32(12, content.height || 0, true);
+    frame.set(data, 16);
+    return frame;
   }
-  function rgba(data) {
-    const value = atob(data);
-    return Uint8ClampedArray.from(value, (character) =>
-      character.charCodeAt(0),
-    );
+  async function decodeContent(stream) {
+    const reader = stream.getReader();
+    const blocks = []; let size = 0;
+    try {
+      while (true) {
+        const block = await reader.read();
+        if (block.done) break;
+        size += block.value.byteLength;
+        if (size > maxBytes + 16) throw new Error('Clipboard payload too large');
+        blocks.push(block.value);
+      }
+    } catch (error) { await reader.cancel().catch(() => {}); throw error; }
+    finally { reader.releaseLock(); }
+    const frame = new Uint8Array(size); let offset = 0;
+    for (const block of blocks) { frame.set(block, offset); offset += block.byteLength; }
+    if (size < 16 || frame[0] !== 89 || frame[1] !== 68 || frame[2] !== 67 || frame[3] !== 49) throw new Error('Invalid clipboard frame');
+    const header = new DataView(frame.buffer);
+    const kind = header.getUint32(4, true), width = header.getUint32(8, true), height = header.getUint32(12, true);
+    const data = frame.subarray(16);
+    if (kind === 0 && !width && !height && !data.length) return { changed: false };
+    if (kind === 1 && !width && !height) return { kind: 'text', text: new TextDecoder('utf-8', { fatal: true }).decode(data) };
+    if (kind === 2 && width > 0 && height > 0 && width <= 8192 && height <= 8192 && data.length === width * height * 4) return { kind: 'image', width, height, data };
+    throw new Error('Invalid clipboard dimensions or payload');
   }
   async function fingerprint(content) {
     let bytes;
@@ -57,7 +80,7 @@ window.createDeskClipboard = function ({
         `text:${content.text.replace(/\r\n/g, "\n")}`,
       );
     } else {
-      const pixels = rgba(content.data);
+      const pixels = new Uint8ClampedArray(content.data.buffer, content.data.byteOffset, content.data.byteLength);
       const prefix = new TextEncoder().encode(
         `rgba:${content.width}:${content.height}:`,
       );
@@ -97,9 +120,7 @@ window.createDeskClipboard = function ({
               kind: "image",
               width: canvas.width,
               height: canvas.height,
-              data: base64(
-                context.getImageData(0, 0, canvas.width, canvas.height).data,
-              ),
+              data: context.getImageData(0, 0, canvas.width, canvas.height).data,
             };
           } finally {
             bitmap.close();
@@ -135,7 +156,7 @@ window.createDeskClipboard = function ({
     }
     if (!navigator.clipboard?.write || !window.ClipboardItem)
       throw new Error("浏览器不支持图片剪贴板");
-    const pixels = rgba(content.data);
+    const pixels = new Uint8ClampedArray(content.data.buffer, content.data.byteOffset, content.data.byteLength);
     if (
       pixels.length > maxBytes ||
       pixels.length !== content.width * content.height * 4
@@ -158,10 +179,7 @@ window.createDeskClipboard = function ({
       kind: "image",
       width: canvas.width,
       height: canvas.height,
-      data: base64(
-        canvas.getContext("2d").getImageData(0, 0, canvas.width, canvas.height)
-          .data,
-      ),
+      data: canvas.getContext("2d").getImageData(0, 0, canvas.width, canvas.height).data,
     });
     if (!valid(current) || !focused()) return false;
     await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
@@ -197,7 +215,7 @@ window.createDeskClipboard = function ({
               content.kind === "text" &&
               content.text === "";
             if (!initiallyEmpty) {
-              await request("POST", url(), content, controller.signal);
+              await request("POST", url(), encodeContent(content), controller.signal);
               if (!valid(current)) return;
               remoteFingerprint = hash;
               pendingRemote = undefined;
@@ -217,7 +235,7 @@ window.createDeskClipboard = function ({
       }
     }
     if (state.capabilities?.clipboard_read && valid(current)) {
-      const content = await request("GET", url(), undefined, controller.signal);
+      const content = await decodeContent(await request("GET", url(), undefined, controller.signal, true));
       if (!valid(current)) return;
       if (content && content.changed !== false) {
         const hash = await fingerprint(content);

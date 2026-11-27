@@ -44,6 +44,10 @@ pub trait Transport: Send + Sync {
     }
     /// 有界同步请求，错误必须关闭该代连接。
     fn request(&self, op: &str, args: Value) -> Result<Reply, ApiError>;
+    /// 有界文件数据单独传送，不经过 JSON/base64。
+    fn request_binary(&self, _op: &str, _args: Value, _bytes: &[u8]) -> Result<Reply, ApiError> {
+        Err(unavailable())
+    }
     /// 立即取消正在执行的I/O；服务停止/换会话不等待远端响应。
     fn close(&self);
 }
@@ -99,6 +103,14 @@ pub fn call(op: &str, args: Value) -> Option<Result<Reply, ApiError>> {
     call_expected(None, op, args)
 }
 fn call_expected(expected: Option<u64>, op: &str, args: Value) -> Option<Result<Reply, ApiError>> {
+    call_expected_payload(expected, op, args, None)
+}
+fn call_expected_payload(
+    expected: Option<u64>,
+    op: &str,
+    args: Value,
+    bytes: Option<&[u8]>,
+) -> Option<Result<Reply, ApiError>> {
     let guard = state().lock().unwrap_or_else(|e| e.into_inner());
     if !guard.enabled {
         return None;
@@ -130,7 +142,10 @@ fn call_expected(expected: Option<u64>, op: &str, args: Value) -> Option<Result<
         Ok(slot) => slot,
         Err(err) => return Some(Err(err)),
     };
-    let result = transport.request(op, args.clone());
+    let result = match bytes {
+        Some(bytes) => transport.request_binary(op, args.clone(), bytes),
+        None => transport.request(op, args.clone()),
+    };
     let mut guard = state().lock().unwrap_or_else(|e| e.into_inner());
     if guard.generation != generation {
         return Some(Err(unavailable()));
@@ -208,19 +223,13 @@ pub fn clipboard() -> Box<dyn crate::desk::Clipboard> {
 struct RemoteClipboard(u64);
 impl crate::desk::Clipboard for RemoteClipboard {
     fn read(&mut self) -> Result<Option<crate::desk::ClipboardContent>, ApiError> {
-        let result = call_generation(
-            self.0,
-            "endpoint",
-            json!({"conn":0,"value":{"action":"clipboard.read"}}),
-        )?;
-        if result.value.is_null() {
-            Ok(None)
-        } else {
-            crate::http::clipboard_from_json(&result.value).map(Some)
-        }
+        let result = call_generation(self.0, "clipboard.read", json!({"conn":0}))?;
+        crate::http::clipboard_from_binary(&result.bytes)
     }
     fn write(&mut self, content: &crate::desk::ClipboardContent) -> Result<(), ApiError> {
-        call_generation(self.0, "endpoint", json!({"conn":0,"value":{"action":"clipboard.write","content":crate::http::clipboard_to_json(content)}})).map(|_| ())
+        let bytes = crate::http::clipboard_to_binary(Some(content))?;
+        call_expected_payload(Some(self.0), "clipboard.write", json!({"conn":0}), Some(&bytes))
+            .ok_or_else(unavailable)?.map(|_| ())
     }
 }
 
@@ -234,44 +243,119 @@ extern "C" {
         cap: usize,
     ) -> i32;
     fn yd_engine_file_close(conn: i32) -> i32;
-    #[cfg(windows)]
+}
+extern "C" {
     fn yd_engine_file_write(conn: i32, id: i32, offset: u64, data: *const u8, len: usize) -> i32;
-    #[cfg(windows)]
-    fn yd_engine_file_read(conn: i32, id: i32, offset: u64, out: *mut u8, cap: usize, done: *mut u8) -> i32;
+    fn yd_engine_file_read(
+        conn: i32,
+        id: i32,
+        offset: u64,
+        out: *mut u8,
+        cap: usize,
+        done: *mut u8,
+    ) -> i32;
 }
 
-#[cfg(windows)]
-pub(crate) fn write_file_block(conn: i32, id: i32, offset: u64, bytes: &[u8]) -> Result<(), ApiError> {
-    native_file_operation(conn, || {
-        let status = unsafe { yd_engine_file_write(conn, id, offset, bytes.as_ptr(), bytes.len()) };
-        match status {
-            0 => Ok(()),
-            -400 => Err(ApiError::new(400, codes::INVALID_REQUEST, "invalid upload block")),
-            -404 => Err(ApiError::new(404, codes::NOT_FOUND, "transfer not found")),
-            -409 => Err(ApiError::new(409, codes::STATE_CONFLICT, "upload offset mismatch")),
-            _ => Err(unavailable()),
-        }
-    })
+pub(crate) fn write_file_block(
+    conn: i32,
+    id: i32,
+    offset: u64,
+    bytes: &[u8],
+) -> Result<(), ApiError> {
+    if bytes.is_empty() || bytes.len() > 128 * 1024 {
+        return Err(ApiError::new(
+            400,
+            codes::INVALID_REQUEST,
+            "invalid upload block",
+        ));
+    }
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    return call_expected_payload(
+        None,
+        "file.write",
+        json!({"conn":conn,"transfer_id":id,"offset":offset}),
+        Some(bytes),
+    )
+    .ok_or_else(unavailable)?
+    .map(|_| ());
+    #[cfg(not(any(target_os = "linux", target_os = "macos")))]
+    native_file_operation(conn, || write_file_block_native(conn, id, offset, bytes))
 }
 
-#[cfg(windows)]
-pub(crate) fn read_file_block(conn: i32, id: i32, offset: u64) -> Result<(Vec<u8>, bool), ApiError> {
-    native_file_operation(conn, || {
-        let mut bytes = vec![0; 128 * 1024];
-        let mut done = 0;
-        let count = unsafe {
-            yd_engine_file_read(conn, id, offset, bytes.as_mut_ptr(), bytes.len(), &mut done)
-        };
-        if count < 0 || count as usize > bytes.len() {
+pub(crate) fn write_file_block_native(
+    conn: i32,
+    id: i32,
+    offset: u64,
+    bytes: &[u8],
+) -> Result<(), ApiError> {
+    let status = unsafe { yd_engine_file_write(conn, id, offset, bytes.as_ptr(), bytes.len()) };
+    match status {
+        0 => Ok(()),
+        -400 => Err(ApiError::new(
+            400,
+            codes::INVALID_REQUEST,
+            "invalid upload block",
+        )),
+        -404 => Err(ApiError::new(404, codes::NOT_FOUND, "transfer not found")),
+        -409 => Err(ApiError::new(
+            409,
+            codes::STATE_CONFLICT,
+            "upload offset mismatch",
+        )),
+        _ => Err(unavailable()),
+    }
+}
+
+pub(crate) fn read_file_block(
+    conn: i32,
+    id: i32,
+    offset: u64,
+) -> Result<(Vec<u8>, bool), ApiError> {
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    {
+        let reply = call(
+            "file.read",
+            json!({"conn":conn,"transfer_id":id,"offset":offset}),
+        )
+        .ok_or_else(unavailable)??;
+        let done = reply.value["done"].as_bool().ok_or_else(unavailable)?;
+        if reply.bytes.len() > 128 * 1024 || (reply.bytes.is_empty() && !done) {
             return Err(unavailable());
         }
-        bytes.truncate(count as usize);
-        Ok((bytes, done != 0))
-    })
+        return Ok((reply.bytes, done));
+    }
+    #[cfg(not(any(target_os = "linux", target_os = "macos")))]
+    native_file_operation(conn, || read_file_block_native(conn, id, offset))
 }
 
-#[cfg(windows)]
-fn native_file_operation<T>(conn: i32, operation: impl FnOnce() -> Result<T, ApiError>) -> Result<T, ApiError> {
+pub(crate) fn read_file_block_native(
+    conn: i32,
+    id: i32,
+    offset: u64,
+) -> Result<(Vec<u8>, bool), ApiError> {
+    let mut bytes = vec![0; 128 * 1024];
+    let mut done = 0;
+    let count = unsafe {
+        yd_engine_file_read(conn, id, offset, bytes.as_mut_ptr(), bytes.len(), &mut done)
+    };
+    match count {
+        -400 => return Err(ApiError::new(400, codes::INVALID_REQUEST, "invalid download block")),
+        -404 => return Err(ApiError::new(404, codes::NOT_FOUND, "transfer not found")),
+        -409 => return Err(ApiError::new(409, codes::STATE_CONFLICT, "download offset mismatch")),
+        _ => (),
+    }
+    if count < 0 || count as usize > bytes.len() || (count == 0 && done == 0) {
+        return Err(unavailable());
+    }
+    bytes.truncate(count as usize);
+    Ok((bytes, done != 0))
+}
+
+#[cfg(not(any(target_os = "linux", target_os = "macos")))]
+fn native_file_operation<T>(
+    conn: i32,
+    operation: impl FnOnce() -> Result<T, ApiError>,
+) -> Result<T, ApiError> {
     if enabled() {
         files_operation(conn, operation, || close_files(conn))
     } else {
@@ -355,6 +439,90 @@ fn files_native(conn: i32, value: &Value) -> Result<Value, ApiError> {
 mod tests {
     use super::*;
     use std::sync::atomic::{AtomicUsize, Ordering};
+    #[test]
+    #[ignore = "run in a dedicated process: changes permanent service proxy mode"]
+    fn binary_file_payload_preserves_bytes_and_rejects_replaced_worker_reply() {
+        use std::sync::mpsc;
+        use std::time::Duration;
+        struct Binary {
+            bytes: Mutex<Vec<u8>>,
+            pause: Mutex<Option<(mpsc::Sender<()>, mpsc::Receiver<()>)>>,
+        }
+        impl Transport for Binary {
+            fn request(&self, _: &str, _: Value) -> Result<Reply, ApiError> {
+                Ok(Reply {
+                    value: Value::Null,
+                    bytes: Vec::new(),
+                })
+            }
+            fn request_binary(
+                &self,
+                op: &str,
+                args: Value,
+                bytes: &[u8],
+            ) -> Result<Reply, ApiError> {
+                assert_eq!(op, "file.write");
+                assert_eq!(args["conn"], 81);
+                *self.bytes.lock().unwrap() = bytes.to_vec();
+                let pause = self.pause.lock().unwrap().take();
+                if let Some((entered, resume)) = pause {
+                    entered.send(()).unwrap();
+                    resume.recv_timeout(Duration::from_secs(3)).unwrap();
+                }
+                Ok(Reply {
+                    value: Value::Null,
+                    bytes: Vec::new(),
+                })
+            }
+            fn close(&self) {}
+        }
+        let first = Arc::new(Binary {
+            bytes: Mutex::new(Vec::new()),
+            pause: Mutex::new(None),
+        });
+        set_transport(Some(first.clone()));
+        call("subscribe", json!({"conn":81})).unwrap().unwrap();
+        let payload = [0xff, 0, 0x80, b'{', b'"', b'\\'];
+        call_expected_payload(
+            None,
+            "file.write",
+            json!({"conn":81,"transfer_id":1,"offset":0}),
+            Some(&payload),
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(*first.bytes.lock().unwrap(), payload);
+        let (entered, started) = mpsc::channel();
+        let (release, resume) = mpsc::channel();
+        *first.pause.lock().unwrap() = Some((entered, resume));
+        let pending = std::thread::spawn(move || {
+            call_expected_payload(
+                None,
+                "file.write",
+                json!({"conn":81,"transfer_id":1,"offset":6}),
+                Some(&payload),
+            )
+            .unwrap()
+        });
+        started.recv_timeout(Duration::from_secs(3)).unwrap();
+        let replacement = Arc::new(Fake {
+            requests: AtomicUsize::new(0),
+            closed: AtomicUsize::new(0),
+        });
+        set_transport(Some(replacement.clone()));
+        release.send(()).unwrap();
+        assert!(pending.join().unwrap().is_err());
+        assert!(call_expected_payload(
+            None,
+            "file.write",
+            json!({"conn":81,"transfer_id":1,"offset":12}),
+            Some(&payload)
+        )
+        .unwrap()
+        .is_err());
+        assert_eq!(replacement.requests.load(Ordering::SeqCst), 0);
+        set_transport(None);
+    }
     struct Fake {
         requests: AtomicUsize,
         closed: AtomicUsize,

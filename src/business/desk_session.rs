@@ -370,7 +370,7 @@ impl DeskSession {
         }
     }
 
-    #[cfg(all(windows, feature = "desk-engine"))]
+    #[cfg(feature = "desk-engine")]
     pub(crate) fn write_file_block(&self, id: i32, offset: u64, bytes: &[u8]) -> Result<(), ApiError> {
         self.require_active_endpoint()?;
         let _guard = self.endpoint_lock.lock().unwrap_or_else(|error| error.into_inner());
@@ -381,7 +381,7 @@ impl DeskSession {
         crate::desk::engine::rpc::write_file_block(self.engine_conn, id, offset, bytes)
     }
 
-    #[cfg(all(windows, feature = "desk-engine"))]
+    #[cfg(feature = "desk-engine")]
     pub(crate) fn read_file_block(&self, id: i32, offset: u64) -> Result<(Vec<u8>, bool), ApiError> {
         self.require_active_endpoint()?;
         let _guard = self.endpoint_lock.lock().unwrap_or_else(|error| error.into_inner());

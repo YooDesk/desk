@@ -45,6 +45,11 @@ pub extern "C" fn yd_engine_linux_user_input_service() -> i32 {
     {
         return crate::YD_ERR_STATE;
     }
+    // The package's uaccess rule covers only this product's synthetic keyboard.
+    std::env::set_var(
+        "YOODESK_ENGINE_KEYBOARD_NAME",
+        format!("{}DeskEngine Keyboard", env!("PRODUCT_ID")),
+    );
     let _ = env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("warn"))
         .try_init();
     for (name, start) in [

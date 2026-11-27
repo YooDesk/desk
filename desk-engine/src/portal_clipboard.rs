@@ -1,6 +1,5 @@
 //! RemoteDesktop Clipboard v1适配；只在用户授予同一Portal会话的剪贴板权限后工作。
 use super::wayland_portal::Session;
-use base64::{engine::general_purpose::STANDARD, Engine as _};
 use dbus::{
     arg::{OwnedFd, PropMap, RefArg, Variant},
     blocking::SyncConnection,
@@ -26,7 +25,7 @@ struct Clipboard {
     mimes: Vec<String>,
     owner: bool,
     formats: Formats,
-    value: Option<Value>,
+    value: Option<(Value, Vec<u8>)>,
     generation: u64,
 }
 static CLIPBOARD: Mutex<Clipboard> = Mutex::new(Clipboard {
@@ -227,7 +226,7 @@ fn selection_write(
     Ok(())
 }
 /// 将前端RGBA按既有16MiB限制编码为标准PNG报价。
-fn encode(value: &Value) -> Result<Formats, String> {
+fn encode(value: &Value, pixels: &[u8]) -> Result<Formats, String> {
     let mut formats = Formats::new();
     match value["kind"].as_str() {
         Some("text") => {
@@ -254,13 +253,6 @@ fn encode(value: &Value) -> Result<Formats, String> {
                 .and_then(|n| n.checked_mul(4))
                 .filter(|n| *n <= MAX)
                 .ok_or("clipboard image too large")?;
-            let encoded = value["data"]
-                .as_str()
-                .filter(|s| s.len() <= MAX * 4 / 3 + 4)
-                .ok_or("clipboard image data required")?;
-            let pixels = STANDARD
-                .decode(encoded)
-                .map_err(|_| "invalid clipboard image encoding")?;
             if pixels.len() != count {
                 return Err("invalid clipboard image size".into());
             }
@@ -281,7 +273,7 @@ fn encode(value: &Value) -> Result<Formats, String> {
     Ok(formats)
 }
 /// 将经Portal读取的PNG恢复为前端既有RGBA DTO，限制展开后的图像尺寸。
-fn decode_png(bytes: &[u8]) -> Result<Value, String> {
+fn decode_png(bytes: &[u8]) -> Result<(Value, Vec<u8>), String> {
     let mut decoder = png::Decoder::new(bytes);
     decoder.set_transformations(png::Transformations::EXPAND | png::Transformations::STRIP_16);
     decoder.set_limits(png::Limits { bytes: MAX });
@@ -316,23 +308,23 @@ fn decode_png(bytes: &[u8]) -> Result<Value, String> {
         }
         _ => return Err("unsupported clipboard PNG color".into()),
     }
-    Ok(json!({"kind":"image","width":info.width,"height":info.height,"data":STANDARD.encode(rgba)}))
+    Ok((json!({"kind":"image","width":info.width,"height":info.height}), rgba))
 }
 /// Portal权限拒绝时明确403，绝不偷偷转到X11读取用户未授权的剪贴板。
-pub(super) fn endpoint(session: &Session, value: &Value) -> Result<Value, (u16, String)> {
+pub(super) fn endpoint(session: &Session, value: &Value, raw: &[u8]) -> Result<(Value, Vec<u8>), (u16, String)> {
     if !session.clipboard {
         return Err((403, "Wayland clipboard permission was not granted".into()));
     }
     let proxy = scrap::wayland::pipewire::get_portal(&session.conn);
     if value["action"] == "clipboard.write" {
-        let formats = encode(&value["content"]).map_err(|e| (400, e))?;
+        let formats = encode(&value["content"], raw).map_err(|e| (400, e))?;
         let mimes = formats.keys().cloned().collect::<Vec<_>>();
         let generation = {
             let mut state = CLIPBOARD.lock().unwrap();
             state.generation = state.generation.wrapping_add(1);
             state.formats = formats;
             state.owner = false;
-            state.value = Some(value["content"].clone());
+            state.value = Some((value["content"].clone(), raw.to_vec()));
             state.generation
         };
         let result: Result<(), dbus::Error> = {
@@ -354,12 +346,12 @@ pub(super) fn endpoint(session: &Session, value: &Value) -> Result<Value, (u16, 
             }
         }
         result.map_err(|_| (503, "Portal SetSelection failed".into()))?;
-        return Ok(json!({"applied":true}));
+        return Ok((json!({"applied":true}), Vec::new()));
     }
     let mimes = {
         let state = CLIPBOARD.lock().unwrap();
         if state.owner {
-            return Ok(state.value.clone().unwrap_or(Value::Null));
+            return Ok(state.value.clone().unwrap_or((Value::Null, Vec::new())));
         }
         state.mimes.clone()
     };
@@ -367,7 +359,7 @@ pub(super) fn endpoint(session: &Session, value: &Value) -> Result<Value, (u16, 
         .into_iter()
         .find(|m| mimes.iter().any(|s| s == m));
     let Some(mime) = mime else {
-        return Ok(Value::Null);
+        return Ok((Value::Null, Vec::new()));
     };
     let (fd,): (OwnedFd,) = {
         let _io = super::wayland_portal::IO.lock().unwrap();
@@ -383,7 +375,7 @@ pub(super) fn endpoint(session: &Session, value: &Value) -> Result<Value, (u16, 
             return Err((413, "clipboard text too large".into()));
         }
         Ok(
-            json!({"kind":"text","text":String::from_utf8(bytes).map_err(|_|(503,"invalid UTF-8 clipboard text".into()))?}),
+            (json!({"kind":"text","text":String::from_utf8(bytes).map_err(|_|(503,"invalid UTF-8 clipboard text".into()))?}), Vec::new()),
         )
     }
 }
@@ -402,20 +394,21 @@ mod tests {
     /// RGBA经PNG报价再读取保持像素和尺寸，包含透明像素。
     #[test]
     fn portal_png_roundtrip_preserves_rgba() {
-        let value = json!({"kind":"image","width":2,"height":1,"data":STANDARD.encode([255u8,0,0,255,0,255,0,0])});
-        let formats = encode(&value).unwrap();
-        assert_eq!(decode_png(&formats["image/png"]).unwrap(), value);
+        let value = json!({"kind":"image","width":2,"height":1});
+        let pixels = vec![255u8,0,0,255,0,255,0,0];
+        let formats = encode(&value, &pixels).unwrap();
+        assert_eq!(decode_png(&formats["image/png"]).unwrap(), (value, pixels));
     }
     /// 文本报价保持UTF-8，不把未知格式或过大数据发送到Portal。
     #[test]
     fn text_is_utf8_and_invalid_formats_are_rejected() {
-        let formats = encode(&json!({"kind":"text","text":"Wayland剪贴板"})).unwrap();
+        let formats = encode(&json!({"kind":"text","text":"Wayland剪贴板"}), &[]).unwrap();
         assert_eq!(
             &**formats.get("text/plain;charset=utf-8").unwrap(),
             "Wayland剪贴板".as_bytes()
         );
-        assert!(encode(&json!({"kind":"file"})).is_err());
-        assert!(encode(&json!({"kind":"image","width":16384,"height":16384,"data":""})).is_err());
+        assert!(encode(&json!({"kind":"file"}), &[]).is_err());
+        assert!(encode(&json!({"kind":"image","width":16384,"height":16384}), &[]).is_err());
     }
     /// 使用真实Unix pipe验证读取遇EOF结束，而非依赖剪贴板源永远在线。
     #[test]
