@@ -84,6 +84,14 @@ allows 144 FPS and passed its boundary test; local APK compilation, DEX,
 resources, signature and actual payload checks passed. Cloud validation remains
 outstanding.
 
+Fresh build-only attempts confirmed the same restriction:
+[WebService 46067496993](https://github.com/YooDesk/webservice/actions/runs/46067496993)
+at `08593d1`, and
+[APK 46067491935](https://github.com/YooDesk/yoodeskclient/actions/runs/46067491935)
+at `89075b0`. Both were stopped before any build step executed. Their check-run
+annotations explicitly report failed account payments or the spending limit.
+Both release jobs were skipped.
+
 The remote Gateway's public HTTPS and STUN binding response were verified, but
 the provided account login returned HTTP 401. Authorized remote Gateway/STUN
 desktop acceptance at 144 FPS remains outstanding. No remote deployment or
