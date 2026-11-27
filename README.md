@@ -67,6 +67,9 @@ encoder resets after short writer stalls. Both frame count and native pending
 bytes remain bounded. Build-only Windows x64 runs also export their native
 dependency SDK for local builds against the same CI libraries.
 
+See [144 FPS validation](docs/video-144-validation-20261128.md) for exact CI
+artifacts, Windows LAN measurements and outstanding platform acceptance.
+
 ## macOS
 
 macOS 原生支持来自上游 `b9fc78a`：引擎使用 VideoToolbox H.264，文件操作锚定目录描述符，
