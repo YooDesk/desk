@@ -32,7 +32,7 @@ All runs use build-only mode and do not publish releases.
 | --- | --- | --- | --- |
 | Windows x64 | [46051372948](https://github.com/YooDesk/desk/actions/runs/46051372948) | `fb2381a` | Passed; local LAN acceptance above |
 | Windows x86 | [46059404585](https://github.com/YooDesk/desk/actions/runs/46059404585) | `58dd35e` | Passed |
-| Windows ARM64 | [46059407842](https://github.com/YooDesk/desk/actions/runs/46059407842) | `58dd35e` | Running; not yet accepted |
+| Windows ARM64 | [46059407842](https://github.com/YooDesk/desk/actions/runs/46059407842) | `58dd35e` | Passed |
 | Linux x64 | [46054146764](https://github.com/YooDesk/desk/actions/runs/46054146764) | `fb2381a` | Passed |
 | Linux ARM64 | [46059414121](https://github.com/YooDesk/desk/actions/runs/46059414121) | `58dd35e` | Passed |
 | macOS ARM64 | [46055359068](https://github.com/YooDesk/desk/actions/runs/46055359068) | `86538f4` | Passed |
@@ -49,6 +49,12 @@ Windows x86 additionally passed 11 SDK video tests, the actual FFmpeg input-pool
 ownership test, six bitmap tests and 110 main-library tests (seven ignored).
 Its exact artifact was checked for source and content hashes, x86 PE architecture,
 system DLL dependencies and absence of dynamically linked CRTs.
+
+Windows ARM64 passed 11 SDK video tests, six bitmap tests and 110 main-library
+tests (seven ignored). Its exact DLL passed ARM64 PE architecture, source/content
+hashes, system DLL dependency and static CRT checks. The archive check on this
+architecture verifies x264 software fallback; it does not establish availability
+of a hardware encoder on a Windows ARM64 device.
 
 Linux ARM64 passed 11 SDK video tests and 110 main-library tests (eight ignored).
 Both shipped ELF files were independently inspected: the plugin requires at most
