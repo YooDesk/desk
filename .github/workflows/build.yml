@@ -368,7 +368,7 @@ jobs:
           path: artifacts/oldworld-engine-*
           if-no-files-found: warn
       - name: Publish immutable third-party native library SDK
-        if: always() && matrix.cross && hashFiles('artifacts/native-sdk/*.tar.xz') != ''
+        if: always() && !inputs.build_only && matrix.cross && hashFiles('artifacts/native-sdk/*.tar.xz') != ''
         uses: softprops/action-gh-release@v2
         with:
           tag_name: native-sdk-v1-${{ matrix.platform }}
