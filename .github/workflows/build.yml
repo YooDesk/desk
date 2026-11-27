@@ -251,6 +251,8 @@ jobs:
           }
           python scripts/build_engine.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python scripts/test_windows_bitmap.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $env:YOODESK_DESK_ENGINE_LIB_DIR="$env:GITHUB_WORKSPACE/desk-engine/target/$env:CARGO_BUILD_TARGET/release"
           cargo build --locked --release --lib
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

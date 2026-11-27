@@ -67,3 +67,6 @@ hwcodec = { path = "../artifacts/hwcodec-patched" }
 
 [patch."https://github.com/rustdesk-org/evdev"]
 evdev = { path = "../artifacts/evdev-patched" }
+
+[patch."https://github.com/rustdesk-org/arboard"]
+arboard = { path = "../artifacts/arboard-patched" }

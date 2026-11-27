@@ -49,7 +49,7 @@ native input/file/clipboard witnesses.
 | Desk basic file navigation, Unicode/empty/duplicate names, 64 small files and 128 MiB bidirectional SHA-256 | Passed | Passed |
 | Desk bidirectional chat and history/read-only protections | Passed | Passed |
 | Desk browser-to-native image RGBA | Passed | Passed |
-| Desk native-to-browser image RGBA | Failed | Failed |
+| Desk native-to-browser image RGBA | Fixed; clipfix passed | Fixed; clipfix passed |
 | Desk clipboard no-echo, viewer read-only pause and server read-only denial | Passed | Passed |
 | RDP changing native pixels, keyboard/mouse and text clipboard | Passed | Passed |
 | RDP five forced reconnects, fresh pixels and input after reconnect | Passed | Passed |
@@ -62,7 +62,7 @@ performed, and this run does not assign a proven cause to Windows throughput.
 Audio, recording/export, privacy screen and cross-network NAT traversal are
 outside this functional suite.
 
-## Confirmed image-clipboard failure
+## Resolved image-clipboard failure
 
 The native fixture writes an opaque 2x2 Windows bitmap. Both its own pixel
 witness and a separate interactive process read the expected native RGBA.
@@ -73,7 +73,40 @@ after the 124-byte header and interprets those masks as pixel data. Browser
 pixels reproduce the resulting mask colors and shifted source pixel.
 
 This establishes a Windows bitmap-reader compatibility failure, rather than
-binary-wire corruption or STUN packet loss. No product fix is included in this
-acceptance run; image clipboard cannot be reported as fully passed. The raw
+binary-wire corruption or STUN packet loss. The follow-up fix below resolves this
+reader failure and the installed candidate now passes both paths. The raw
 sample and independent witness are local test artifacts containing only the
 known test pixels. Other completed results above remain valid.
+
+
+## Installed clipboard fix
+
+Rebuilt and installed `yoodeskclient-0.1.0+clipfix.20261127-windows-x64.exe`,
+SHA256 `8a10ed5e26ac52d2184d9aae58969b6e13fd6f844e330fb6bf4d3d3dcd521bd7`.
+The actual installer again passed all 61 payload-file checks. The native Desk
+engine was rebuilt; configuration, identity, certificates and access/backend
+keys were preserved, plugin hashes checked and the VM account stayed online.
+Backup: `C:/ProgramData/YooDeskLab/upgrade-20261127/before-clipfix`.
+
+For opaque DIBV5 clipboard images, the pinned arboard adapter now reads the
+Windows-owned CF_BITMAP through GDI rather than guessing a pixel offset in a
+synthesized DIB. It leaves the borrowed bitmap handle owned by the clipboard,
+releases the temporary screen DC, bounds output to 16 MiB, validates row
+completion and emits the same raw RGBA binary frame. Explicit-alpha DIBV5
+retains the existing reader and transparency behavior. No PNG/Base64 payload
+fallback was added. The adapter is materialized from the exact pinned Git
+commit into ignored artifacts, without editing Cargo's shared source cache.
+
+All six Windows GDI tests passed: row order/colors at multiple widths, repeated
+reads of the borrowed bitmap, invalid/oversized dimensions, explicit alpha,
+existing missing-alpha handling and color conversion. Windows native CI now
+runs these tests via `scripts/test_windows_bitmap.py` using the pinned crate's
+own immutable test lock.
+
+After the real package upgrade, both LAN and host-to-host STUN passed text
+and image clipboard in both directions, native RGBA pixel checks, no echo,
+viewer read-only pause and server-side read-only rejection. Local reports use
+`windows-clipfix-` prefixes. RDP's plugin and viewer/SDK assets are byte-identical
+to the already accepted build. The test fixture was stopped afterward; the
+canonical service remains online. GitHub CI results are separate from the
+local Windows tests and deployed acceptance reported here.

@@ -149,6 +149,7 @@ def main() -> int:
     # cargo refresh the lock once.
     subprocess.run([sys.executable, str(ROOT / "scripts" / "prepare_nix.py")], env=env, check=True)
     subprocess.run([sys.executable, str(ROOT / "scripts" / "prepare_evdev.py")], env=env, check=True)
+    subprocess.run([sys.executable, str(ROOT / "scripts" / "prepare_arboard.py")], env=env, check=True)
     subprocess.run([sys.executable, str(ROOT / "scripts" / "prepare_ring.py")], env=env, check=True)
     subprocess.run([sys.executable, str(ROOT / "scripts" / "prepare_mozjpeg.py")], env=env, check=True)
     fetch = ["cargo", "fetch", "--locked"]
