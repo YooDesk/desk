@@ -60,6 +60,7 @@ def prepare():
             git(tree, "apply", "--check", "-", input=payload)
             git(tree, "apply", "-", input=payload)
         patch_vram_repeat(tree)
+        patch_interactive_latency(tree)
         if sys.platform == "darwin":
             build_file = tree / "build.rs"
             text = build_file.read_text(encoding="utf-8")
@@ -90,6 +91,7 @@ def patch_vram_repeat(tree):
 
 ''' + anchor)
     source.write_text(text, encoding="utf-8")
+
     source = tree / "cpp/ffmpeg_vram/ffmpeg_vram_encode.cpp"
     text = source.read_text(encoding="utf-8")
     text = text.replace('  AVFrame *frame_ = NULL;', '  AVFrame *frame_ = NULL;\n  bool has_frame_ = false;')
@@ -113,6 +115,27 @@ def patch_vram_repeat(tree):
     if text.count(anchor) != 1:
         raise RuntimeError("Review MediaSDK dispatcher linkage")
     text = text.replace(anchor, anchor + '\n        builder.file(mfx_path.join("windows/src/mfx_driver_store_loader.cpp"));')
+    source.write_text(text, encoding="utf-8")
+
+
+def patch_interactive_latency(tree):
+    """Signal zero reordering in the bitstream, not just zero encoder queue delay."""
+    source = tree / "cpp/common/util.cpp"
+    text = source.read_text(encoding="utf-8")
+    anchor = '    if ((ret = av_opt_set(priv_data, "delay", "0", 0)) < 0) {'
+    if text.count(anchor) != 1:
+        raise RuntimeError("Review NVENC interactive latency options")
+    text = text.replace(anchor, '''    // WebCodecs cannot force AV_CODEC_FLAG_LOW_DELAY on its decoder. The
+    // stream itself must advertise zero reorder delay, or per-frame ACK waits
+    // for pictures that the decoder buffers until subsequent inputs arrive.
+    if (av_opt_set(priv_data, "preset", "p1", 0) < 0 ||
+        av_opt_set(priv_data, "tune", "ull", 0) < 0 ||
+        av_opt_set_int(priv_data, "rc-lookahead", 0, 0) < 0 ||
+        av_opt_set_int(priv_data, "zerolatency", 1, 0) < 0) {
+      LOG_ERROR(std::string("NVENC interactive latency options unavailable"));
+      return false;
+    }
+''' + anchor)
     source.write_text(text, encoding="utf-8")
 
 

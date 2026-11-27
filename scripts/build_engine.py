@@ -73,6 +73,14 @@ def main() -> int:
         overlays.append("rustdesk-windows-keypad-meta.patch")
     for name in overlays:
         overlay = PATCH.parent / name
+        # Later SDK adapters legitimately change context lines (e.g. encoder FPS).
+        # Check both semantic changes instead of treating a failed reverse-context
+        # check as proof that this already-applied overlay is missing.
+        if name == "rustdesk-x265-pixel-format.patch":
+            hardware = (tree / "libs/scrap/src/common/hwcodec.rs").read_text(encoding="utf-8")
+            codec = (tree / "libs/scrap/src/common/codec.rs").read_text(encoding="utf-8")
+            if 'pixfmt: if config.name == "libx265"' in hardware and 'name.contains("h264") || name == "libx264"' in codec:
+                continue
         if subprocess.run(["git", "-C", str(tree), "apply", "--reverse", "--check", "--ignore-space-change", str(overlay)], capture_output=True).returncode:
             subprocess.run(["git", "-C", str(tree), "apply", "--ignore-space-change", str(overlay)], check=True)
     from patch_engine_lifecycle import patch as patch_engine_lifecycle

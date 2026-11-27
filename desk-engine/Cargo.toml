@@ -38,7 +38,7 @@ path = "../artifacts/rustdesk-engine-src/libs/scrap"
 features = ["hwcodec", "vram"]
 
 [target.'cfg(windows)'.dependencies]
-winapi = { version = "0.3", features = ["winuser", "wingdi", "libloaderapi", "processthreadsapi", "errhandlingapi", "fileapi", "winbase"] }
+winapi = { version = "0.3", features = ["winuser", "wingdi", "libloaderapi", "processthreadsapi", "errhandlingapi", "fileapi", "winbase", "shellscalingapi"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 dbus = "0.9"

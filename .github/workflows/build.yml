@@ -179,7 +179,11 @@ jobs:
           directory: ${{ github.workspace }}/artifacts/llvm-x64
       - name: Prepare pinned RustDesk and hwcodec source with YooDesk adapters
         if: runner.os == 'Windows'
-        run: python scripts/prepare_sources.py
+        run: |
+          python scripts/prepare_sources.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python scripts/build_engine.py --prepare-only
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Install CMake required by the RustDesk vcpkg scripts
         if: runner.os == 'Windows'
         run: python -m pip install 'cmake==4.4.0'
@@ -220,6 +224,7 @@ jobs:
           nasm -v
           # Connector 与 WebService 的宿主包由各自的流水线构建；本仓库只产出 Desk 插件。
           python3 scripts/prepare_sources.py
+          python3 scripts/build_engine.py --prepare-only
           export VCPKG_ROOT="$PWD/.ci-cache/vcpkg"
           git -C "$VCPKG_ROOT" rev-parse --verify HEAD >/dev/null 2>&1 || {
             mkdir -p "$VCPKG_ROOT" && git clone --depth 1 https://github.com/microsoft/vcpkg.git "$VCPKG_ROOT"

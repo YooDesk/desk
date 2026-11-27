@@ -95,6 +95,7 @@ if [[ "$kind" == desk ]]; then
         nasm -v
     fi
     python3.13 scripts/prepare_sources.py
+    python3.13 scripts/build_engine.py --prepare-only
     python3.13 scripts/prepare_linux_native.py
     export VCPKG_ROOT=/workspace/artifacts/vcpkg
     export VCPKG_INSTALLED_ROOT="$VCPKG_ROOT/installed"

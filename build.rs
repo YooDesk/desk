@@ -271,6 +271,7 @@ fn link_engine() {
     // 引擎不链接官方 GUI 框架；系统库用于采集/编码/输入/网络及本进程隐私窗口。
     for name in [
         "User32",
+        "shcore",
         "bcrypt",
         "ole32",
         "advapi32",

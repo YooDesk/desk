@@ -89,6 +89,10 @@ pub extern "C" fn yd_engine_init() -> c_int {
     if ENGINE.get().is_some() {
         return YD_OK;
     }
+    // Match RustDesk's Windows executable startup before probing/enumerating
+    // displays: virtualized logical sizes otherwise disable the texture encoder.
+    #[cfg(windows)]
+    unsafe { winapi::um::shellscalingapi::SetProcessDpiAwareness(2); }
     // 只标记本宿主的编码服务；正常SWITCH不应被上游通用service循环计入故障退避。
     std::env::set_var("YOODESK_EMBEDDED_ENGINE", "1");
     // 依赖树的 log 与宿主 tracing 分离；初始化一次，真实采集失败不能静默消失。
