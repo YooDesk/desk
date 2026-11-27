@@ -67,6 +67,7 @@ fn link_engine() {
     for relative in [
         "desk-engine/src/video_bridge.rs",
         "desk-engine/src/video_codec.rs",
+        "desk-engine/src/video_window.rs",
         "scripts/video_pipeline_metrics.rs",
         "scripts/video_pipeline_pacing.rs",
         "scripts/frame_wait.rs",

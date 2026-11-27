@@ -1283,7 +1283,9 @@
     if (!decoder) { return; }
     try {
       state.waitingKey = false;
-      if (state.submitted.size >= 8) { refreshVideo(); return; }
+      // H.264 may legally buffer16 DPB pictures before its first output. Keep a
+      // bounded decode window without resetting such a decoder at picture8.
+      if (state.submitted.size >= 18) { refreshVideo(); return; }
       state.submitted.set(frame.pts, performance.now());
       decoder.decode(new window.EncodedVideoChunk({
         type: frame.key ? 'key' : 'delta',

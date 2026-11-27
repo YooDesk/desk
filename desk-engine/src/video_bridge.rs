@@ -15,7 +15,7 @@ struct Cache {
     cursors: VecDeque<Vec<u8>>,
     last_key: Option<Packet>,
     last_cursor: Option<Vec<u8>>,
-    pending: Option<(i64, Instant)>,
+    pending: crate::video_window::Window,
     epoch: Instant,
     last_pts: i64,
     refresh_at: Instant,
@@ -122,7 +122,7 @@ pub fn subscribe(display: i32, conn: i32, fps: u32, bitrate: u32) -> i32 {
             cursors: VecDeque::new(),
             last_key: None,
             last_cursor: None,
-            pending: None,
+            pending: crate::video_window::Window::default(),
             epoch: Instant::now(),
             last_pts: -1,
             refresh_at: Instant::now(),
@@ -224,21 +224,20 @@ pub fn subscribe(display: i32, conn: i32, fps: u32, bitrate: u32) -> i32 {
                         );
                         continue;
                     }
-                    if c.frames.len() >= 8 {
+                    let pts = (c.epoch.elapsed().as_millis() as i64).max(c.last_pts + 1);
+                    if c.frames.len() >= crate::video_window::MAX_FRAMES || !c.pending.admit(pts, source_at, bytes.len()) {
                         c.frames.clear();
                         c.waiting_key = true;
-                        c.pending = None;
+                        c.pending.clear();
                         drop(c);
                         request_refresh(conn);
                         continue;
                     }
-                    let pts = (c.epoch.elapsed().as_millis() as i64).max(c.last_pts + 1);
                     c.last_pts = pts;
                     if key {
                         c.waiting_key = false;
                         c.last_key = Some((bytes.clone(), key, pts));
                     }
-                    c.pending = Some((pts, source_at));
                     c.frames.push_back((bytes, key, pts));
                     shared.1.notify_all();
                 }
@@ -255,17 +254,15 @@ pub fn ack(conn: i32, pts: i64) -> i32 {
         return YD_ERR_STATE;
     };
     let mut c = shared.0.lock().unwrap();
-    let Some((expected, at)) = c.pending else {
+    let Some(ack) = c.pending.ack(pts) else {
         return YD_OK;
     };
-    if expected != pts {
-        return YD_OK;
-    }
-    c.pending = None;
     let display = c.display;
-    let delay = at.elapsed().as_millis().min(u32::MAX as u128) as u32;
+    let delay = ack.at.elapsed().as_millis().min(u32::MAX as u128) as u32;
     drop(c);
-    librustdesk::video_service::notify_video_frame_fetched(display as usize, conn, None);
+    if ack.release_sdk {
+        librustdesk::video_service::notify_video_frame_fetched(display as usize, conn, None);
+    }
     let mut qos = librustdesk::video_service::VIDEO_QOS.lock().unwrap();
     qos.user_network_delay(conn, delay);
     let fps = qos.fps();
@@ -312,7 +309,7 @@ pub fn request_refresh(conn: i32) -> i32 {
         c.frames.clear();
         c.last_key = None;
         c.waiting_key = true;
-        c.pending = None;
+        c.pending.clear();
         c.refresh_at = refresh_at;
         affected.push(id);
     }
@@ -334,7 +331,7 @@ pub fn replay(conn: i32) -> i32 {
     };
     let mut c = shared.0.lock().unwrap();
     if let Some(key) = c.last_key.clone() {
-        if c.pending.map(|p| p.0) == Some(key.2) {
+        if c.pending.only(key.2) {
             c.frames.clear();
             c.frames.push_back(key);
             shared.1.notify_all();
@@ -401,7 +398,14 @@ pub fn poll(conn: i32, data: *mut u8, cap: usize, frame: *mut Frame, timeout: u6
                     pts: p.2,
                 };
             }
+            let pts = p.2;
             c.frames.pop_front();
+            let release_sdk = c.pending.fetched(pts);
+            let display = c.display;
+            drop(c);
+            if release_sdk {
+                librustdesk::video_service::notify_video_frame_fetched(display as usize, conn, None);
+            }
             return YD_OK;
         }
         if c.closed {

@@ -36,6 +36,7 @@ mod privacy;
 mod privileged;
 mod video_bridge;
 mod video_codec;
+mod video_window;
 #[cfg(test)]
 #[path = "../../scripts/video_pipeline_pacing.rs"]
 mod video_pacing_tests;

@@ -1,0 +1,14 @@
+diff --git a/libavcodec/nvenc.c b/libavcodec/nvenc.c
+--- a/libavcodec/nvenc.c
++++ b/libavcodec/nvenc.c
+@@ -1212,5 +1212,10 @@ static av_cold int nvenc_setup_h264_config(AVCodecContext *avctx)
+     NV_ENC_CONFIG_H264_VUI_PARAMETERS *vui = &h264->h264VUIParameters;
+ 
++    /* Without explicit restriction parameters a conforming decoder can infer
++     * the level's full DPB reorder depth, even when no B pictures are encoded. */
++    if (ctx->zerolatency && !avctx->max_b_frames)
++        vui->bitstreamRestrictionFlag = 1;
++
+     const AVPixFmtDescriptor *pixdesc = av_pix_fmt_desc_get(ctx->data_pix_fmt);
+ 
+     if ((pixdesc->flags & AV_PIX_FMT_FLAG_RGB) && !IS_GBRP(ctx->data_pix_fmt)) {

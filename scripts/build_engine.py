@@ -92,10 +92,22 @@ def main() -> int:
     # Included in vcpkg's port ABI: rebuild native FFmpeg instead of restoring the
     # earlier software-only/native-codec caches under an unchanged port hash.
     port = tree / "res/vcpkg/ffmpeg/portfile.cmake"
-    native_revision = "# YooDesk native video ABI: hardware-first-144-v1\n"
+    native_revision = "# YooDesk native video ABI: hardware-first-144-v2\n"
     port_text = port.read_text(encoding="utf-8")
-    if native_revision not in port_text:
-        port.write_text(native_revision + port_text, encoding="utf-8")
+    normalized = ''.join(line for line in port_text.splitlines(keepends=True) if not line.startswith("# YooDesk native video ABI:"))
+    native_patch = "patch/yoodesk-nvenc-zero-reorder-vui.patch"
+    if native_patch not in normalized:
+        anchor = "    patch/0015-fix-hybrid-mp4-finalization.patch\n"
+        if normalized.count(anchor) != 1:
+            raise RuntimeError("Review pinned FFmpeg patch list")
+        normalized = normalized.replace(anchor, anchor + "    " + native_patch + "\n")
+    normalized = native_revision + normalized
+    if normalized != port_text:
+        port.write_text(normalized, encoding="utf-8")
+    native_patch_path = port.parent / native_patch
+    native_patch_content = (ROOT / "engine-patches/ffmpeg-nvenc-zero-reorder-vui.patch").read_text(encoding="utf-8")
+    if not native_patch_path.exists() or native_patch_path.read_text(encoding="utf-8") != native_patch_content:
+        native_patch_path.write_text(native_patch_content, encoding="utf-8")
 
     if sys.platform == "linux":
         from patch_uinput_keyboard import patch_keyboard
