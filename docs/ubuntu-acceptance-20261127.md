@@ -46,7 +46,8 @@ been eliminated. No further physical-link tuning is required by the user.
 
 - The basic file suite omits legacy JSON fault-injection hooks. It is not a
   claim that the original complete fault-injection suite passed.
-- The original acceptance ran on Wayland. Portal capture worked; DRM capture failed.
+- The original acceptance ran on Wayland. Portal capture worked; DRM capture failed
+  in the original accelerated VMware setup; the later no-3D result is below.
   The later X11 regression below ran after the user changed the desktop session.
 - Wayland keyboard input is fixed. The product-specific virtual keyboard now
   receives active-seat access through a scoped udev/logind rule; physical input
@@ -96,3 +97,45 @@ resumed. Legacy file fault-injection hooks remain outside this basic suite.
 Chat testing used a separate SSH forwarding port with the original admin
 Host/Origin preserved; a changed port correctly triggered Host validation.
 Reports are saved locally with the `retest-ubuntu-x11-` prefix.
+
+
+## Wayland DRM regression with VMware 3D acceleration disabled
+
+After disabling VMware 3D acceleration, the user initially saw a black desktop.
+The GNOME user session was still running, using vmwgfx atomic KMS. Backed up
+and removed the stale monitor configuration and installed this user-scoped
+GNOME Shell Wayland service drop-in:
+
+```ini
+# ~/.config/systemd/user/org.gnome.Shell@wayland.service.d/60-vmware-no3d-kms.conf
+[Service]
+Environment=MUTTER_DEBUG_FORCE_KMS_MODE=simple
+```
+
+After restarting GDM and the user logging in, GNOME logged non-atomic mode
+setting. This retains Wayland and DRM; it does not enable VMware 3D acceleration.
+Monitor/configuration backups are under
+`~/yoodesk-acceptance-20261127/wayland-no3d-recovery`. To undo the KMS override,
+remove that drop-in, reload the user systemd manager, then log in again.
+
+Enabled only `enable_drm` in the existing service configuration, preserving
+identity/account settings. The preceding config is backed up at
+`/var/backups/yoodesk-acceptance-20261127/config-before-drm-no3d.json`.
+Verified a root DRM helper, an active Wayland desktop worker with
+`YOODESK_ENGINE_DRM_ENABLED=1`, and online Connector before/after the tests.
+The DRM profile disables the native Portal capture branch.
+
+Both LAN and host-to-host UDP STUN passed native changing-pixel video checks,
+keyboard/mouse input, text and image clipboard with native RGBA checks,
+read-only enforcement, viewer mode switches, network recovery, three forced
+reconnects, basic files and bidirectional chat/history. The file suite included
+64 small files and 128 MiB uploads/downloads with SHA-256 integrity checks.
+Observed UI-completion speeds were about 103/96 MiB/s LAN and 48/35 MiB/s
+STUN upload/download; the physical-link limit remains accepted, rather than
+claiming the old 40 MiB/s download gate passed.
+
+System audio also passed on both paths: the Ubuntu host played a native test
+tone and the browser decoded real audio with nonzero energy. This checks audio
+capture/transport/decoding, not a recording/export or a listening-quality test.
+Reports use the local `retest-ubuntu-drm-` prefix. The GTK/audio fixtures were
+stopped after acceptance; the service is left online in Wayland DRM mode.
