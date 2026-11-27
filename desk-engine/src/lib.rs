@@ -35,6 +35,7 @@ mod privacy;
 #[cfg(target_os = "linux")]
 mod privileged;
 mod video_bridge;
+mod video_codec;
 #[cfg(target_os = "linux")]
 mod wayland_portal;
 
@@ -77,7 +78,7 @@ pub extern "C" fn yd_engine_linux_wayland_probe() -> ! {
     base::platform::linux::wayland_display_probe_child_main()
 }
 
-/// 初始化进程级引擎：注册软件编码器，准备运行时。
+/// 初始化进程级引擎：探测硬件编码并保留软件回退，准备运行时。
 ///
 /// 必须在其它函数之前调用一次；重复调用是幂等的。
 #[no_mangle]
@@ -112,9 +113,7 @@ pub extern "C" fn yd_engine_init() -> c_int {
         }
         std::thread::spawn(librustdesk::ipc::start_pa);
     }
-    // 没有 GPU 的机器上上游探测返回空列表，H.264 会静默回落到 VP9；显式注册软编码。
-    #[cfg(not(target_os = "macos"))]
-    librustdesk::video_service::register_software_encoders();
+    video_codec::initialize();
     #[cfg(target_os = "macos")]
     {
         if !librustdesk::platform::is_root() {
@@ -123,17 +122,6 @@ pub extern "C" fn yd_engine_init() -> c_int {
                 return YD_ERR_STATE;
             }
         }
-        use scrap::raw_hwcodec::ffmpeg_ram::{CodecInfo, Priority};
-        // macOS 的 FFmpeg 只构建了 VideoToolbox H.264；不能注册不存在的 libx264。
-        let mut encoder = CodecInfo::default();
-        encoder.name = "h264_videotoolbox".into();
-        encoder.priority = Priority::Best as i32;
-        let config = scrap::hwcodec::HwCodecConfig {
-            signature: 0,
-            ram_encode: vec![encoder],
-            ram_decode: Vec::new(),
-        };
-        scrap::hwcodec::HwCodecConfig::set(serde_json::to_string(&config).unwrap());
     }
     // 本产品只消费 H.264（浏览器 WebCodecs `avc1`），必须显式声明偏好；
     // 引擎的默认协商会选 VP9。

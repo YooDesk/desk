@@ -59,6 +59,13 @@ def prepare():
             payload = (patch_dir / patch).read_text(encoding="utf-8").encode("utf-8")
             git(tree, "apply", "--check", "-", input=payload)
             git(tree, "apply", "-", input=payload)
+        patch_vram_repeat(tree)
+        if sys.platform == "darwin":
+            build_file = tree / "build.rs"
+            text = build_file.read_text(encoding="utf-8")
+            text = text.replace('let mut static_libs = vec!["avcodec", "avutil", "avformat"];',
+                                'let mut static_libs = vec!["avcodec", "avutil", "avformat"];\n            if target_os == "macos" { static_libs.push("x264"); }')
+            build_file.write_text(text, encoding="utf-8")
         for source_file in tree.rglob("*"):
             relative = source_file.relative_to(tree)
             if relative.parts[0] == ".git" or not source_file.is_file():
@@ -67,6 +74,46 @@ def prepare():
             target_file.parent.mkdir(parents=True, exist_ok=True)
             copy_changed(source_file, target_file)
     print(f"hwcodec {commit} prepared at {destination}")
+
+
+def patch_vram_repeat(tree):
+    """Repeat the encoder-owned GPU frame, never a released DXGI texture pointer."""
+    source = tree / "src/vram/encode.rs"
+    text = source.read_text(encoding="utf-8")
+    anchor = '    extern "C" fn callback('
+    if text.count(anchor) != 1:
+        raise RuntimeError("Review hwcodec VRAM callback adapter")
+    text = text.replace(anchor, '''    pub fn encode_repeat(&mut self, ms: i64) -> Result<&mut Vec<EncodeFrame>, i32> {
+        if self.ctx.f.driver != FFMPEG { return Err(-1); }
+        self.encode(std::ptr::null_mut(), ms)
+    }
+
+''' + anchor)
+    source.write_text(text, encoding="utf-8")
+    source = tree / "cpp/ffmpeg_vram/ffmpeg_vram_encode.cpp"
+    text = source.read_text(encoding="utf-8")
+    text = text.replace('  AVFrame *frame_ = NULL;', '  AVFrame *frame_ = NULL;\n  bool has_frame_ = false;')
+    old = '''    if (!convert(texture))
+      return -1;
+
+    return do_encode(callback, obj, ms);'''
+    new = '''    if (texture) {
+      if (!convert(texture)) return -1;
+      has_frame_ = true;
+    } else if (!has_frame_) {
+      return -1;
+    }
+    return do_encode(callback, obj, ms);'''
+    if text.count(old) != 1:
+        raise RuntimeError("Review hwcodec GPU-frame ownership for repeat encoding")
+    source.write_text(text.replace(old, new), encoding="utf-8")
+    source = tree / "build.rs"
+    text = source.read_text(encoding="utf-8")
+    anchor = '        builder.include(mfx_path.join("windows").join("include"));'
+    if text.count(anchor) != 1:
+        raise RuntimeError("Review MediaSDK dispatcher linkage")
+    text = text.replace(anchor, anchor + '\n        builder.file(mfx_path.join("windows/src/mfx_driver_store_loader.cpp"));')
+    source.write_text(text, encoding="utf-8")
 
 
 if __name__ == "__main__":

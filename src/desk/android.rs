@@ -24,6 +24,11 @@ struct State {
     sequence: u64,
     latest: Option<Arc<RgbaFrame>>,
     waiting: usize,
+    encoded_mode: bool,
+    encoded: Option<Arc<super::encode::EncodedFrame>>,
+    encoder_fps: u32,
+    encoder_bitrate: u32,
+    request_keyframe: bool,
 }
 
 static STATE: Mutex<State> = Mutex::new(State {
@@ -32,6 +37,11 @@ static STATE: Mutex<State> = Mutex::new(State {
     sequence: 0,
     latest: None,
     waiting: 0,
+    encoded_mode: false,
+    encoded: None,
+    encoder_fps: 144,
+    encoder_bitrate: 4_000_000,
+    request_keyframe: false,
 });
 static CHANGED: Condvar = Condvar::new();
 static INPUT: Mutex<(bool, VecDeque<Vec<u8>>)> = Mutex::new((false, VecDeque::new()));
@@ -120,6 +130,8 @@ pub extern "C" fn yd_android_capture_start() -> u64 {
     state.active = true;
     state.waiting = 0;
     state.latest = None;
+    state.encoded_mode = false;
+    state.encoded = None;
     INPUT.lock().unwrap().1.clear();
     CHANGED.notify_all();
     state.epoch
@@ -150,7 +162,8 @@ pub extern "C" fn yd_android_capture_deny(epoch: u64) {
 /// 当前录屏授权是否已经交付首帧。
 #[no_mangle]
 pub extern "C" fn yd_android_capture_ready() -> bool {
-    STATE.lock().unwrap().latest.is_some()
+    let state = STATE.lock().unwrap();
+    state.latest.is_some() && (!state.encoded_mode || state.encoded.is_some())
 }
 
 /// 停止指定代录屏；迟到的系统回调不影响新一代。
@@ -160,6 +173,8 @@ pub extern "C" fn yd_android_capture_stop(epoch: u64) {
     if state.active && state.epoch == epoch {
         state.active = false;
         state.latest = None;
+        state.encoded = None;
+        state.encoded_mode = false;
         let mut input = INPUT.lock().unwrap();
         input.1.clear();
         if input.0 {
@@ -263,7 +278,7 @@ impl Backend for AndroidBackend {
 
     fn capabilities(&self) -> DeskCapabilities {
         let mut capabilities = DeskCapabilities::none();
-        let ready = STATE.lock().unwrap().latest.is_some();
+        let ready = yd_android_capture_ready();
         capabilities.capture = ready && self.supports_h264();
         capabilities.displays = ready;
         capabilities.h264 = capabilities.capture;
@@ -311,6 +326,7 @@ impl Backend for AndroidBackend {
             geometry,
             epoch,
             sequence: None,
+            encoded_waiting_key: true,
             consent_deadline: waiting.then(|| Instant::now() + CONSENT_TIMEOUT),
         }))
     }
@@ -334,6 +350,7 @@ struct AndroidCapturer {
     geometry: DisplayGeometry,
     epoch: u64,
     sequence: Option<u64>,
+    encoded_waiting_key: bool,
     consent_deadline: Option<Instant>,
 }
 
@@ -393,6 +410,45 @@ impl Drop for AndroidCapturer {
 }
 
 impl Capturer for AndroidCapturer {
+    fn configure_encoder(&mut self, settings: super::encode::EncoderSettings) {
+        let mut state = STATE.lock().unwrap();
+        state.encoder_fps = settings.fps.clamp(1, 144);
+        state.encoder_bitrate = settings.bitrate_bps.clamp(200_000, 100_000_000);
+        state.request_keyframe = true;
+    }
+
+    fn request_encoded_keyframe(&mut self) -> bool {
+        let mut state = STATE.lock().unwrap();
+        if state.encoded_mode || self.waiting_for_consent(&state) {
+            state.request_keyframe = true;
+            true
+        } else { false }
+    }
+
+    fn next_encoded(&mut self, timeout: Duration) -> Option<io::Result<super::encode::EncodedFrame>> {
+        let (mut state, _) = CHANGED.wait_timeout_while(STATE.lock().unwrap(), timeout, |s| {
+            self.waiting_for_consent(s) || (s.active && s.epoch == self.epoch && s.encoded_mode && (s.encoded.is_none() || self.sequence == Some(s.sequence)))
+        }).unwrap();
+        if self.waiting_for_consent(&state) {
+            return Some(Err(io::ErrorKind::WouldBlock.into()));
+        }
+        if !state.active || state.epoch != self.epoch {
+            return Some(Err(io::ErrorKind::BrokenPipe.into()));
+        }
+        if !state.encoded_mode { return None; }
+        let Some(encoded) = state.encoded.clone() else { return Some(Err(io::ErrorKind::WouldBlock.into())); };
+        if self.sequence == Some(state.sequence) { return Some(Err(io::ErrorKind::WouldBlock.into())); }
+        let contiguous = self.sequence.is_some_and(|n| n + 1 == state.sequence);
+        self.sequence = Some(state.sequence);
+        if !encoded.key && (!contiguous || self.encoded_waiting_key) {
+            self.encoded_waiting_key = true;
+            state.request_keyframe = true;
+            return Some(Err(io::ErrorKind::WouldBlock.into()));
+        }
+        if encoded.key { self.encoded_waiting_key = false; }
+        if let Some(frame) = &state.latest { self.geometry = geometry(frame); }
+        Some(Ok((*encoded).clone()))
+    }
     fn first_frame_timeout(&self) -> Option<Duration> {
         Some(FIRST_FRAME_TIMEOUT)
     }
@@ -411,12 +467,66 @@ impl Capturer for AndroidCapturer {
     }
 }
 
+/// Version 1 Surface/MediaCodec bridge. Pixels stay in Android's graphics pipeline.
+#[no_mangle]
+pub extern "C" fn yd_android_encoded_start_v1(width: u32, height: u32) -> u64 {
+    if width < 2 || height < 2 || width as u64 * height as u64 * 4 > MAX_FRAME_BYTES as u64 { return 0; }
+    let epoch = yd_android_capture_start();
+    let mut state = STATE.lock().unwrap();
+    state.encoded_mode = true;
+    state.request_keyframe = true;
+    state.latest = Some(Arc::new(RgbaFrame { display: 0, width, height, data: vec![], captured_at: SystemTime::now() }));
+    CHANGED.notify_all();
+    epoch
+}
+
+/// # Safety
+/// data points to len readable Annex B bytes for this call only.
+#[no_mangle]
+pub unsafe extern "C" fn yd_android_encoded_frame_v1(epoch: u64, pts_us: i64, key: bool, data: *const u8, len: usize) -> i32 {
+    if data.is_null() || len == 0 || len > 8 << 20 || pts_us < 0 { return -1; }
+    let mut state = STATE.lock().unwrap();
+    if !state.active || !state.encoded_mode || state.epoch != epoch { return 0; }
+    let bytes = unsafe { std::slice::from_raw_parts(data, len) };
+    if !bytes.starts_with(&[0, 0, 0, 1]) && !bytes.starts_with(&[0, 0, 1]) { return -1; }
+    let pts_ms = state.encoded.as_ref().map_or(pts_us / 1000, |previous| (pts_us / 1000).max(previous.pts_ms + 1));
+    state.encoded = Some(Arc::new(super::encode::EncodedFrame { data: bytes.to_vec(), key, pts_ms }));
+    state.sequence += 1;
+    CHANGED.notify_all();
+    1
+}
+
+/// # Safety
+/// out points to three writable u32 values: FPS, bitrate, request-IDR flag.
+#[no_mangle]
+pub unsafe extern "C" fn yd_android_encoder_settings_v1(out: *mut u32) -> i32 {
+    if out.is_null() { return -1; }
+    let mut state = STATE.lock().unwrap();
+    let values = [state.encoder_fps, state.encoder_bitrate, u32::from(state.request_keyframe)];
+    state.request_keyframe = false;
+    unsafe { std::ptr::copy_nonoverlapping(values.as_ptr(), out, 3); }
+    0
+}
+
+/// Preserve the already granted projection and active subscriptions on hardware failure.
+#[no_mangle]
+pub extern "C" fn yd_android_encoder_fallback_v1(epoch: u64) -> bool {
+    let mut state = STATE.lock().unwrap();
+    if !state.active || state.epoch != epoch || !state.encoded_mode { return false; }
+    state.encoded_mode = false;
+    state.encoded = None;
+    state.latest = None;
+    CHANGED.notify_all();
+    true
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[tokio::test]
     async fn padded_frames_reach_both_viewers_and_old_projection_cannot_publish() {
+        surface_frames_preserve_consent_and_recover_from_gaps_and_hardware_failure();
         let old = yd_android_capture_start();
         let mut rgba = [99; 44];
         rgba[..8].copy_from_slice(&[1, 2, 3, 4, 5, 6, 7, 8]);
@@ -567,5 +677,39 @@ mod tests {
         assert!(rgb[right + 2] > 150 && rgb[right] < 80);
         yd_android_capture_stop(pending);
         session.close("fixture_done");
+    }
+
+    fn surface_frames_preserve_consent_and_recover_from_gaps_and_hardware_failure() {
+        let epoch = yd_android_encoded_start_v1(64, 64);
+        assert!(!yd_android_capture_ready());
+        let mut viewer = AndroidBackend.create_capturer(0).unwrap();
+        viewer.configure_encoder(super::super::encode::EncoderSettings { fps: 144, ..Default::default() });
+        let key = [0, 0, 0, 1, 0x65, 7];
+        let delta = [0, 0, 0, 1, 0x41, 8];
+        let publish = |keyframe, data: &[u8]| unsafe { yd_android_encoded_frame_v1(epoch, 1_000, keyframe, data.as_ptr(), data.len()) };
+        assert_eq!(publish(true, &key), 1);
+        assert!(yd_android_capture_ready());
+        assert!(viewer.next_encoded(Duration::ZERO).unwrap().unwrap().key);
+        // Two frames arriving before a poll creates a prediction gap.
+        assert_eq!(publish(false, &delta), 1);
+        assert_eq!(publish(false, &delta), 1);
+        assert_eq!(viewer.next_encoded(Duration::ZERO).unwrap().unwrap_err().kind(), io::ErrorKind::WouldBlock);
+        let mut settings = [0; 3];
+        assert_eq!(unsafe { yd_android_encoder_settings_v1(settings.as_mut_ptr()) }, 0);
+        assert_eq!(settings[0], 144);
+        assert_eq!(settings[2], 1);
+        assert_eq!(publish(false, &delta), 1);
+        assert!(viewer.next_encoded(Duration::ZERO).unwrap().is_err());
+        assert_eq!(publish(true, &key), 1);
+        assert!(viewer.next_encoded(Duration::ZERO).unwrap().unwrap().key);
+        assert!(yd_android_encoder_fallback_v1(epoch));
+        assert!(viewer.next_encoded(Duration::ZERO).is_none());
+        assert_eq!(publish(true, &key), 0);
+        let raw = [0u8; 64 * 64 * 4];
+        assert_eq!(unsafe { yd_android_capture_frame(epoch, 64, 64, 256, raw.as_ptr(), raw.len()) }, 1);
+        assert_eq!(viewer.next_frame(Duration::ZERO).unwrap().data.len(), raw.len());
+        yd_android_capture_stop(epoch);
+        assert_eq!(viewer.next_encoded(Duration::ZERO).unwrap().unwrap_err().kind(), io::ErrorKind::BrokenPipe);
+        assert!(!yd_android_capture_ready());
     }
 }

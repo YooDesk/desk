@@ -30,6 +30,31 @@ python ci/package.py desk --platform linux-x64
 `YOODESK_DESK_ENGINE_LIB_DIR` 必须指向独立引擎的 `target/<target>/release`。
 本库含 RustDesk，按 AGPL-3.0 分发；不编译 Flutter/Sciter 官方 UI。
 
+## Hardware video and high refresh rates
+
+The desktop SDK probes RustDesk's hardware encoders and keeps software H.264 at
+lowest priority. Windows x86/x64 enables RustDesk's `vram` feature so DXGI textures
+can stay on the GPU through encoding. Linux uses the available NVENC/VAAPI/AMF
+path, and macOS uses VideoToolbox. Hardware initialization or encoding failures
+retain H.264 software fallback instead of switching browser sessions to VP9.
+The macOS FFmpeg build includes libx264 alongside VideoToolbox.
+
+Android's host adapter uses MediaProjection directly into a hardware MediaCodec
+Surface when supported, then switches to the existing raw-capture/OpenH264 path
+on failure. This adapter requires the matching Desk component's versioned
+`yd_android_*_v1` encoded-video bridge. Permission revocation and capture epochs
+remain authoritative across fallback.
+
+Set `fps` to a value in `1..=144` in the WebService configuration. This is a
+target, not a claim about capture, encoder, display, or viewer throughput.
+Existing explicit configuration and the default 20 FPS are preserved.
+`YOODESK_VIDEO_PIPELINE_DIAGNOSTICS=1` logs actual captured/encoded FPS and stage
+times. `YOODESK_VIDEO_ENCODER=software` selects the software diagnostic path.
+
+Native dependencies follow the pinned RustDesk workflow's vcpkg manifest and
+static target triplets. CI uses a new native-video cache generation and audits
+FFmpeg archives for the required encoder symbols before accepting them.
+
 ## macOS
 
 macOS 原生支持来自上游 `b9fc78a`：引擎使用 VideoToolbox H.264，文件操作锚定目录描述符，

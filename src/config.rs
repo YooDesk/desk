@@ -191,8 +191,8 @@ impl Config {
         if self.max_sessions == 0 {
             return Err(ConfigError::Invalid("max_sessions must be > 0".into()));
         }
-        if self.fps == 0 || self.fps > 60 {
-            return Err(ConfigError::Invalid("fps must be 1..=60".into()));
+        if self.fps == 0 || self.fps > 144 {
+            return Err(ConfigError::Invalid("fps must be 1..=144".into()));
         }
         if self.bitrate_bps < 200_000 || self.bitrate_bps > 100_000_000 {
             return Err(ConfigError::Invalid(
@@ -265,6 +265,13 @@ pub(crate) mod tests {
     #[test]
     fn valid_config_passes() {
         assert!(test_config().validate().is_ok());
+    }
+
+    #[test]
+    fn high_refresh_rate_bounds() {
+        let mut config = test_config();
+        for fps in [1, 60, 120, 144] { config.fps = fps; assert!(config.validate().is_ok()); }
+        for fps in [0, 145, u32::MAX] { config.fps = fps; assert!(config.validate().is_err()); }
     }
 
     #[test]

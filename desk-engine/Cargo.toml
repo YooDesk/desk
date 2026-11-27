@@ -8,6 +8,7 @@ description = "YooDesk desk engine: RustDesk endpoint capabilities behind a smal
 # 独立 workspace：RustDesk 的依赖图（含其 fork 的 webrtc/tungstenite）与 WebService 自身
 # 的依赖图互不影响。产物是静态库，只由 desk 插件链接。
 [workspace]
+resolver = "2"
 
 [lib]
 name = "yoodesk_desk_engine"
@@ -26,6 +27,15 @@ arboard = { git = "https://github.com/rustdesk-org/arboard", features = ["waylan
 log = "0.4"
 protobuf = "3.7"
 tokio = { version = "1", features = ["rt-multi-thread", "sync", "time", "macros"] }
+
+[target.'cfg(all(windows, any(target_arch = "x86", target_arch = "x86_64")))'.dependencies.rustdesk]
+path = "../artifacts/rustdesk-engine-src"
+default-features = false
+features = ["hwcodec", "vram", "headless"]
+
+[target.'cfg(all(windows, any(target_arch = "x86", target_arch = "x86_64")))'.dependencies.scrap]
+path = "../artifacts/rustdesk-engine-src/libs/scrap"
+features = ["hwcodec", "vram"]
 
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3", features = ["winuser", "wingdi", "libloaderapi", "processthreadsapi", "errhandlingapi", "fileapi", "winbase"] }

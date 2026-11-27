@@ -1,6 +1,11 @@
 name: Build and release Android component
 on:
   workflow_dispatch:
+    inputs:
+      build_only:
+        description: Compile and validate without publishing a release
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
@@ -45,8 +50,8 @@ jobs:
             artifacts/android/vcpkg-installed/
             artifacts/android/vcpkg-build/
             ~/.cache/vcpkg/archives/
-          key: android-desk-rust199-ndk26-v1-${{ hashFiles('Cargo.lock', 'dependencies.lock.json', 'engine-patches/android-frame-sink.rs', 'ci/android.py', 'scripts/android_capture.py') }}-${{ github.sha }}
-          restore-keys: android-desk-rust199-ndk26-v1-
+          key: android-desk-rust199-ndk26-video144-v2-${{ hashFiles('Cargo.lock', 'dependencies.lock.json', 'src/desk/android.rs', 'engine-patches/android-frame-sink.rs', 'ci/android.py', 'scripts/android_capture.py') }}-${{ github.sha }}
+          restore-keys: android-desk-rust199-ndk26-video144-v2-
       - name: Build browser assets
         run: |
           npm ci --prefix frontend --ignore-scripts
@@ -77,6 +82,7 @@ jobs:
           path: dist/*android-arm64.zip*
           if-no-files-found: error
   release:
+    if: ${{ !inputs.build_only }}
     needs: android
     runs-on: ubuntu-24.04-arm
     permissions:

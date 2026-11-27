@@ -66,6 +66,8 @@ fn link_engine() {
     let built_at = std::fs::metadata(&library).unwrap().modified().unwrap();
     for relative in [
         "desk-engine/src/video_bridge.rs",
+        "desk-engine/src/video_codec.rs",
+        "scripts/video_pipeline_metrics.rs",
         "scripts/frame_wait.rs",
         "artifacts/rustdesk-engine-src/yoodesk_frame_wait.rs",
         "artifacts/rustdesk-engine-src/src/server/video_qos.rs",

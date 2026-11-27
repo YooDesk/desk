@@ -73,7 +73,7 @@ fn display_dimensions(display: i32) -> Result<(usize, usize), String> {
 
 pub fn subscribe(display: i32, conn: i32, fps: u32, bitrate: u32) -> i32 {
     let _lifecycle = LIFECYCLE.lock().unwrap();
-    if !(1..=60).contains(&fps) || !(200_000..=100_000_000).contains(&bitrate) {
+    if !(1..=144).contains(&fps) || !(200_000..=100_000_000).contains(&bitrate) {
         return YD_ERR_ARG;
     }
     #[cfg(target_os = "linux")]

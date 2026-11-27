@@ -14,6 +14,10 @@ on:
         description: Audit the selected cross sysroot without compiling the engine
         type: boolean
         default: false
+      build_only:
+        description: Compile and validate without publishing a release
+        type: boolean
+        default: false
       source_ref:
         description: Exact source commit when reusing completed platforms after a build-only fix
         type: string
@@ -140,8 +144,8 @@ jobs:
             .ci-cache/vcpkg/
             target/
             desk-engine/target/
-          key: native-desk-${{ matrix.platform }}-rust199-ubuntu18-v2-${{ hashFiles('**/Cargo.lock', 'engine-patches/**', 'scripts/*.py', 'ci/linux-build.sh', 'ci/*.py', 'ci/cross-*.sh', 'ci/triplets/**') }}-${{ github.run_id }}
-          restore-keys: native-desk-${{ matrix.platform }}-rust199-ubuntu18-v2-
+          key: native-desk-${{ matrix.platform }}-rust199-ubuntu18-video144-v3-${{ hashFiles('**/Cargo.lock', 'engine-patches/**', 'scripts/*.py', 'scripts/*.rs', 'ci/linux-build.sh', 'ci/*.py', 'ci/cross-*.sh', 'ci/triplets/**') }}-${{ github.run_id }}
+          restore-keys: native-desk-${{ matrix.platform }}-rust199-ubuntu18-video144-v3-
       - uses: actions/setup-python@v5
         if: runner.os == 'Windows'
         with:
@@ -198,6 +202,8 @@ jobs:
           $env:VCPKG_BINARY_SOURCES="clear;x-gha,readwrite;files,$binaryCache,readwrite"
           & "$env:VCPKG_ROOT/vcpkg.exe" install --triplet '${{ matrix.triplet }}' --host-triplet '${{ matrix.triplet }}' --x-install-root="$env:VCPKG_ROOT/installed"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python "$env:GITHUB_WORKSPACE/scripts/check_video_native.py" "$env:VCPKG_ROOT/installed/${{ matrix.triplet }}/lib/avcodec.lib" '${{ matrix.platform }}'
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Build macOS native code and run tests
         if: matrix.macos
@@ -224,9 +230,11 @@ jobs:
           python3 scripts/prepare_vcpkg_downloads.py "$VCPKG_ROOT"
           export VCPKG_INSTALLED_ROOT="$VCPKG_ROOT/installed"
           export VCPKGRS_TRIPLET='${{ matrix.triplet }}'
+          python3 scripts/prepare_macos_native.py artifacts/rustdesk-engine-src
           "$VCPKG_ROOT/vcpkg" install --triplet '${{ matrix.triplet }}' --host-triplet '${{ matrix.triplet }}' \
             --x-manifest-root=artifacts/rustdesk-engine-src --x-install-root="$VCPKG_INSTALLED_ROOT"
           python3 scripts/build_engine.py
+          python3 scripts/check_video_native.py "$VCPKG_INSTALLED_ROOT/${{ matrix.triplet }}/lib/libavcodec.a" '${{ matrix.platform }}'
           export YOODESK_DESK_ENGINE_LIB_DIR="$PWD/desk-engine/target/${{ matrix.target }}/release"
           cargo build --locked --release --lib --target '${{ matrix.target }}'
           # 两个架构都在原生 runner 上，测试与打包都能执行。
@@ -384,7 +392,7 @@ jobs:
           path: .ci-cache/tools/
           key: ${{ steps.linux-tools.outputs.cache-primary-key }}
   release:
-    if: github.event_name != 'pull_request' && !inputs.audit_only && (github.event_name != 'workflow_dispatch' || inputs.platform == 'all')
+    if: github.event_name != 'pull_request' && !inputs.audit_only && !inputs.build_only && (github.event_name != 'workflow_dispatch' || inputs.platform == 'all')
     needs: [native, targets]
     runs-on: ubuntu-24.04-arm
     permissions:

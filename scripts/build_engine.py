@@ -79,6 +79,15 @@ def main() -> int:
     patch_engine_lifecycle(tree)
     from patch_video_frame_wait import patch as patch_video_frame_wait
     patch_video_frame_wait(tree)
+    from patch_video_pipeline import patch as patch_video_pipeline
+    patch_video_pipeline(tree)
+    # Included in vcpkg's port ABI: rebuild native FFmpeg instead of restoring the
+    # earlier software-only/native-codec caches under an unchanged port hash.
+    port = tree / "res/vcpkg/ffmpeg/portfile.cmake"
+    native_revision = "# YooDesk native video ABI: hardware-first-144-v1\n"
+    port_text = port.read_text(encoding="utf-8")
+    if native_revision not in port_text:
+        port.write_text(native_revision + port_text, encoding="utf-8")
 
     if sys.platform == "linux":
         from patch_uinput_keyboard import patch_keyboard

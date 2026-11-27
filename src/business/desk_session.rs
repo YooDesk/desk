@@ -949,6 +949,7 @@ impl DeskSessionManager {
                     return;
                 }
             };
+            capturer.configure_encoder(encoder_settings);
             // 引擎后端自带编码：不创建本产品的 H.264 编码器，改为拉取引擎码流。
             #[cfg(feature = "desk-engine")]
             let engine = backend.as_any_engine();
@@ -989,6 +990,8 @@ impl DeskSessionManager {
             // 光标来源与采集器同线程创建：两者都依赖平台桌面会话状态。
             let mut cursor = backend.cursor_source();
             let mut first_frame = true;
+            let media_epoch = std::time::Instant::now();
+            let mut last_output_pts = -1i64;
             let display_name = capturer.geometry().name.clone();
             tracing::info!(
                 session = %session.id,
@@ -1030,7 +1033,8 @@ impl DeskSessionManager {
                 }
                 // 新观众加入：编码一次当前画面并标记为关键帧。
                 while keyframe_requests.try_recv().is_ok() {
-                    match capture_snapshot(&mut capturer, &mut encoder, &session) {
+                    if capturer.request_encoded_keyframe() { continue; }
+                    match capture_snapshot(&mut capturer, &mut encoder, &session, media_epoch, &mut last_output_pts) {
                         Ok(true) => first_frame = false,
                         Ok(false) => {}
                         Err(err) => {
@@ -1071,10 +1075,36 @@ impl DeskSessionManager {
                         }
                     }
                 }
+                if let Some(result) = capturer.next_encoded(CAPTURE_TIMEOUT) {
+                    match result {
+                        Ok(mut encoded) => {
+                            stamp_encoded(&mut encoded, media_epoch, &mut last_output_pts);
+                            let geometry = capturer.geometry();
+                            if let Some(message) = to_message(&encoded, geometry.width, geometry.height) {
+                                if first_frame {
+                                    if !encoded.key { continue; }
+                                    first_frame = false;
+                                    attach_deadline = Some(std::time::Instant::now() + STREAM_ATTACH_TIMEOUT);
+                                    session.publish_state(SessionStateKind::TransportReady, true);
+                                    session.publish_state(SessionStateKind::Active, true);
+                                }
+                                let _ = session.frames.send(Arc::new(message));
+                            }
+                        }
+                        Err(err) if err.kind() == std::io::ErrorKind::WouldBlock => (),
+                        Err(err) => {
+                            tracing::warn!(session = %session.id, %err, "native encoded capture failed");
+                            session.fail("capture_failed");
+                            break;
+                        }
+                    }
+                    continue;
+                }
                 match capturer.next_frame(CAPTURE_TIMEOUT) {
                     Ok(frame) => {
                         match encoder.encode(frame.width, frame.height, &frame.data) {
-                            Ok(encoded) => {
+                            Ok(mut encoded) => {
+                                stamp_encoded(&mut encoded, media_epoch, &mut last_output_pts);
                                 if let Some(message) =
                                     to_message(&encoded, frame.width, frame.height)
                                 {
@@ -1485,17 +1515,25 @@ fn capture_snapshot(
     capturer: &mut Box<dyn crate::desk::Capturer>,
     encoder: &mut H264Encoder,
     session: &DeskSession,
+    media_epoch: std::time::Instant,
+    last_output_pts: &mut i64,
 ) -> Result<bool, ApiError> {
     let frame = capturer
         .snapshot()
         .map_err(|err| ApiError::new(502, codes::DESK_ENGINE, err.to_string()))?;
     encoder.request_keyframe();
-    let encoded = encoder.encode(frame.width, frame.height, &frame.data)?;
+    let mut encoded = encoder.encode(frame.width, frame.height, &frame.data)?;
+    stamp_encoded(&mut encoded, media_epoch, last_output_pts);
     if let Some(message) = to_message(&encoded, frame.width, frame.height) {
         let _ = session.frames.send(Arc::new(message));
         return Ok(true);
     }
     Ok(false)
+}
+
+fn stamp_encoded(encoded: &mut EncodedFrame, epoch: std::time::Instant, previous: &mut i64) {
+    encoded.pts_ms = (epoch.elapsed().as_millis().min(i64::MAX as u128) as i64).max(previous.saturating_add(1));
+    *previous = encoded.pts_ms;
 }
 
 /// 把光标状态转换为 `hbb.Message` 列表。

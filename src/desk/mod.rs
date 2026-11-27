@@ -131,6 +131,15 @@ pub enum ClipboardContent {
 
 /// 采集器接口：一个会话一个实例，独占对应显示器。
 pub trait Capturer: Send {
+    /// Configure a platform encoder when capture can deliver compressed frames directly.
+    fn configure_encoder(&mut self, _settings: encode::EncoderSettings) {}
+
+    /// Encoded capture bypasses CPU pixel readback. None selects the raw/software path.
+    fn next_encoded(&mut self, _timeout: std::time::Duration) -> Option<std::io::Result<encode::EncodedFrame>> { None }
+
+    /// Request a keyframe on an encoded capture path; false selects raw snapshot handling.
+    fn request_encoded_keyframe(&mut self) -> bool { false }
+
     /// Separate startup budget for platforms that require local consent before capture.
     /// When set, the stream attachment deadline starts after the first frame is ready.
     fn first_frame_timeout(&self) -> Option<std::time::Duration> {

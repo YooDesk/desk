@@ -135,6 +135,7 @@ if [[ "$kind" == desk ]]; then
     fi
     popd
     export PKG_CONFIG_PATH="$VCPKG_INSTALLED_ROOT/$triplet/lib/pkgconfig:$VCPKG_INSTALLED_ROOT/$triplet/share/pkgconfig"
+    python3.13 scripts/check_video_native.py "$VCPKG_INSTALLED_ROOT/$triplet/lib/libavcodec.a" "$platform"
     # Opus pkg-config exposes include/opus, while magnum-opus includes opus/opus_multistream.h.
     export BINDGEN_EXTRA_CLANG_ARGS="-I$VCPKG_INSTALLED_ROOT/$triplet/include"
     export SODIUM_LIB_DIR="$VCPKG_INSTALLED_ROOT/$triplet/lib"
