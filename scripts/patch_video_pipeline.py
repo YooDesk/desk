@@ -62,6 +62,14 @@ def patch(tree: Path) -> None:
     edit("libs/scrap/src/common/vram.rs", vram)
 
     def service(text):
+        text = once(text, '// replacement DXGI capturer time to produce its first frame. Normal startup is unaffected.', '// replacement DXGI capturer time to produce its first frame. Embedded startup uses the same grace.')
+        text = once(text, '''        .take_restart_pending()
+        .then(Instant::now);''', '''        .take_restart_pending()
+        .then(Instant::now)
+        // Four empty polls at high FPS are not evidence of a broken capturer.
+        // Give a fresh embedded DXGI capturer the same bounded first-frame
+        // grace as an ACCESS_LOST replacement; real errors still fall back.
+        .or_else(|| (std::env::var("YOODESK_EMBEDDED_ENGINE").as_deref() == Ok("1")).then(Instant::now));''')
         start = text.index("pub fn register_software_encoders() {")
         end = text.index("\n}\n", start) + 3
         replacement = '''pub fn register_software_encoders() {

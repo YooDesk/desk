@@ -209,6 +209,18 @@ jobs:
           python "$env:GITHUB_WORKSPACE/scripts/check_video_native.py" "$env:VCPKG_ROOT/installed/${{ matrix.triplet }}/lib/avcodec.lib" '${{ matrix.platform }}'
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      - name: Upload Windows dependencies for local build-only validation
+        if: runner.os == 'Windows' && inputs.build_only && matrix.platform == 'windows-x64'
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-sdk-${{ matrix.platform }}
+          path: |
+            C:/vcpkg/installed/${{ matrix.triplet }}/include/
+            C:/vcpkg/installed/${{ matrix.triplet }}/lib/
+            C:/vcpkg/installed/${{ matrix.triplet }}/share/
+          compression-level: 1
+          retention-days: 7
+          if-no-files-found: error
       - name: Build macOS native code and run tests
         if: matrix.macos
         shell: bash
