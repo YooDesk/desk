@@ -19,9 +19,20 @@ def prepare(tree: Path):
     manifest = tree / "res/vcpkg/ffmpeg/vcpkg.json"
     data = json.loads(manifest.read_text(encoding="utf-8"))
     for entry in data["dependencies"]:
+        if entry == "x264":
+            break  # An unconditional dependency already includes macOS.
         if isinstance(entry, dict) and entry["name"] == "x264":
-            entry["platform"] = "osx | linux | (windows & !uwp)"
-    manifest.write_text(json.dumps(data, indent=2) + '\n', encoding="utf-8")
+            platform = entry.get("platform")
+            if platform and platform != "osx" and not platform.startswith("osx | ("):
+                entry["platform"] = f"osx | ({platform})"
+            break
+    else:
+        # The pinned upstream port has no x264 dependency at all on a fresh
+        # macOS checkout; changing only existing Windows entries misses it.
+        data["dependencies"].append({"name": "x264", "platform": "osx"})
+    content = json.dumps(data, indent=2) + '\n'
+    if manifest.read_text(encoding="utf-8") != content:
+        manifest.write_text(content, encoding="utf-8")
 
 
 if __name__ == "__main__":
