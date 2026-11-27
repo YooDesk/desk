@@ -69,6 +69,13 @@ fn link_engine() {
         "desk-engine/src/video_codec.rs",
         "desk-engine/src/video_window.rs",
         "scripts/video_pipeline_metrics.rs",
+        "scripts/video_pipeline_output.rs",
+        "scripts/video_capture_timeout.rs",
+        "scripts/video_capture_priority.rs",
+        "scripts/patch_hwcodec.py",
+        "scripts/patch_nvenc_pipeline.py",
+        "scripts/patch_video_pipeline.py",
+        "engine-patches/nvenc_input_pool.h",
         "scripts/video_pipeline_pacing.rs",
         "scripts/frame_wait.rs",
         "artifacts/rustdesk-engine-src/yoodesk_frame_wait.rs",
@@ -272,6 +279,7 @@ fn link_engine() {
     // 引擎不链接官方 GUI 框架；系统库用于采集/编码/输入/网络及本进程隐私窗口。
     for name in [
         "User32",
+        "avrt",
         "shcore",
         "bcrypt",
         "ole32",

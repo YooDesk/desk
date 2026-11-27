@@ -23,8 +23,8 @@ use crate::desk::encode::{EncodedFrame, EncoderSettings, H264Encoder};
 use crate::desk::{Backend, InputSink};
 use crate::json::{codes, ApiError};
 
-/// 单会话帧通道容量：只保留最新两帧，积压时丢弃旧帧。
-pub const FRAME_CHANNEL_CAPACITY: usize = 2;
+/// Match the native 18-frame window so brief writer scheduling gaps do not lose H.264 references.
+pub const FRAME_CHANNEL_CAPACITY: usize = 18;
 
 /// 光标通道容量：光标变化不需要保留历史，多出的直接丢弃。
 pub const CURSOR_CHANNEL_CAPACITY: usize = 4;

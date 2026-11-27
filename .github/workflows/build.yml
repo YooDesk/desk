@@ -279,6 +279,10 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           cargo test --manifest-path desk-engine/Cargo.toml --locked --release --lib video_ -- --test-threads=1
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ($env:CARGO_BUILD_TARGET -in @('i686-pc-windows-msvc', 'x86_64-pc-windows-msvc')) {
+            python ci/test_nvenc_input_pool.py "$env:VCPKG_INSTALLED_ROOT/${{ matrix.triplet }}"
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
           python scripts/test_windows_bitmap.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $env:YOODESK_DESK_ENGINE_LIB_DIR="$env:GITHUB_WORKSPACE/desk-engine/target/$env:CARGO_BUILD_TARGET/release"

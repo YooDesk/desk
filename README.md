@@ -55,6 +55,18 @@ Native dependencies follow the pinned RustDesk workflow's vcpkg manifest and
 static target triplets. CI uses a new native-video cache generation and audits
 FFmpeg archives for the required encoder symbols before accepting them.
 
+Windows NVENC H.264 above 60 FPS uses three owned GPU input surfaces with one
+frame in flight. A surface is reused only after FFmpeg releases its input
+reference. Static first frames and final updates drain through the same owned
+surfaces. Producer and receiver threads use scoped MMCSS capture scheduling;
+DXGI's refresh clock replaces the software timer only when it respects the
+requested FPS cap. Software encoding remains the fallback.
+
+The video broadcast channel accommodates the native 18-frame window, avoiding
+encoder resets after short writer stalls. Both frame count and native pending
+bytes remain bounded. Build-only Windows x64 runs also export their native
+dependency SDK for local builds against the same CI libraries.
+
 ## macOS
 
 macOS 原生支持来自上游 `b9fc78a`：引擎使用 VideoToolbox H.264，文件操作锚定目录描述符，

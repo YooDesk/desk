@@ -18,21 +18,22 @@ pub struct Window {
 pub struct Ack { pub at: Instant, pub release_sdk: bool }
 
 impl Window {
-    pub fn admit(&mut self, pts: i64, at: Instant, bytes: usize) -> bool {
-        if self.pending.len() >= MAX_FRAMES || bytes > MAX_BYTES.saturating_sub(self.bytes) { return false; }
-        if self.pending.back().is_some_and(|p| pts <= p.pts) { return false; }
+    // SDK receive credit can advance after taking bounded ownership, before
+    // the host polls. Decoded ACKs still require a real host fetch below.
+    pub fn admit(&mut self, pts: i64, at: Instant, bytes: usize) -> Option<bool> {
+        if self.pending.len() >= MAX_FRAMES || bytes > MAX_BYTES.saturating_sub(self.bytes) { return None; }
+        if self.pending.back().is_some_and(|p| pts <= p.pts) { return None; }
         self.pending.push_back(Pending { pts, at, bytes, fetched: false });
         self.bytes += bytes;
-        true
-    }
-
-    pub fn fetched(&mut self, pts: i64) -> bool {
-        let Some(pending) = self.pending.iter_mut().find(|p| p.pts == pts) else { return false; };
-        if pending.fetched { return false; }
-        pending.fetched = true;
         let room = self.pending.len() < MAX_FRAMES && self.bytes < MAX_BYTES;
         self.blocked = !room;
-        room
+        Some(room)
+    }
+
+    pub fn fetched(&mut self, pts: i64) {
+        if let Some(pending) = self.pending.iter_mut().find(|p| p.pts == pts) {
+            pending.fetched = true;
+        }
     }
 
     pub fn ack(&mut self, pts: i64) -> Option<Ack> {
@@ -57,8 +58,9 @@ mod tests {
     fn buffered_decoder_can_receive_its_initial_pictures_without_claiming_decode() {
         let mut window = Window::default();
         for pts in 0..16 {
-            assert!(window.admit(pts, Instant::now(), 1000));
-            assert!(window.fetched(pts));
+            assert_eq!(window.admit(pts, Instant::now(), 1000), Some(true));
+            assert!(window.ack(pts).is_none());
+            window.fetched(pts);
         }
         assert_eq!(window.pending.len(), 16); // Fetch is not a decoded-frame ACK.
         assert!(!window.ack(0).unwrap().release_sdk); // Credit was already granted once.
@@ -69,28 +71,29 @@ mod tests {
     fn slow_viewer_is_bounded_and_only_real_fetched_acks_release_credit_once() {
         let mut window = Window::default();
         for pts in 0..MAX_FRAMES as i64 {
-            assert!(window.admit(pts, Instant::now(), 1000));
-            assert_eq!(window.fetched(pts), pts + 1 < MAX_FRAMES as i64);
-            assert!(!window.fetched(pts));
+            assert_eq!(window.admit(pts, Instant::now(), 1000), Some(pts + 1 < MAX_FRAMES as i64));
+            assert!(window.admit(pts, Instant::now(), 1000).is_none());
+            window.fetched(pts);
+            window.fetched(pts);
         }
-        assert!(!window.admit(100, Instant::now(), 1));
+        assert!(window.admit(100, Instant::now(), 1).is_none());
         assert!(window.ack(100).is_none());
         assert!(window.ack(2).unwrap().release_sdk);
         assert!(window.ack(2).is_none());
         assert!(!window.ack(3).unwrap().release_sdk);
-        assert!(window.admit(100, Instant::now(), 1));
+        assert_eq!(window.admit(100, Instant::now(), 1), Some(true));
         assert!(window.ack(100).is_none()); // Not fetched, even if its timestamp is guessed.
     }
 
     #[test]
     fn byte_limit_and_refresh_invalidate_pending_credits() {
         let mut window = Window::default();
-        assert!(window.admit(1, Instant::now(), MAX_BYTES));
-        assert!(!window.fetched(1));
-        assert!(!window.admit(2, Instant::now(), 1));
+        assert_eq!(window.admit(1, Instant::now(), MAX_BYTES), Some(false));
+        window.fetched(1);
+        assert!(window.admit(2, Instant::now(), 1).is_none());
         window.clear();
         assert!(window.ack(1).is_none());
-        assert!(window.admit(2, Instant::now(), 1));
-        assert!(window.fetched(2));
+        assert_eq!(window.admit(2, Instant::now(), 1), Some(true));
+        window.fetched(2);
     }
 }

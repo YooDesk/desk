@@ -61,6 +61,9 @@ def prepare():
             git(tree, "apply", "-", input=payload)
         patch_vram_repeat(tree)
         patch_interactive_latency(tree)
+        patch_vram_stage_diagnostics(tree)
+        from patch_nvenc_pipeline import patch_nvenc_pipeline
+        patch_nvenc_pipeline(tree)
         if sys.platform == "darwin":
             build_file = tree / "build.rs"
             text = build_file.read_text(encoding="utf-8")
@@ -75,6 +78,30 @@ def prepare():
             target_file.parent.mkdir(parents=True, exist_ok=True)
             copy_changed(source_file, target_file)
     print(f"hwcodec {commit} prepared at {destination}")
+
+
+def patch_vram_stage_diagnostics(tree):
+    """Separate slow GPU conversion from synchronous encoder work, opt-in only."""
+    source = tree / "cpp/ffmpeg_vram/ffmpeg_vram_encode.cpp"
+    text = source.read_text(encoding="utf-8")
+    text = "#include <cstdlib>\n" + text
+    anchor = '  int encode(void *texture, EncodeCallback callback, void *obj, int64_t ms) {\n'
+    if text.count(anchor) != 1:
+        raise RuntimeError("Review VRAM encoding diagnostics entry")
+    text = text.replace(anchor, anchor + '    auto conversion_started = util::now();\n')
+    anchor = '    return do_encode(callback, obj, ms);'
+    if text.count(anchor) != 1:
+        raise RuntimeError("Review VRAM encoding diagnostics stages")
+    text = text.replace(anchor, '''    auto conversion_ms = util::elapsed_ms(conversion_started);
+    auto encoding_started = util::now();
+    int result = do_encode(callback, obj, ms);
+    auto encoding_ms = util::elapsed_ms(encoding_started);
+    if (std::getenv("YOODESK_VIDEO_PIPELINE_DIAGNOSTICS") && conversion_ms + encoding_ms >= 5) {
+      LOG_INFO(std::string("VRAM slow frame: conversion_ms=") + std::to_string(conversion_ms) +
+               " encoding_ms=" + std::to_string(encoding_ms));
+    }
+    return result;''')
+    source.write_text(text, encoding="utf-8")
 
 
 def patch_vram_repeat(tree):

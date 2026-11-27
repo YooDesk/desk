@@ -37,6 +37,12 @@ mod privileged;
 mod video_bridge;
 mod video_codec;
 mod video_window;
+#[cfg(windows)]
+mod video_capture_priority { include!("../../scripts/video_capture_priority.rs"); }
+#[cfg(test)]
+mod video_output { include!("../../scripts/video_pipeline_output.rs"); }
+#[cfg(test)]
+mod video_capture_timeout { include!("../../scripts/video_capture_timeout.rs"); }
 #[cfg(test)]
 #[path = "../../scripts/video_pipeline_pacing.rs"]
 mod video_pacing_tests;

@@ -175,6 +175,8 @@ pub fn subscribe(display: i32, conn: i32, fps: u32, bitrate: u32) -> i32 {
     drop(state);
     crate::endpoint::subscribe(conn);
     std::thread::spawn(move || {
+        #[cfg(windows)]
+        let _capture_priority = if fps > 60 { crate::video_capture_priority::Guard::new() } else { None };
         let Ok(rt) = tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
@@ -225,14 +227,17 @@ pub fn subscribe(display: i32, conn: i32, fps: u32, bitrate: u32) -> i32 {
                         continue;
                     }
                     let pts = (c.epoch.elapsed().as_millis() as i64).max(c.last_pts + 1);
-                    if c.frames.len() >= crate::video_window::MAX_FRAMES || !c.pending.admit(pts, source_at, bytes.len()) {
+                    let credit = if c.frames.len() >= crate::video_window::MAX_FRAMES {
+                        None
+                    } else { c.pending.admit(pts, source_at, bytes.len()) };
+                    let Some(release_sdk) = credit else {
                         c.frames.clear();
                         c.waiting_key = true;
                         c.pending.clear();
                         drop(c);
                         request_refresh(conn);
                         continue;
-                    }
+                    };
                     c.last_pts = pts;
                     if key {
                         c.waiting_key = false;
@@ -240,6 +245,10 @@ pub fn subscribe(display: i32, conn: i32, fps: u32, bitrate: u32) -> i32 {
                     }
                     c.frames.push_back((bytes, key, pts));
                     shared.1.notify_all();
+                    drop(c);
+                    if release_sdk {
+                        librustdesk::video_service::notify_video_frame_fetched(display as usize, conn, None);
+                    }
                 }
             }
         });
@@ -400,12 +409,7 @@ pub fn poll(conn: i32, data: *mut u8, cap: usize, frame: *mut Frame, timeout: u6
             }
             let pts = p.2;
             c.frames.pop_front();
-            let release_sdk = c.pending.fetched(pts);
-            let display = c.display;
-            drop(c);
-            if release_sdk {
-                librustdesk::video_service::notify_video_frame_fetched(display as usize, conn, None);
-            }
+            c.pending.fetched(pts);
             return YD_OK;
         }
         if c.closed {

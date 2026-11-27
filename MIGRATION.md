@@ -34,3 +34,28 @@ missing native encoders. Windows desktop acceptance and GitHub builds must be
 recorded separately from the passing policy/unit regressions; a cap of 144 does
 not itself establish 144 FPS throughput.
 
+
+## Bounded Windows high-FPS pipeline
+
+The Windows NVENC adapter pipelines one frame above 60 FPS without B pictures
+or decoder reordering. Three separately allocated NV12 surfaces are retained
+by the encoder; FFmpeg's input-reference count prevents reuse while an input
+is still pending. CPU submission/output-wait timings no longer represent the
+complete latency of an individual GPU encode.
+
+Accepted input without a packet does not produce a video message or decode
+acknowledgment. Bounded warm-up and static repeats preserve first and final
+images; persistent no-output falls back instead of warming up forever. Static
+repeats copy encoder-owned NV12, never a released DXGI pointer. Tests exercise
+actual FFmpeg frame-reference ownership, exhaustion, release and partial cleanup.
+
+Capture and SDK receive threads use scoped Windows MMCSS Capture tasks. The
+capture frame controller reuses its Tokio runtime. A valid first DXGI snapshot
+can seed a static session; fractional acquisition timeouts round up. The native
+refresh clock is used only below the requested frame-rate cap. The business
+broadcast capacity matches the native 18-frame window (Tokio rounds its storage
+to 32 slots), while lagging readers still trigger bounded recovery.
+
+Local validation uses the exact pinned CI dependency SDK. Final Windows
+acceptance must also use a plugin artifact matching its successful CI commit;
+local diagnostic builds are explicitly labeled separately.
