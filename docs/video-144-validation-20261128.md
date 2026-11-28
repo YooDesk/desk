@@ -127,9 +127,42 @@ The complete Desk native matrix at `9bee5ab` (run 46087732528) passed all ten
 architectures. Verified artifacts were published as `v0.1.0-ci.182` by successful
 promotion run 46092325771. Android publication run 46091206701 also passed,
 producing `android-v0.1.0-ci.7`. Matching WebService desktop release run
-46092534207 is assembling the newly released plugins before final installer
-packages are built. The earlier APK compatibility build used
-an older released Desk component and is not the final hardware-enabled package.
+46092534207 passed all ten architectures and published `v0.1.0-ci.87`.
+Final Android APK run 46093348758 and desktop installer run 46093346925 passed;
+the subsequent main-branch installer run 46093478914 also passed. The APK lock
+pins Desk `9bee5ab` and Android Host `79b49bd`; actual payload inspection verifies
+the four encoded exports, weak JNI imports, 16 KiB ELF load alignment and APK
+signature. The earlier APK compatibility build is superseded by this matching
+hardware-enabled package.
+
+The actual Windows installer `0.1.0+ci.51` was verified against all 61 payload
+files and installed. The installed Host SHA256 is
+`10d441f24d684985cbad026d453711459291c15ff70050c8ade0bcfed53cdf15`;
+Desk SHA256 is
+`d512e114e6618ad3ffacef9ef71a82496e168273e11f4f3d2e72f17de55a755e`.
+Configuration and device identity fields were unchanged, and the existing
+account remained logged in and connected. The initial byte-for-byte config
+check rejected serialization differences; a subsequent field comparison found
+no changed values and actual installed binaries matched the package.
+
+Final-package 30-second LAN acceptance decoded 143.1714 FPS with source
+143.9890 FPS; default resumable STUN acceptance decoded 143.0282 FPS with source
+144.0038 FPS. Both included a 40 ms viewer pause, changing decoded fixture pixels,
+zero decode/chunk errors and zero decoder reconfigurations. An earlier LAN test
+running concurrently with original-repository compilation measured 136.2949 FPS
+and failed; that evidence is retained rather than counted as a pass. The passing
+tests ran after compilation finished. These remain same-machine real desktop
+capture/headless decode measurements, not cross-network or visible presentation
+proof.
+
+Final evidence is in `../gateway/artifacts/remote-144/lan-installed-1795830082011/`
+and `stun-installed-1795830150734/`; upgrade proof is in
+`artifacts/hardware-pipeline/final-46093478914-native-windows-x64/upgrade-verified.json`.
+Source changes were fast-forwarded to each repository's main branch, with local
+main tracking origin/main. The original monolith received adapted code and tests
+at `29a91cf`, followed by isolated RPC test documentation at `ee82c14`; its native
+engine build, video tests (11) and Host tests (145 plus four separately isolated
+RPC cases) passed. Six environment-dependent Host tests remain unexecuted.
 
 Password re-login previously returned HTTP 401, but that does not block the
 already authorized local Connector. Its existing account/device authorization
