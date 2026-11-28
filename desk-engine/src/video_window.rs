@@ -47,6 +47,7 @@ impl Window {
     }
 
     pub fn only(&self, pts: i64) -> bool { self.pending.len() == 1 && self.pending[0].pts == pts }
+    pub fn oldest(&self) -> Option<Instant> { self.pending.front().map(|p| p.at) }
     pub fn clear(&mut self) { self.pending.clear(); self.bytes = 0; self.blocked = false; }
 }
 

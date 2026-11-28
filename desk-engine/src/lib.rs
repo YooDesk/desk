@@ -37,6 +37,7 @@ mod privileged;
 mod video_bridge;
 mod video_codec;
 mod video_window;
+mod video_feedback;
 #[cfg(windows)]
 mod video_capture_priority { include!("../../scripts/video_capture_priority.rs"); }
 #[cfg(test)]

@@ -16,6 +16,7 @@ struct Cache {
     last_key: Option<Packet>,
     last_cursor: Option<Vec<u8>>,
     pending: crate::video_window::Window,
+    feedback: crate::video_feedback::Feedback,
     epoch: Instant,
     last_pts: i64,
     refresh_at: Instant,
@@ -113,7 +114,6 @@ pub fn subscribe(display: i32, conn: i32, fps: u32, bitrate: u32) -> i32 {
         qos.user_custom_fps(conn, fps);
         qos.user_auto_adjust_fps(conn, fps);
         qos.user_image_quality(conn, ((high * 50.0).round() as i32) << 8);
-        qos.user_network_delay(conn, 0);
     }
     let shared = Arc::new((
         Mutex::new(Cache {
@@ -123,6 +123,7 @@ pub fn subscribe(display: i32, conn: i32, fps: u32, bitrate: u32) -> i32 {
             last_key: None,
             last_cursor: None,
             pending: crate::video_window::Window::default(),
+            feedback: crate::video_feedback::Feedback::default(),
             epoch: Instant::now(),
             last_pts: -1,
             refresh_at: Instant::now(),
@@ -184,8 +185,30 @@ pub fn subscribe(display: i32, conn: i32, fps: u32, bitrate: u32) -> i32 {
             return;
         };
         rt.block_on(async move {
+            let mut timer = tokio::time::interval_at(
+                tokio::time::Instant::now() + crate::video_feedback::INTERVAL,
+                crate::video_feedback::INTERVAL,
+            );
+            timer.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
             loop {
-                let msg = tokio::select! {m=rx.recv()=>m,m=rv.recv()=>m};
+                let msg = tokio::select! {
+                    _ = timer.tick() => {
+                        let mut c = shared.0.lock().unwrap();
+                        if c.closed { break; }
+                        let oldest = c.pending.oldest();
+                        let (sample, stalled) = c.feedback.tick(oldest, Instant::now());
+                        drop(c);
+                        let mut qos = librustdesk::video_service::VIDEO_QOS.lock().unwrap();
+                        if let Some(delay) = sample { qos.user_network_delay(conn, delay); }
+                        if let Some(elapsed) = stalled { qos.user_delay_response_elapsed(conn, elapsed); }
+                        if std::env::var_os("YOODESK_VIDEO_QOS_DIAGNOSTICS").is_some() {
+                            eprintln!("Desk video QoS: conn={conn} fps={} ack_delay_ms={sample:?} stalled_ms={stalled:?}", qos.fps());
+                        }
+                        continue;
+                    },
+                    m=rx.recv()=>m,
+                    m=rv.recv()=>m,
+                };
                 let Some((source_at, msg)) = msg else {
                     break;
                 };
@@ -267,21 +290,10 @@ pub fn ack(conn: i32, pts: i64) -> i32 {
         return YD_OK;
     };
     let display = c.display;
-    let delay = ack.at.elapsed().as_millis().min(u32::MAX as u128) as u32;
+    c.feedback.ack(ack.at, Instant::now());
     drop(c);
     if ack.release_sdk {
         librustdesk::video_service::notify_video_frame_fetched(display as usize, conn, None);
-    }
-    let mut qos = librustdesk::video_service::VIDEO_QOS.lock().unwrap();
-    qos.user_network_delay(conn, delay);
-    let fps = qos.fps();
-    drop(qos);
-    if std::env::var_os("YOODESK_VIDEO_QOS_DIAGNOSTICS").is_some() {
-        let at = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_millis();
-        eprintln!("Desk video QoS: at_ms={at} fps={fps} ack_delay_ms={delay}");
     }
     YD_OK
 }
@@ -519,4 +531,64 @@ pub fn close_all() -> i32 {
         unsubscribe(id);
     }
     YD_OK
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn video_feedback_drives_sdk_full_rate_congestion_timeout_and_recovery() {
+        fn fresh<T: Default>(_: &T) -> T { T::default() }
+        // A private instance of the actual pinned SDK controller, not a copy of its rules.
+        let mut qos = fresh(&*librustdesk::video_service::VIDEO_QOS.lock().unwrap());
+        let conn = 987654;
+        qos.on_connection_open(conn);
+        qos.user_custom_fps(conn, 144);
+        qos.user_auto_adjust_fps(conn, 144);
+        qos.user_image_quality(conn, 100 << 8);
+        qos.new_display("feedback-test".into());
+        qos.set_support_changing_quality("feedback-test", true);
+        qos.store_bitrate(8000);
+        // SDK uses a wall clock for its startup guard and bitrate cooldown.
+        std::thread::sleep(Duration::from_millis(3100));
+        let mut feedback = crate::video_feedback::Feedback::default();
+        let start = Instant::now();
+        let mut tick = 0;
+        let mut reply = |feedback: &mut crate::video_feedback::Feedback, delay: u64| {
+            tick += 1;
+            let now = start + Duration::from_secs(tick);
+            feedback.ack(now - Duration::from_millis(delay), now);
+            let (sample, stalled) = feedback.tick(None, now);
+            assert!(stalled.is_none());
+            sample.unwrap()
+        };
+        for _ in 0..12 {
+            let delay = reply(&mut feedback, 25);
+            qos.user_network_delay(conn, delay);
+        }
+        assert_eq!(qos.fps(), 144, "healthy feedback must retain the configured cap");
+        std::thread::sleep(Duration::from_millis(3100));
+        let initial_ratio = qos.ratio();
+        for _ in 0..6 {
+            let delay = reply(&mut feedback, 425);
+            qos.user_network_delay(conn, delay);
+        }
+        assert!(qos.ratio() < initial_ratio, "SDK must reduce bitrate on sustained queueing");
+        assert!(qos.fps() < 144, "persistent congestion must also reduce capture FPS");
+        for _ in 0..12 {
+            let delay = reply(&mut feedback, 25);
+            qos.user_network_delay(conn, delay);
+        }
+        assert_eq!(qos.fps(), 144);
+        let stopped_at = start + Duration::from_secs(tick);
+        let (_, stalled) = feedback.tick(Some(stopped_at), stopped_at + Duration::from_secs(4));
+        qos.user_delay_response_elapsed(conn, stalled.unwrap());
+        assert!(qos.fps() < 144, "missing ACKs must engage the SDK timeout brake");
+        // The late reply closes the braked interval; subsequent good replies recover.
+        qos.user_network_delay(conn, 4000);
+        for _ in 0..12 { qos.user_network_delay(conn, 25); }
+        assert_eq!(qos.fps(), 144);
+        qos.on_connection_close(conn);
+    }
 }

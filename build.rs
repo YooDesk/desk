@@ -68,6 +68,7 @@ fn link_engine() {
         "desk-engine/src/video_bridge.rs",
         "desk-engine/src/video_codec.rs",
         "desk-engine/src/video_window.rs",
+        "desk-engine/src/video_feedback.rs",
         "scripts/video_pipeline_metrics.rs",
         "scripts/video_pipeline_output.rs",
         "scripts/video_capture_timeout.rs",
