@@ -123,9 +123,12 @@ checks. Both repositories were restored to private. Android Host build/release
 46091214583 also passed, producing `android-v0.1.0-ci.7` at `79b49bd` with an
 embedded 144 FPS request, then restoring repository privacy.
 
-The complete Desk native matrix at `9bee5ab` (run 46087732528) and its Android
-component publication (run 46091206701) are being completed before final matching
-Host/installer packages are assembled. The earlier APK compatibility build used
+The complete Desk native matrix at `9bee5ab` (run 46087732528) passed all ten
+architectures. Verified artifacts were published as `v0.1.0-ci.182` by successful
+promotion run 46092325771. Android publication run 46091206701 also passed,
+producing `android-v0.1.0-ci.7`. Matching WebService desktop release run
+46092534207 is assembling the newly released plugins before final installer
+packages are built. The earlier APK compatibility build used
 an older released Desk component and is not the final hardware-enabled package.
 
 Password re-login previously returned HTTP 401, but that does not block the
