@@ -73,26 +73,61 @@ uses the six pinned released components. The older released Desk component
 keeps software fallback until a matching new component is released. No release
 pins were replaced with unpublished artifacts.
 
+## Formal installation and remote Gateway acceptance
+
+The local installed service was upgraded while preserving its existing identity,
+password, certificates and configuration, with FPS set to 144. Its Host and Desk
+hashes match the accepted Windows binaries above. LAN access through the installed
+service decoded 143.8469 FPS over 30 seconds, with a 144.0107 FPS animation source.
+
+The installed Connector initially differed from the current published component.
+After upgrading it to `v0.1.0-ci.70` (`cdc167a`) and restarting the service, the
+existing account remained logged in, the Gateway connection recovered and the
+account/device identity fingerprint was unchanged. The installed Connector SHA256
+is `fec9dd65512f20cc7915ffa6f0c930104582689e240c643ffd3df5be6a680eea`.
+
+Using that existing device authorization and the normal invitation flow, the
+default resumable transport negotiated through the real remote Gateway and
+remained on STUN for the entire measurement. Over 30 seconds after warm-up,
+actual decoded FPS was 143.5685 and source animation FPS was 143.9850. The test
+included a deliberate 40 ms viewer JavaScript pause. Decoder errors, chunk errors
+and decoder reconfigurations were zero; decoded fixture pixels changed throughout.
+This meets the 144 FPS target within measurement/scheduling variation. It is a
+same-machine direct-ICE test through remote Gateway negotiation, not evidence of
+144 FPS across two physical networks or visible-browser presentation throughput.
+
+The deployed Gateway is the previously CI-verified `v0.1.0-ci.60` at `c90a011`.
+The running binary SHA256 matches
+`88167ca50a87e25b55e5aea4d863fee4a89dacc01f39ef9bc56cb1a48dc9e641`.
+The previous container and original data directory were retained for rollback;
+the new container uses a cold copy of the existing data and unchanged configuration
+and certificates. Public HTTPS, STUN binding and TURN TCP reachability passed.
+
+Local evidence:
+
+- `../gateway/artifacts/remote-144/lan-installed-1795826054190/report.json`.
+- `../gateway/artifacts/remote-144/stun-installed-1795827623306/report.json`.
+- `../connector/artifacts/ci70-windows-x64/post-upgrade-auth-proof.json`.
+- `../gateway/artifacts/deploy-c90a011/deploy-proof.json`.
+
 ## Outstanding acceptance
 
 Other-platform physical throughput remains for the user's machines. These build
 results do not establish their actual capture, encode or decode rate.
 
-The independent WebService and Android APK GitHub runs were prevented from
-starting by the account billing/spending restriction. Local host configuration
-allows 144 FPS and passed its boundary test; local APK compilation, DEX,
-resources, signature and actual payload checks passed. Cloud validation remains
-outstanding.
+The user authorized temporarily making one private repository public at a time.
+This removed the billing startup restriction: WebService desktop run
+46086813168 passed all ten architectures, and APK run 46087638757 passed its six
+Android tests, including native JNI compatibility, plus packaging and payload
+checks. Both repositories were restored to private. Android Host build/release
+46091214583 also passed, producing `android-v0.1.0-ci.7` at `79b49bd` with an
+embedded 144 FPS request, then restoring repository privacy.
 
-Fresh build-only attempts confirmed the same restriction:
-[WebService 46067496993](https://github.com/YooDesk/webservice/actions/runs/46067496993)
-at `08593d1`, and
-[APK 46067491935](https://github.com/YooDesk/yoodeskclient/actions/runs/46067491935)
-at `89075b0`. Both were stopped before any build step executed. Their check-run
-annotations explicitly report failed account payments or the spending limit.
-Both release jobs were skipped.
+The complete Desk native matrix at `9bee5ab` (run 46087732528) and its Android
+component publication (run 46091206701) are being completed before final matching
+Host/installer packages are assembled. The earlier APK compatibility build used
+an older released Desk component and is not the final hardware-enabled package.
 
-The remote Gateway's public HTTPS and STUN binding response were verified, but
-the provided account login returned HTTP 401. Authorized remote Gateway/STUN
-desktop acceptance at 144 FPS remains outstanding. No remote deployment or
-configuration change was made for these checks.
+Password re-login previously returned HTTP 401, but that does not block the
+already authorized local Connector. Its existing account/device authorization
+was verified and used successfully for the actual remote Gateway/STUN test above.
