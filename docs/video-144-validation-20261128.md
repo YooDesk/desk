@@ -164,6 +164,15 @@ at `29a91cf`, followed by isolated RPC test documentation at `ee82c14`; its nati
 engine build, video tests (11) and Host tests (145 plus four separately isolated
 RPC cases) passed. Six environment-dependent Host tests remain unexecuted.
 
+After the main merge, Desk run 46093473086 at `a61b3ac` passed all ten native
+architectures, browser checks and publication, producing `v0.1.0-ci.184` with
+twenty release files. Relative to the accepted component source `9bee5ab`, this
+source differs only in this validation document. Independently downloaded main
+artifacts for all three Windows architectures and both macOS architectures passed
+API digest, nested checksum, source, ABI, architecture and runtime import checks.
+The installed final Client package remains the exact audited/tested combination
+recorded above; a later component rebuild is not substituted for its payload.
+
 Password re-login previously returned HTTP 401, but that does not block the
 already authorized local Connector. Its existing account/device authorization
 was verified and used successfully for the actual remote Gateway/STUN test above.
